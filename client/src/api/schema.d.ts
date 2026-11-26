@@ -2977,7 +2977,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, the holds that protect its time for sessions, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date */
+        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, its available time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date */
         get: operations["get_calendar"];
         put?: never;
         post?: never;
@@ -4025,6 +4025,12 @@ export interface components {
             redirect?: string;
             unknownClient?: boolean;
         };
+        CalendarAvailableStretch: {
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+        };
         CalendarConflict: {
             /**
              * Format: date-time
@@ -4066,16 +4072,6 @@ export interface components {
          * @enum {string}
          */
         CalendarFeedKind: "occupations" | "holds";
-        CalendarHold: {
-            /** @description The id of the feed it's read from, one of `feeds` */
-            feedId: string;
-            /** Format: date-time */
-            start: string;
-            /** Format: date-time */
-            end: string;
-            /** @description Whether it takes whole days */
-            wholeDay: boolean;
-        };
         CalendarOccupation: {
             /** @description The id of the feed it's read from, one of `feeds` */
             feedId: string;
@@ -7828,7 +7824,7 @@ export interface operations {
                         ok: true;
                         /**
                          * Format: date
-                         * @description The day the conflicts and the sessions outside protected time are counted from: today, in Québec
+                         * @description The day the conflicts, the sessions outside protected time and the available time are counted from: today, in Québec
                          */
                         today: string;
                         /** @description Every feed, in the order they were added, with when each was last read, and why that failed */
@@ -7837,8 +7833,8 @@ export interface operations {
                         sessions: components["schemas"]["Session"][];
                         /** @description The occupations that take some of the days, by start, then end */
                         occupations: components["schemas"]["CalendarOccupation"][];
-                        /** @description The holds that take some of the days, by start, then end */
-                        holds: components["schemas"]["CalendarHold"][];
+                        /** @description The available time that takes some of the days, stretch by stretch, by start: the protected time of the next 365 days, from 00:00 today, that no session that isn't cancelled, nor occupation, takes */
+                        availability: components["schemas"]["CalendarAvailableStretch"][];
                         /** @description The conflicts of the next 365 days, from today, whatever the days asked for */
                         conflicts: components["schemas"]["CalendarConflict"][];
                         /** @description The sessions outside protected time, of the next 365 days, from today, by start, whatever the days asked for */

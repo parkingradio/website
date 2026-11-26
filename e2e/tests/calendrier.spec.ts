@@ -168,13 +168,12 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await logIn(page, { at: `/admin/calendrier?day=${day}` })
 
   // In the month, each "conflit" on the day they overlap, the stay from its start, as it lasts more than 12 hours, and its
-  // end the next day, without it, and no free time, without a holds feed.
+  // end the next day, without it.
   const cell = dayCell(page, day)
   await expect(cell).toContainText(`10 h – 16 hoccupation : RÉPARATION ${unique}, calendrier ${team}conflit`)
   await expect(cell).toContainText(`dès 12 hoccupation : ${stays}conflit`)
   const next = dayCell(page, addDays(day, 1))
   await expect(next.locator('.calendar-occupation')).toHaveText(`jusqu'à 11 hoccupation : ${stays}`)
-  await expect(next.locator('.calendar-free')).toHaveCount(0)
   // The stay stretches down to the bottom of its first day, which it lasts until the end of, and not of the next. Phones
   // show marks in place of the words.
   if (!isMobile) {
@@ -245,7 +244,7 @@ function ownSession(id: string, title: string, start: string, end: string): NonN
   }
 }
 
-test('free time is the protected time that nothing takes, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
+test('available time shows where nothing takes the protected time, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
   const { unique } = own(testInfo)
   if (isMobile) await page.setViewportSize(NARROW)
   // Two days in the same month, a week or more before the nearest seeded session (see seed-data.ts), so that only the
@@ -259,28 +258,29 @@ test('free time is the protected time that nothing takes, and the sessions outsi
   const outside = ownSession(`outside-${unique}`, `E2E OUT ${unique}`, at(next, '13:00'), at(next, '17:00'))
   await withCalendar(page, {
     feeds: [ownFeed(`loft-${unique}`, loft, day, { kind: 'holds', error: FAILED }), ownFeed(`blocks-${unique}`, blocks, day, { kind: 'holds', read: false }), ownFeed(`team-${unique}`, team, day)],
-    holds: [
-      { feedId: `loft-${unique}`, start: at(day, '11:00'), end: at(day, '18:00'), wholeDay: false },
-      { feedId: `blocks-${unique}`, start: at(next, '15:00'), end: at(addDays(next, 1), '00:00'), wholeDay: false },
-    ],
     occupations: [{ feedId: `team-${unique}`, start: at(day, '12:00'), end: at(day, '13:00'), wholeDay: false, title: `RÉUNION ${unique}` }],
     sessions: [inside, outside],
+    availability: [
+      { start: at(day, '11:00'), end: at(day, '12:00') },
+      { start: at(day, '13:00'), end: at(day, '15:00') },
+      { start: at(day, '17:00'), end: at(day, '18:00') },
+      { start: at(next, '17:00'), end: at(addDays(next, 1), '00:00') },
+    ],
     conflicts: [],
     unprotectedSessions: [{ id: outside.id, title: outside.title, start: outside.start!, end: outside.end! }],
   })
   await logIn(page, { at: `/admin/calendrier?month=${day.slice(0, 7)}` })
 
-  // Free time around what takes the protected time, and none where it isn't protected, even where nothing takes it, on
-  // a day with a session too. The month says nothing of the session outside protected time.
-  const free = (day: string) => dayCell(page, day).locator('.calendar-free')
-  await expect(free(day)).toHaveText(['dispo 11 h – 12 h', 'dispo 13 h – 15 h', 'dispo 17 h – 18 h'])
-  await expect(free(next)).toHaveText(['dispo dès 17 h'])
+  // The fixture's stretches, as the server would give them, cut to each day, on a day with a session too. The month says
+  // nothing of the session outside protected time.
+  const available = (day: string) => dayCell(page, day).locator('.calendar-available')
+  await expect(available(day)).toHaveText(['dispo 11 h – 12 h', 'dispo 13 h – 15 h', 'dispo 17 h – 18 h'])
+  await expect(available(next)).toHaveText(['dispo dès 17 h'])
   // Which stretches down to the bottom of its day, which it lasts until the end of. Phones show marks in place of the
   // words.
-  if (!isMobile) await expect.poll(() => reachesCellBottom(free(next))).toBe(true)
+  if (!isMobile) await expect.poll(() => reachesCellBottom(available(next))).toBe(true)
   await expect(dayCell(page, next)).not.toContainText('protégée')
-  await expect(dayCell(page, addDays(day, -1)).locator('.calendar-free, .calendar-mark-free')).toHaveCount(0)
-  if (isMobile) await expect(dayCell(page, day).locator('.calendar-mark-free')).toBeVisible()
+  if (isMobile) await expect(dayCell(page, day).locator('.calendar-mark-available')).toBeVisible()
 
   // The holds feeds' warnings, and the session outside protected time, the only one, since the server under test has no
   // holds feed, whose row shows its day.

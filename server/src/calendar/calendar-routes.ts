@@ -5,14 +5,14 @@ import { Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { Status, after, sessionTitle } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
 import type { SessionWithoutSets, SessionsStore } from '../sessions/store.js'
-import { byStartThenEnd, compareStrings, conflicts, takesSomeOf, thingOrder } from './conflicts.js'
+import { compareStrings, conflicts, takesSomeOf, takingThings, thingOrder } from './conflicts.js'
 import type { CalendarSession, OccupationThing, Thing } from './conflicts.js'
 import type { CalendarEvent } from './events.js'
 import type { CalendarFeedsStore } from './feeds.js'
 import type { FeedKind } from './fields.js'
 import type { CalendarReads } from './reads.js'
 import { Feed, feedBody } from './feeds-routes.js'
-import { unprotectedSessions } from './protected-time.js'
+import { availableTime, unprotectedSessions } from './protected-time.js'
 
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
@@ -22,7 +22,7 @@ import { unprotectedSessions } from './protected-time.js'
 const FIRST_DAY = '2000-01-01'
 const LAST_DAY = '2999-12-31'
 const MAX_DAYS = 400
-// The conflicts and the sessions outside protected time are those of the days from today.
+// The conflicts, the sessions outside protected time and the available time are those of the days from today.
 const CONFLICT_DAYS = 365
 
 // A day of the calendar, `from` or `to`, which are days, unlike the instants of the lists of sessions and of events.
@@ -51,8 +51,7 @@ const Occupation = z
   })
   .meta({ id: 'CalendarOccupation' })
 
-// Holds have no title (see "Feeds" in docs/design/server/calendar.md).
-const Hold = Occupation.omit({ title: true }).meta({ id: 'CalendarHold' })
+const AvailableStretch = z.object({ start: Timestamp, end: Timestamp }).meta({ id: 'CalendarAvailableStretch' })
 
 const UnprotectedSession = z
   .object({ ...SessionBody.pick({ id: true, title: true }).shape, start: Timestamp, end: Timestamp })
@@ -75,11 +74,14 @@ const Conflict = z
 
 const CalendarResponse = z.object({
   ok: z.literal(true),
-  today: Day.meta({ description: 'The day the conflicts and the sessions outside protected time are counted from: today, in Québec' }),
+  today: Day.meta({ description: 'The day the conflicts, the sessions outside protected time and the available time are counted from: today, in Québec' }),
   feeds: z.array(Feed).meta({ description: 'Every feed, in the order they were added, with when each was last read, and why that failed' }),
   sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start' }),
   occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, by start, then end' }),
-  holds: z.array(Hold).meta({ description: 'The holds that take some of the days, by start, then end' }),
+  availability: z.array(AvailableStretch).meta({
+    description:
+      "The available time that takes some of the days, stretch by stretch, by start: the protected time of the next 365 days, from 00:00 today, that no session that isn't cancelled, nor occupation, takes",
+  }),
   conflicts: z.array(Conflict).meta({ description: 'The conflicts of the next 365 days, from today, whatever the days asked for' }),
   unprotectedSessions: z
     .array(UnprotectedSession)
@@ -89,8 +91,8 @@ const CalendarResponse = z.object({
     .meta({ description: "The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for" }),
 })
 
-const holdBody = ({ feedId, start, end, wholeDay }: Omit<OccupationThing, 'kind'>) => ({ feedId, start: start.toISOString(), end: end.toISOString(), wholeDay })
-const occupationBody = (occupation: OccupationThing) => ({ ...holdBody(occupation), title: occupation.title })
+const timesBody = ({ start, end }: { start: Date; end: Date }) => ({ start: start.toISOString(), end: end.toISOString() })
+const occupationBody = ({ feedId, start, end, wholeDay, title }: OccupationThing) => ({ feedId, ...timesBody({ start, end }), wholeDay, title })
 
 function thingBody(thing: Thing): z.infer<typeof Thing> {
   if (thing.kind === 'occupation') return { kind: thing.kind, ...occupationBody(thing) }
@@ -118,7 +120,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       schema: {
         operationId: 'get_calendar',
         summary:
-          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, the holds that protect its time for sessions, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date',
+          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, its available time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date',
         tags: ['Calendar'],
         querystring: CalendarQuery,
         response: { 200: CalendarResponse },
@@ -141,7 +143,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const eventsOf = <Item>(kind: FeedKind, item: (feedId: string, event: CalendarEvent) => Item) =>
         withReads.filter(({ feed }) => feed.kind === kind).flatMap(({ feed, read }) => (read?.events ?? []).map((event) => item(feed.id, event)))
       const occupations: OccupationThing[] = eventsOf('occupations', (feedId, event) => ({ kind: 'occupation' as const, feedId, ...event }))
-      const holds = eventsOf('holds', (feedId, event) => ({ feedId, ...event }))
+      const holds = eventsOf('holds', (_feedId, event) => event)
 
       const sessionsInRange = given
         .filter((row) => row.startAt !== null)
@@ -160,13 +162,12 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
         feeds: withReads.map(({ feed, read }) => feedBody(feed, read)),
         sessions: sessionsInRange.map(sessionBody),
         occupations: occupations.filter(inRange).sort(thingOrder).map(occupationBody),
-        holds: holds.filter(inRange).sort(byStartThenEnd).map(holdBody),
+        availability: availableTime(holds, takingThings(counted, occupations), window).filter(inRange).map(timesBody),
         conflicts: found.map(({ start, end, things: [first, second] }) => ({
-          start: start.toISOString(),
-          end: end.toISOString(),
+          ...timesBody({ start, end }),
           things: [thingBody(first), thingBody(second)] as [z.infer<typeof Thing>, z.infer<typeof Thing>],
         })),
-        unprotectedSessions: unprotected.map(({ id, title, start, end }) => ({ id, title, start: start.toISOString(), end: end.toISOString() })),
+        unprotectedSessions: unprotected.map(({ id, title, start, end }) => ({ id, title, ...timesBody({ start, end }) })),
         undatedSessions: undated.map(sessionBody),
       }
     },

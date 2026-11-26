@@ -32,7 +32,7 @@ export const LAST_DAY = '2999-12-31'
 export const FIRST_MONTH = FIRST_DAY.slice(0, 7)
 export const LAST_MONTH = LAST_DAY.slice(0, 7)
 
-// How many days from today conflicts are found in, and the free time and the list are shown in.
+// How many days from today the list shows: the 365 days that conflicts and available time are found in.
 const HORIZON_DAYS = 365
 
 // `value` if it's a month the page shows, from 2000-01 to 2999-12, or else null.
@@ -102,7 +102,7 @@ function takesSomeOf({ start, end }: Times, day: string): boolean {
 // Whether something lasts until the end of `day`, 00:00 the next day, or later.
 const lastsToEndOf = ({ end }: Times, day: string) => Date.parse(end) >= dayStart(addDays(day, 1))
 
-// What a thing takes of a day when that's all of it, and the free time of a day that's all free time.
+// What a thing takes of a day when that's all of it, and the available time of a day that's all available time.
 const WHOLE_DAY = 'toute la journée'
 
 // The part of `day` something takes, as the month writes it, e.g. "21 h – 23 h", "dès 18 h", "jusqu'à 1 h" or "toute la
@@ -162,57 +162,9 @@ export function startDay({ start }: Times, near: string): string {
 // has none.
 export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar))
 
-// A stretch of free time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h", "dès 11 h" or
-// "11 h – 15 h", whether it's the whole day, and whether it lasts until the end of the day.
-export type FreeStretch = { part: string; wholeDay: boolean; toDayEnd: boolean }
-
-// A stretch of time, in milliseconds.
-type Period = [number, number]
-
-// The time that `holds` protect, of any feeds, as periods that don't overlap or follow each other, by start: holds that
-// overlap or follow each other are one (see "Protected time" in docs/design/server/calendar.md).
-function protectedTime(holds: Times[]): Period[] {
-  const merged: Period[] = []
-  for (const [from, to] of holds.map(({ start, end }): Period => [Date.parse(start), Date.parse(end)]).sort(([a], [b]) => a - b)) {
-    const last = merged.at(-1)
-    if (last && from <= last[1]) last[1] = Math.max(last[1], to)
-    else merged.push([from, to])
-  }
-  return merged
-}
-
-// The free time of `day`, the time `protectedPeriods` protect that nothing of `busy` takes, stretch by stretch, each with
-// when it starts, or nothing when it has none.
-function freeStretches(day: string, protectedPeriods: Period[], busy: Times[]): { start: number; stretch: FreeStretch }[] {
-  const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
-  const within = (periods: Period[]) => periods.map(([from, to]): Period => [Math.max(from, dayFrom), Math.min(to, dayTo)]).filter(([from, to]) => from < to)
-  const taken = within(busy.map(({ start, end }): Period => [Date.parse(start), Date.parse(end)])).sort(([a], [b]) => a - b)
-  const stretches: Period[] = []
-  for (const [protectedFrom, protectedTo] of within(protectedPeriods)) {
-    let free = protectedFrom
-    for (const [from, to] of taken) {
-      if (from >= protectedTo) break
-      if (from > free) stretches.push([free, from])
-      free = Math.max(free, to)
-    }
-    if (free < protectedTo) stretches.push([free, protectedTo])
-  }
-  const part = (from: number, to: number) => {
-    if (from === dayFrom && to === dayTo) return WHOLE_DAY
-    if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
-    if (to === dayTo) return `dès ${timeOf(from)}`
-    return fromTo(timeOf(from), timeOf(to))
-  }
-  return stretches.map(([from, to]) => {
-    const toDayEnd = to === dayTo
-    return { start: from, stretch: { part: part(from, to), wholeDay: from === dayFrom && toDayEnd, toDayEnd } }
-  })
-}
-
-// The free time of `day`, the time `holds` protect that nothing of `busy` takes, stretch by stretch.
-export function freeTime(day: string, holds: Times[], busy: Times[]): FreeStretch[] {
-  return freeStretches(day, protectedTime(holds), busy).map(({ stretch }) => stretch)
-}
+// A stretch of available time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h",
+// "dès 11 h" or "11 h – 15 h", whether it's the whole day, and whether it lasts until the end of the day.
+export type AvailableStretch = { part: string; wholeDay: boolean; toDayEnd: boolean }
 
 // What tells things apart, the way the server does: a session by its id, and an occupation by all it's given with (see
 // "The calendar" in docs/design/server/calendar.md).
@@ -290,39 +242,45 @@ export function thingsWithConflicts(calendar: Calendar): ThingWithConflicts[] {
 // end of the day, 00:00 or later.
 export type DayThing = { thing: Thing; part: string; conflicts: ThingConflict[]; toDayEnd: boolean }
 
-// What's on a day of the grid, in order of time: what takes some of it, by start, then end, and the stretches of its free
-// time, if it has any (see "Free time" in docs/design/client/admin/calendrier.md), among them.
-export type DayEntry = DayThing | FreeStretch
+// What's on a day of the grid, in order of time: what takes some of it, by start, then end, and the stretches of its
+// available time, if it has any (see "Availability" in docs/design/client/admin/calendrier.md), among them.
+export type DayEntry = DayThing | AvailableStretch
 export type CalendarDay = DayEntry[]
 
-export const isFree = (entry: DayEntry): entry is FreeStretch => !('thing' in entry)
+export const isAvailable = (entry: DayEntry): entry is AvailableStretch => !('thing' in entry)
 
 // The days of a grid, `days`, as they're shown with `calendar`, read for them.
 export function calendarDays(calendar: Calendar, days: string[]): Map<string, CalendarDay> {
   const byDay = new Map(days.map((day): [string, DayThing[]] => [day, []]))
-  const protectedPeriods = protectedTime(calendar.holds)
   for (const { thing, conflicts } of thingsWithConflicts(calendar)) {
     for (const day of daysOf(thing, [days[0], days.at(-1)!])) {
       byDay.get(day)!.push({ thing, part: partOfDay(thing, day), conflicts: conflicts.filter(({ conflict }) => takesSomeOf(conflict, day)), toDayEnd: lastsToEndOf(thing, day) })
     }
   }
-  return new Map([...byDay].map(([day, dayThings]) => [day, withFreeTime(day, dayThings, protectedPeriods, calendar.today)]))
+  return new Map([...byDay].map(([day, dayThings]) => [day, withAvailability(day, dayThings, calendar.availability)]))
 }
 
-// What takes some of `day`, `dayThings`, with the stretches of its free time among them, if it has any: the time
-// `protectedPeriods` protect that nothing takes, in the 365 days from the server's `today` (see "Free time" in
-// docs/design/client/admin/calendrier.md).
-function withFreeTime(day: string, dayThings: DayThing[], protectedPeriods: Period[], today: string): CalendarDay {
-  // The days conflicts are found in, from the server's today.
-  if (day < today || day >= addDays(today, HORIZON_DAYS)) return dayThings
-  // Cancelled sessions don't take the studio.
-  const taking = dayThings.map(({ thing }) => thing).filter((thing) => thing.kind !== 'session' || thing.status !== 'cancelled')
-  const dayFrom = dayStart(day)
+// What takes some of `day`, `dayThings`, with the stretches of its available time among them, if it has any: those of
+// `available`, as the server gives them (see "Availability" in docs/design/server/calendar.md), cut to the day (see
+// "Availability" in docs/design/client/admin/calendrier.md).
+function withAvailability(day: string, dayThings: DayThing[], available: Times[]): CalendarDay {
+  const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
+  const part = (from: number, to: number) => {
+    if (from === dayFrom && to === dayTo) return WHOLE_DAY
+    if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
+    if (to === dayTo) return `dès ${timeOf(from)}`
+    return fromTo(timeOf(from), timeOf(to))
+  }
   // By when each entry starts on the day, the things that started earlier at 00:00, and a thing before a stretch that
   // starts when it does, e.g. a cancelled session.
   const entries: [number, DayEntry][] = [
     ...dayThings.map((entry): [number, DayEntry] => [Math.max(Date.parse(entry.thing.start), dayFrom), entry]),
-    ...freeStretches(day, protectedPeriods, taking).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
+    ...available.flatMap(({ start, end }): [number, DayEntry][] => {
+      const [from, to] = [Math.max(Date.parse(start), dayFrom), Math.min(Date.parse(end), dayTo)]
+      if (from >= to) return []
+      const toDayEnd = to === dayTo
+      return [[from, { part: part(from, to), wholeDay: from === dayFrom && toDayEnd, toDayEnd }]]
+    }),
   ]
   return entries.sort(([a], [b]) => a - b).map(([, entry]) => entry)
 }

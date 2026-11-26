@@ -1,7 +1,7 @@
 /* The Calendrier page (see docs/design/client/admin/calendrier.md). Each kind of thing has its color and its shape, the
    same in the legend, the month, the chosen day and the list, and in the marks of the month on phones: sessions light
-   blue with a dark blue bar on their left, occupations light violet with a dashed violet border, free time green, and
-   conflicts a red frame, inside the bar and the border, so that the shapes stay seen. */
+   blue with a dark blue bar on their left, occupations light violet with a dashed violet border, available time green,
+   and conflicts a red frame, inside the bar and the border, so that the shapes stay seen. */
 
 .calendar-session,
 .calendar-mark-session {
@@ -17,8 +17,8 @@
   color: #4b2a85;
 }
 
-.calendar-free,
-.calendar-mark-free {
+.calendar-available,
+.calendar-mark-available {
   background: #dcf1e0;
   color: #1b5e2a;
 }
@@ -292,7 +292,7 @@
   cursor: pointer;
 }
 
-.calendar-month td.calendar-available {
+.calendar-month td.calendar-day-available {
   background: #eef8f0;
 }
 
@@ -600,7 +600,7 @@
   }
 
   /* The strokes that tell marks apart have a contrast of at least 3:1, which the pale fills don't: done sessions are
-     filled grey, cancelled ones are hollow, and free time is a circle with a border. */
+     filled grey, cancelled ones are hollow, and available time is a circle with a border. */
   .calendar-mark-session.calendar-mark-done {
     border-left-color: #767676;
     background: #767676;
@@ -611,8 +611,8 @@
     background: none;
   }
 
-  .calendar-mark-free,
-  .calendar-legend .calendar-free {
+  .calendar-mark-available,
+  .calendar-legend .calendar-available {
     border: 1px solid #1b5e2a;
     border-radius: 50%;
   }

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { dayStart, instantIn } from '../api/formats.js'
 import type { Status } from '../sessions/fields.js'
 import type { CalendarSession } from './conflicts.js'
-import { protectedTime, unprotectedSessions } from './protected-time.js'
+import { availableTime, protectedTime, unprotectedSessions } from './protected-time.js'
 
-// The time that's protected for sessions, and the sessions outside it (see "Protected time" in
-// docs/design/server/calendar.md).
+// The time that's protected for sessions, the sessions outside it, and the available time (see "Protected time" and
+// "Availability" in docs/design/server/calendar.md).
 
 // An instant, at a time of a day in Québec.
 const at = (day: string, time: string) => instantIn(null, `${day}T${time}:00`)
@@ -121,5 +121,59 @@ describe('unprotectedSessions', () => {
 
   it('gives none without a `holds` feed, when nothing is known to be protected or not', () => {
     expect(outside([session('planned', at('2026-11-25', '21:00'), at('2026-11-25', '23:00'))], null)).toEqual([])
+  })
+})
+
+describe('availableTime', () => {
+  const available = (holds: { start: Date; end: Date }[], taking: { start: Date; end: Date }[] = [], window = WINDOW) => availableTime(holds, taking, window)
+
+  it('is the protected time that nothing takes, around and between what takes it', () => {
+    const afternoon = [span(at('2026-11-25', '11:00'), at('2026-11-25', '18:00'))]
+    expect(available(afternoon)).toEqual(afternoon)
+    // A session within the hold, an occupation that starts before it, and another within that occupation.
+    const taking = [
+      span(at('2026-11-25', '15:00'), at('2026-11-25', '16:00')),
+      span(at('2026-11-25', '09:00'), at('2026-11-25', '12:00')),
+      span(at('2026-11-25', '10:00'), at('2026-11-25', '11:30')),
+    ]
+    expect(available(afternoon, taking)).toEqual([span(at('2026-11-25', '12:00'), at('2026-11-25', '15:00')), span(at('2026-11-25', '16:00'), at('2026-11-25', '18:00'))])
+    // Something that takes all of it, or more, and something that ends when it starts, or starts when it ends.
+    expect(available(afternoon, [span(at('2026-11-25', '10:00'), at('2026-11-26', '00:00'))])).toEqual([])
+    expect(available(afternoon, [span(at('2026-11-25', '09:00'), at('2026-11-25', '11:00')), span(at('2026-11-25', '18:00'), at('2026-11-25', '20:00'))])).toEqual(afternoon)
+  })
+
+  it("is none of the time that isn't protected, even when nothing takes it", () => {
+    expect(available([])).toEqual([])
+    expect(available([span(at('2026-11-25', '11:00'), at('2026-11-25', '15:00'))], [span(at('2026-11-25', '11:00'), at('2026-11-25', '15:00'))])).toEqual([])
+  })
+
+  it('makes holds that overlap or follow each other, of any feeds, one stretch, across midnight too, but not across a gap of 1 ms', () => {
+    const holds = [
+      // From 15:00 on November 25 to 11:00 on November 27, from two feeds that follow each other at midnight.
+      span(at('2026-11-26', '00:00'), at('2026-11-27', '11:00')),
+      span(at('2026-11-25', '15:00'), at('2026-11-26', '00:00')),
+      span(at('2026-11-25', '20:00'), at('2026-11-26', '02:00')),
+      span(new Date(at('2026-11-27', '11:00').getTime() + 1), at('2026-11-27', '15:00')),
+    ]
+    expect(available(holds)).toEqual([
+      span(at('2026-11-25', '15:00'), at('2026-11-27', '11:00')),
+      span(new Date(at('2026-11-27', '11:00').getTime() + 1), at('2026-11-27', '15:00')),
+    ])
+    // A session over midnight cuts it there, and nowhere else.
+    expect(available(holds.slice(0, 2), [span(at('2026-11-25', '21:00'), at('2026-11-26', '01:00'))])).toEqual([
+      span(at('2026-11-25', '15:00'), at('2026-11-25', '21:00')),
+      span(at('2026-11-26', '01:00'), at('2026-11-27', '11:00')),
+    ])
+  })
+
+  it('is cut at the start and the end of the 365 days, from 00:00 today, what is over today included', () => {
+    // From a week before today to a week after the 365 days end.
+    const always = [span(at('2026-11-16', '15:00'), at('2027-11-30', '11:00'))]
+    expect(available(always)).toEqual([span(WINDOW.from, WINDOW.to)])
+    // What takes it before today, and from before the 365 days end to after.
+    const taking = [span(at('2026-11-20', '10:00'), at('2026-11-23', '01:00')), span(at('2027-11-22', '21:00'), at('2027-11-23', '01:00'))]
+    expect(available(always, taking)).toEqual([span(at('2026-11-23', '01:00'), at('2027-11-22', '21:00'))])
+    // Holds that are all before today, or after the 365 days.
+    expect(available([span(at('2026-11-22', '11:00'), dayStart('2026-11-23')), span(dayStart('2027-11-23'), at('2027-11-23', '11:00'))])).toEqual([])
   })
 })
