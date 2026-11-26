@@ -276,6 +276,8 @@ async function expectSearch(query: string, found: string[]) {
 const dayInput = (when: 'Début' | 'Fin') => within(screen.getByRole('group', { name: when })).getByLabelText('date')
 const timeField = (when: 'Début' | 'Fin') => within(screen.getByRole('group', { name: when })).getByRole('group', { name: 'heure' })
 const timeHour = (when: 'Début' | 'Fin') => timeParts(timeField(when))[0]
+// One of the programmation's time slots, in the group named "Plages horaires", e.g. "18 h – 22 h".
+const slot = (label: string) => within(screen.getByRole('group', { name: 'Plages horaires' })).getByRole('button', { name: label })
 // How long the session form says the session lasts, rather than what's said of the sets' handles after their table.
 const lasts = () => within(screen.getByRole('group', { name: 'Quand' })).queryByRole('status')
 
@@ -1387,6 +1389,32 @@ describe("A session's page", () => {
     expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-21T21:00-05:00', durationMinutes: 240 })
   })
 
+  it("moves an overnight session into one of the programmation's time slots, on its start's day, which shows as picked", async () => {
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PATCH /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await screen.findByRole('group', { name: 'Début' })
+    const slots = within(screen.getByRole('group', { name: 'Plages horaires' })).getAllByRole('button')
+    expect(slots.map((button) => button.textContent)).toEqual(['11 h – 15 h', '13 h – 17 h', '18 h – 22 h'])
+    expect(slots.filter((button) => button.getAttribute('aria-pressed') === 'true')).toEqual([])
+    fireEvent.click(slot('18 h – 22 h'))
+    expect(slot('18 h – 22 h')).toHaveAttribute('aria-pressed', 'true')
+    expect(shownTime(timeField('Début'))).toBe('18 h 00')
+    expect(dayInput('Fin')).toHaveValue('2026-11-14')
+    expect(shownTime(timeField('Fin'))).toBe('22 h 00')
+    expect(lasts()).toHaveTextContent(/^Dure 4 h\.$/)
+    // The times can still be changed, and the slot then isn't picked anymore.
+    typeTime(timeField('Fin'), '23:00')
+    expect(slot('18 h – 22 h')).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(slot('18 h – 22 h'))
+    // Picking a slot doesn't send the form.
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-14T18:00-05:00', durationMinutes: 240 })
+  })
+
   it('says when its sets add up to more than the session, cancelled ones included, and no longer once one is deleted', async () => {
     // Until 23:00, with sets of 2 h 15, a cancelled one included, and one whose duration isn't known.
     const [first, , cancelled] = SESSION.sets
@@ -2448,6 +2476,35 @@ describe('Adding a session', () => {
       description: '',
       sets: [],
     })
+  })
+
+  it("fills its times in from one of the programmation's time slots, picked before its day, or only its duration without a date", async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await screen.findByRole('group', { name: 'Début' })
+    fireEvent.click(slot('13 h – 17 h'))
+    expect(slot('13 h – 17 h')).toHaveAttribute('aria-pressed', 'true')
+    expect(shownTime(timeField('Début'))).toBe('13 h 00')
+    expect(shownTime(timeField('Fin'))).toBe('17 h 00')
+    // The end takes the start's day once it has one.
+    fireEvent.change(dayInput('Début'), { target: { value: '2026-11-14' } })
+    expect(dayInput('Fin')).toHaveValue('2026-11-14')
+    expect(slot('13 h – 17 h')).toHaveAttribute('aria-pressed', 'true')
+
+    // Without a date, a slot only gives the session its length, and none shows as picked.
+    fireEvent.click(screen.getByLabelText('date à déterminer'))
+    const duration = within(screen.getByRole('group', { name: 'Durée' }))
+    fireEvent.change(duration.getByLabelText('heures'), { target: { value: '2' } })
+    expect(slot('13 h – 17 h')).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(slot('11 h – 15 h'))
+    expect(duration.getByLabelText('heures')).toHaveValue(4)
+    expect(duration.getByLabelText('minutes')).toHaveValue(0)
+    expect(slot('11 h – 15 h')).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('radio', { name: 'Guest mixes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: null, durationMinutes: 240 })
   })
 
   it('adds a session with its own description, of at most 5000 characters, and a flyer', async () => {

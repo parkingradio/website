@@ -119,12 +119,25 @@ test('a session is in its month, and on its day, where a new session is added', 
   await page.keyboard.press('Tab')
   const start = form.getByRole('group', { name: 'Début', exact: true })
   const end = form.getByRole('group', { name: 'Fin', exact: true })
+  const slots = form.getByRole('group', { name: 'Plages horaires' })
   await expect(start.getByRole('spinbutton').first()).toBeFocused()
+  // A time slot, under its times, fills them in, even while an hour is typed in part, and takes the focus, so that what's
+  // typed in the hour once it has it again isn't the end of the hour typed before, e.g. "1" then "8", for 18.
+  await page.keyboard.type('1')
+  await slots.getByRole('button', { name: '13 h – 17 h' }).click()
+  await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toBeFocused()
+  await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(start).toHaveText('\u206613 h 00\u2069')
+  await expect(end).toHaveText('\u206617 h 00\u2069')
+  await start.getByRole('spinbutton').first().click()
+  await page.keyboard.type('19')
+  await expect(start).toHaveText('\u206619 h 00\u2069')
   // In the 24-hour format, whatever the browser's settings, between marks that keep it left to right.
   await fillTime(start, '18:00')
   await fillTime(end, '22:00')
   await expect(start).toHaveText('\u206618 h 00\u2069')
   await expect(end).toHaveText('\u206622 h 00\u2069')
+  await expect(slots.getByRole('button', { name: '18 h – 22 h' })).toHaveAttribute('aria-pressed', 'true')
   await form.getByRole('radio', { name: 'Autre' }).check()
   await form.getByLabel('Nom').fill(`E2E NEW ${unique}`)
   // The server refuses it while it overlaps the other session, which it names.

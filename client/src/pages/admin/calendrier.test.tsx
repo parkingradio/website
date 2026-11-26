@@ -695,6 +695,34 @@ describe('Calendrier', () => {
       await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
     })
 
+    it("fills its times in from one of the programmation's time slots, which shows as picked while they're its own", async () => {
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, 'POST /api/admin/sessions': { ok: true, session: session('session-9', 'GUEST MIXES', '2026-11-25T18:00:00-05:00', '2026-11-25T22:00:00-05:00') } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(addButton('2026-11-25'))
+      const form = newSession()!
+      const slots = within(within(form).getByRole('group', { name: 'Plages horaires' }))
+
+      // Pressing one doesn't take the focus, but clicking it does, once the times are filled in (see `SlotChoices`).
+      expect(fireEvent.mouseDown(slots.getByRole('button', { name: '13 h – 17 h' }))).toBe(false)
+      fireEvent.click(slots.getByRole('button', { name: '13 h – 17 h' }))
+      expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveFocus()
+      expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
+      expect(shownTime(timeField('Début'))).toBe('13 h 00')
+      expect(shownTime(timeField('Fin'))).toBe('17 h 00')
+      expect(within(form).getByRole('status')).toHaveTextContent('Dure 4 h.')
+      // Picking a slot doesn't send the form, and the times can still be changed.
+      expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
+      time('Fin', '18:00')
+      expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'false')
+      fireEvent.click(slots.getByRole('button', { name: '18 h – 22 h' }))
+      expect(slots.getByRole('button', { name: '18 h – 22 h' })).toHaveAttribute('aria-pressed', 'true')
+      fireEvent.click(within(form).getByRole('radio', { name: 'Guest mixes' }))
+      create()
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+      expect(sentSession()).toMatchObject({ start: '2026-11-25T18:00-05:00', durationMinutes: 240 })
+    })
+
     it('adds the session, without sets, and with its other fields empty, then shows it on its day, still chosen', async () => {
       const added = session('session-9', 'HAUTE RIVE TAKEOVER', '2026-11-25T21:00:00-05:00', '2026-11-26T01:00:00-05:00')
       mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, 'POST /api/admin/sessions': { ok: true, session: added } })
