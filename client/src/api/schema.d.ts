@@ -3495,8 +3495,6 @@ export interface paths {
                             /** @enum {boolean} */
                             ok: true;
                             client: string;
-                            redirectHost: string;
-                            local: boolean;
                             scopes: string[];
                         };
                     };

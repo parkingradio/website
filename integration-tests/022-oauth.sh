@@ -72,7 +72,7 @@ for host in localhost 127.0.0.1; do
     callback="$(printf '%s' "$cli_document" | grep -o "\"http://${host//./\\.}/[^\"]*\"" | tr -d '"' | sed "s|${host}|&:3118|")"
     json GET "${AUTHORIZATION}?response_type=code&client_id=${cli}&redirect_uri=${callback}&code_challenge=${CHALLENGE}&code_challenge_method=S256"
     expect_status 200
-    expect_body_contains "\"client\":\"Parking Radio CLI\",\"redirectHost\":\"${host}\",\"local\":true"
+    expect_body_contains '"client":"Parking Radio CLI"'
 done
 
 echo "  an app is allowed, exchanges its code for tokens, and is listed with its connection"

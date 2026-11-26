@@ -90,10 +90,6 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
           200: z.object({
             ok: z.literal(true),
             client: z.string(),
-            // The host of the redirect URI, e.g. "claude.ai".
-            redirectHost: z.string(),
-            // Whether the redirect URI is on the user's computer, where any program could be listening.
-            local: z.boolean(),
             scopes: z.array(z.string()),
           }),
           400: AuthorizationError,
@@ -103,8 +99,7 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
     async (request, reply) => {
       const checked = check(request.query, request.log)
       if (!checked.ok) return reply.status(400).send(failure(checked))
-      const { client, redirectUri, scopes } = checked
-      return { ok: true as const, client: client.name, redirectHost: new URL(redirectUri).hostname, local: client.local, scopes }
+      return { ok: true as const, client: checked.client.name, scopes: checked.scopes }
     },
   )
 

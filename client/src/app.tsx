@@ -8,6 +8,7 @@ import { SynthMeetups } from './pages/synth-meetups'
 import { Appliquer } from './pages/appliquer'
 import { Contribuer } from './pages/contribuer'
 import { NotFound } from './pages/not-found'
+import { AutoriserTermine } from './pages/autoriser-termine'
 import { AdminPage, AdminShell } from './pages/admin/shell'
 
 function App() {
@@ -23,6 +24,8 @@ function App() {
           <Route path="contribuer" element={<Contribuer />} />
           {/* Logging in happens on the admin pages themselves. This keeps older links working. */}
           <Route path="login" element={<Navigate to="/admin" replace />} />
+          {/* Where apps send admins once they're done connecting. It loads with the public pages, needing nothing of the admin ones. */}
+          <Route path="autoriser/termine" element={<AutoriserTermine />} />
           <Route element={<AdminShell />}>
             <Route path="accept-invite" element={<AdminPage page="AcceptInvite" />} />
             {/* Where apps, e.g. Claude, send admins to allow them. */}

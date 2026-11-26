@@ -20,7 +20,7 @@ const PARAMS = {
 }
 const SEARCH = new URLSearchParams(PARAMS).toString()
 const CHECK = `/api/admin/oauth/authorization?${SEARCH}`
-const ASKED_BY_CLAUDE = { ok: true, client: 'Claude', redirectHost: 'claude.ai', local: false, scopes: ['admin'] }
+const ASKED_BY_CLAUDE = { ok: true, client: 'Claude', scopes: ['admin'] }
 const CALLBACK = 'https://claude.ai/api/mcp/auth_callback?code=the-code&state=the-state&iss=https%3A%2F%2Fparking.radio'
 
 function renderAt(search = SEARCH) {
@@ -51,7 +51,7 @@ describe('Autoriser une application', () => {
     expect(await screen.findByRole('heading', { name: 'Autoriser Claude' })).toBeInTheDocument()
   })
 
-  it('says which app asks, as whom, what it will be able to do, and where the browser goes back to', async () => {
+  it('says which app asks, as whom, and what it will be able to do', async () => {
     mockFetch({ ...LOGGED_IN, [CHECK]: ASKED_BY_CLAUDE })
     renderAt()
 
@@ -69,14 +69,6 @@ describe('Autoriser une application', () => {
       'voir, ajouter ou remplacer les photos et les flyers',
     ])
     expect(screen.getByText(/N'autorisez Claude que si vous venez vous-même de lancer sa connexion/)).toBeInTheDocument()
-    expect(screen.getByText('Ensuite, votre navigateur retournera vers claude.ai.')).toBeInTheDocument()
-  })
-
-  it("says when the browser goes back to the admin's computer", async () => {
-    mockFetch({ ...LOGGED_IN, [CHECK]: { ...ASKED_BY_CLAUDE, client: 'Claude Code', redirectHost: 'localhost', local: true } })
-    renderAt()
-
-    expect(await screen.findByText('Ensuite, votre navigateur retournera vers votre ordinateur (localhost).')).toBeInTheDocument()
   })
 
   it.each([

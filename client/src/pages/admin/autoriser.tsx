@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
 import { api } from '../../api/client'
-import type { Schema } from '../../api/client'
+import type { Data, Schema } from '../../api/client'
 import { browser } from '../../browser'
 import { SCOPE_DESCRIPTIONS } from './describe'
 import { RequireSession } from './session'
@@ -21,7 +21,7 @@ function authorizationParams(search: string): Record<string, string | string[]> 
   )
 }
 
-type AskedFor = { client: string; redirectHost: string; local: boolean; scopes: string[] }
+type AskedFor = Data<'get', '/api/admin/oauth/authorization'>
 
 type Step =
   | { kind: 'checking' }
@@ -128,10 +128,6 @@ function Consent({ email }: { email: string }) {
       <p>
         N'autorisez {asked.client} que si vous venez vous-même de lancer sa connexion. Si quelqu'un vous a envoyé ce lien,
         refusez.
-      </p>
-      <p>
-        Ensuite, votre navigateur retournera vers{' '}
-        {asked.local ? `votre ordinateur (${asked.redirectHost})` : asked.redirectHost}.
       </p>
       <div className="admin-actions">
         <button type="button" className="admin-primary" disabled={sending} onClick={() => answer(asked, true)}>

@@ -110,6 +110,10 @@ to the app:
 | `invalid_scope` | The app asks for a scope the user doesn't have |
 | `invalid_target` | `resource` isn't the MCP server |
 
+Once it's done connecting, whether it worked or not, an app can send the browser to the site's page that ends connecting
+it, rather than show one of its own (see
+[Once the app is done connecting](../client/admin/autoriser.md#once-the-app-is-done-connecting)).
+
 ## `GET /.well-known/oauth-protected-resource/mcp`
 
 The MCP server's metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)), which also answers at
@@ -150,8 +154,6 @@ What allowing an app would grant, for the authorization page. Its query has the 
 |---|---|---|
 | `ok` | `true` | |
 | `client` | string | The app's name (see [Clients](#clients)), e.g. `"Claude"` |
-| `redirectHost` | string | The host of `redirect_uri`, e.g. `"claude.ai"` |
-| `local` | boolean | Whether `redirect_uri` is on the user's computer, where any program could be listening |
 | `scopes` | list of strings | The scopes the connection would get |
 
 Fails with 400 when the parameters aren't valid (see [Authorizing an app](#authorizing-an-app)): with `redirect`, the

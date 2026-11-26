@@ -71,7 +71,7 @@ design: when they disagree, these documents still win.
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
 | [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Intégrations](client/admin/integrations.md) | Connecting Claude, the admin's connected apps, and the RA bookmarklet |
-| [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin |
+| [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin, and the page that ends connecting an app |
 | [Admins](client/admin/admins.md) | Who can access the admin pages |
 | [Configuration](client/admin/configuration.md) | The settings that change what the site does |
 
