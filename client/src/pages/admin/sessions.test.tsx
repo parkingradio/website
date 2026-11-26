@@ -1689,10 +1689,14 @@ describe('Going through the list from a session’s page', () => {
     expect(await position()).toHaveTextContent('3 / 3')
     expect(href('← précédente')).toBe('/admin/sessions/session-1?status=planned')
     expect(href('← sessions')).toBe('/admin/sessions?status=planned')
-    // The last one has no next one.
+    // The last one has no next one: its suivante is only greyed out, without a tooltip, since its place says why, and
+    // clicking it does nothing.
     const next = screen.getByRole('button', { name: 'suivante →' })
-    expect(next).toHaveAttribute('aria-disabled', 'true')
-    expect(next).toHaveAccessibleDescription("C'est la dernière session de la liste.")
+    expect(next).toBeDisabled()
+    expect(next).not.toHaveAccessibleDescription()
+    const path = screen.getByTestId('path').textContent
+    fireEvent.click(next)
+    expect(screen.getByTestId('path').textContent).toBe(path)
   })
 
   it('has no previous one at the start of the list', async () => {
@@ -1701,8 +1705,8 @@ describe('Going through the list from a session’s page', () => {
 
     expect(await position()).toHaveTextContent('1 / 3')
     const previous = screen.getByRole('button', { name: '← précédente' })
-    expect(previous).toHaveAttribute('aria-disabled', 'true')
-    expect(previous).toHaveAccessibleDescription("C'est la première session de la liste.")
+    expect(previous).toBeDisabled()
+    expect(previous).not.toHaveAccessibleDescription()
     expect(href('suivante →')).toBe('/admin/sessions/session-1?status=planned')
   })
 
@@ -1717,7 +1721,7 @@ describe('Going through the list from a session’s page', () => {
 
     renderAt('/admin/sessions/session-2?status=all')
     expect(await position()).toHaveTextContent('1 / 5')
-    expect(screen.getByRole('button', { name: '← précédente' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
   })
 
   it('goes through what the search finds among the sessions announced or not, in the order of the list, and leads back to it as it was', async () => {
@@ -1729,7 +1733,7 @@ describe('Going through the list from a session’s page', () => {
 
     expect(await position()).toHaveTextContent('2 / 2')
     expect(href('← précédente')).toBe(`/admin/sessions/session-1${query}`)
-    expect(screen.getByRole('button', { name: 'suivante →' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'suivante →' })).toBeDisabled()
     expect(href('← sessions')).toBe(`/admin/sessions${query}`)
   })
 

@@ -142,13 +142,15 @@ test("a session's page goes through the list it was opened from, with its status
   await page.getByRole('link', { name: '← précédente' }).click()
   await title('LES SŒURS ONDES TAKEOVER')
   await expect(page.getByText('1 / 3')).toBeVisible()
-  await expect(page.getByRole('button', { name: '← précédente' })).toHaveAttribute('aria-disabled', 'true')
+  // The ends are only greyed out, without a tooltip, since the session's place says why.
+  await expect(page.getByRole('button', { name: '← précédente' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '← précédente' })).not.toHaveAccessibleDescription(/./)
   await page.getByRole('link', { name: 'suivante →' }).click()
   await title('MARATHON MODULAIRE')
   await page.getByRole('link', { name: 'suivante →' }).click()
   await title('SOIRÉE À REVOIR')
   await expect(page.getByText('3 / 3')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'suivante →' })).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByRole('button', { name: 'suivante →' })).toBeDisabled()
   const sessionPage = new URL(page.url()).pathname
 
   // Back to the list as it was.

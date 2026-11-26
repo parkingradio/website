@@ -512,8 +512,6 @@ function SessionListNavigation({ id, session }: { id: string; session: Session |
       listed={session && sessions.kind === 'loaded' ? list(sessions.value.sessions, session).listed : undefined}
       failure={sessions.kind === 'error' ? `La liste des sessions n'a pas pu être chargée\u00a0: ${sessions.message}` : undefined}
       path={(to) => sessionPath(to) + address.query}
-      first="C'est la première session de la liste."
-      last="C'est la dernière session de la liste."
     />
   )
 }

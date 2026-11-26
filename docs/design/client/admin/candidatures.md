@@ -90,9 +90,8 @@ cancelled, which keep it "retenue".
 ## Going through the list
 
 Above an application's title, "← candidatures" leads back to the list, and « ← précédente » and « suivante → » go
-through it (see [Going through a list](layout.md#going-through-a-list)), saying « C'est la première candidature de la
-liste. » and « C'est la dernière candidature de la liste. » where they can't be used. When the list of applications, or
-the artists or the collectives, can't be loaded, the page says so in place of « précédente » and « suivante ».
+through it (see [Going through a list](layout.md#going-through-a-list)). When the list of applications, or the artists
+or the collectives, can't be loaded, the page says so in place of « précédente » and « suivante ».
 
 ## Endpoints
 

@@ -162,22 +162,18 @@ function Select<S extends string>({ label, statuses, labels, status, disabled = 
 
 // Précédente and suivante on the page of the entry whose id is `id`, through `listed`, its list, and where it is in it
 // (see "Going through a list" in docs/design/client/admin/layout.md). Until the list is there, neither can be used, and
-// when it can't be loaded, `failure` says so in their place. `first` and `last` say why the first one's précédente and the
-// last one's suivante can't be used.
+// when it can't be loaded, `failure` says so in their place. The first one's précédente and the last one's suivante are
+// only greyed out, since its place next to them says why.
 export function ListPager<T extends { id: string }>({
   id,
   listed,
   failure,
   path,
-  first,
-  last,
 }: {
   id: string
   listed: T[] | undefined
   failure?: string
   path: (entry: T) => string
-  first: string
-  last: string
 }) {
   if (failure) {
     return (
@@ -187,20 +183,18 @@ export function ListPager<T extends { id: string }>({
     )
   }
   const at = listed ? listed.findIndex((each) => each.id === id) : -1
-  // A link to `to`, or, without one, a button that can't be used, saying why, or only for a moment while the list loads.
-  const link = (to: T | undefined, label: string, unavailable: string) =>
+  // A link to `to`, or, without one, a button that can't be used.
+  const link = (to: T | undefined, label: string) =>
     to ? (
       <Link to={path(to)} className="admin-button">
         {label}
       </Link>
     ) : (
-      <Button disabled unavailable={listed ? unavailable : null}>
-        {label}
-      </Button>
+      <Button disabled>{label}</Button>
     )
   return (
     <div className="admin-pager">
-      {link(listed?.[at - 1], '← précédente', first)}
+      {link(listed?.[at - 1], '← précédente')}
       {listed && (
         <span>
           <span aria-hidden="true">
@@ -211,7 +205,7 @@ export function ListPager<T extends { id: string }>({
           </span>
         </span>
       )}
-      {link(listed?.[at + 1], 'suivante →', last)}
+      {link(listed?.[at + 1], 'suivante →')}
     </div>
   )
 }

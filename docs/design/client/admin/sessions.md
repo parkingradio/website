@@ -158,9 +158,8 @@ in place, so that reloading the page, or coming back to it, doesn't open it agai
 ## Going through the list
 
 Above a session's title, "← sessions" leads back to the list, and « ← précédente » and « suivante → » go through it
-(see [Going through a list](layout.md#going-through-a-list)), saying « C'est la première session de la liste. » and
-« C'est la dernière session de la liste. » where they can't be used. When the list of sessions can't be loaded, the page
-says so in place of « précédente » and « suivante ».
+(see [Going through a list](layout.md#going-through-a-list)). When the list of sessions can't be loaded, the page says so
+in place of « précédente » and « suivante ».
 
 ## Creating its event on RA
 

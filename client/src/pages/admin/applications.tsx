@@ -491,8 +491,6 @@ function ListNavigation({ id, application }: { id: string; application: Applicat
       listed={loaded ? list(applications.value.applications, application).listed : undefined}
       failure={failed && `La liste des candidatures n'a pas pu être chargée\u00a0: ${failed.message}`}
       path={(to) => applicationPath(to) + address.query}
-      first="C'est la première candidature de la liste."
-      last="C'est la dernière candidature de la liste."
     />
   )
 }

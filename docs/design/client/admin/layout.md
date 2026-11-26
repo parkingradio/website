@@ -86,7 +86,8 @@ for its default view, and its other parameters (see [Searching lists](#searching
 a status the list knows, the link back to the list above its title, e.g. "← candidatures", shows the list with the
 list's parameters, and « ← précédente » and « suivante → » lead to the entries before and after this one in that list,
 keeping the list's parameters in their address, with this one's place between them, e.g. « 3 / 12 » (« 3 sur 12 » for
-screen readers). The first one's « précédente » and the last one's « suivante » can't be used, saying why (see
+screen readers). The first one's « précédente » and the last one's « suivante » are greyed out and can't be used,
+without a tooltip, since this one's place already says why (see
 [Controls that can't be used](#controls-that-cant-be-used)). Without such a status, e.g. from another section's page,
 the link back shows the list as it opens, and the page has nothing else to go through it.
 
@@ -138,8 +139,10 @@ A control that a rule keeps from being used, e.g. "ajouter un set" while a sessi
 greyed out, and its tooltip says why (see [Tooltips](#tooltips)), rather than the page explaining the rule in a
 sentence. It keeps the keyboard's focus, so that its tooltip can be read, and screen readers announce it as unavailable.
 Clicking it does nothing. A control that can't be used for a moment, e.g. while a change is saved, is only greyed out,
-without a tooltip. An option that a rule keeps from being picked in a list of options, e.g. a rejected application in a
-planned set's form, is listed greyed out, and screen readers announce it as unavailable.
+without a tooltip, and so is one whose reason what's next to it already says, e.g. « suivante » on the last entry of a
+list, next to that entry's place in it (see [Going through a list](#going-through-a-list)). An option that a rule keeps
+from being picked in a list of options, e.g. a rejected application in a planned set's form, is listed greyed out, and
+screen readers announce it as unavailable.
 
 A dropdown that a rule keeps from being used in every row of a list, e.g. the statuses of a cancelled session's sets, is
 replaced by its value, written out, and the list says why once, above it, rather than in a tooltip.
