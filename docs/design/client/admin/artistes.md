@@ -54,9 +54,9 @@ Under it, its applications are listed like an artist's, with a button to create 
 takeovers, like in [Sessions](sessions.md), their status changed and announced from their rows, but without their type,
 with a button to add another one as its takeover ("nouvelle session"), and the list can't be searched, filtered or
 sorted either. Once a takeover's status is changed there, the page loads its applications again, since that can change
-theirs (see [Status, in Applications](../../server/applications.md#status)). At the
-bottom, the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its
-artists stay, and so do their own applications. A collective that has takeovers can't be deleted (see [Types and
+theirs (see [Status, in Applications](../../server/applications.md#status)). At the bottom, the collective can be
+deleted for good, with its photo, if it has one, and applications, after confirming. Its artists stay, and so do their
+own applications. A collective that has takeovers can't be deleted (see [Types and
 names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used, saying
 « Un collectif avec des takeovers ne peut pas être supprimé. » (see [Controls that can't be
 used](layout.md#controls-that-cant-be-used)). When its sessions can't be loaded, it can be used, and the server's

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../../api/client'
-import type { Result } from '../../api/client'
 import type { Session, SessionStatus } from '../../session-fields'
 import { RA_EVENT_KEPT, SET_STATUS_LABELS, raEventKept, sessionName, setTitle } from './describe'
 import type { Announced } from './describe'
@@ -34,6 +33,9 @@ export function confirmStatus(session: Session, status: SessionStatus): boolean 
   return true
 }
 
+// What a change answers: the session as it then is, or why it couldn't be made.
+type Changed = { ok: true; session: Session } | ({ ok: false } & Parameters<typeof failure>[1])
+
 // Changing the status of sessions of a list, or announcing them, or un-announcing them, from their rows, once confirmed:
 // `current` gives the sessions loaded as the changes left them, `changeStatus` and `announce` change one, and `error` says
 // why the last change couldn't be made, if it couldn't. `statusChanged` is called once a status is saved.
@@ -41,7 +43,7 @@ export function useSessionChanges({ statusChanged }: { statusChanged?: () => voi
   const [changed, setChanged] = useState<Record<string, Session>>({})
   const [error, setError] = useState<ReactNode>(null)
   // Shows `session` as `request` saved it, or else says why `what` couldn't be done, and resolves to whether it was saved.
-  const change = async (session: Session, what: string, request: Promise<Result<{ session: Session }, { ok: false } & Parameters<typeof failure>[1]>>) => {
+  const change = async (session: Session, what: string, request: Promise<Changed>) => {
     setError(null)
     const result = await request
     if (result.ok) setChanged((changed) => ({ ...changed, [session.id]: result.session }))

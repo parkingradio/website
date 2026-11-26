@@ -62,18 +62,19 @@ first asking to confirm as its page's buttons do (see [A session's page](#a-sess
 ("Annonce"), as a dropdown, "non annoncée" or "annoncée", that announces it or un-announces it as soon as the other value
 is picked, without confirming, except that un-announcing a session that has an event on RA first asks to confirm, saying
 « L'événement sur RA ne sera pas modifié. » (see [Events on RA](../../server/sessions.md#events-on-ra)). When a change
-isn't confirmed, its row keeps its value. A session without a date can't be announced: its dropdown can't be used, and
-says « La session n'a pas de date. » (see [Controls that can't be used](layout.md#controls-that-cant-be-used)).
+isn't confirmed, its row keeps its value. A session without a date can't be announced: its « Annonce » dropdown can't
+be used, and says « La session n'a pas de date. » (see
+[Controls that can't be used](layout.md#controls-that-cant-be-used)).
 Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 It opens on "planifiées", its default view (see [Searching lists](layout.md#searching-lists)), by date, the earliest
 first, past ones included, then those without a date, the first added first. With another status or "toutes", those
 without a date come first, the most recently added first, then the others, the latest first. Another group of buttons,
 "Annonce", shows only the sessions that are announced ("annoncées"), or those that aren't ("non annoncées"), or both
 ("toutes"), which it opens on, and which its address leaves out (`announced=true`, `announced=false`, or nothing).
-While the buttons show only the sessions with a status, or only the announced sessions, or only those that aren't, a
-session changed to another value leaves the list as soon as that's saved. With "toutes", it stays. Only the dropdown
-that changed is locked while it's saved. When a session's status, or whether it's announced, can't be changed, the list
-says why above it, naming the session (see [Names](#names)), and its row keeps its value.
+A session whose status, or whether it's announced, no longer matches what the buttons show leaves the list as soon as
+that's saved. With "toutes", it stays. Only the dropdown that changed is locked while it's saved. When a session's
+status, or whether it's announced, can't be changed, the list says why above it, naming the session (see
+[Names](#names)), and its row keeps its value.
 
 A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their title, their
 type, their takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026",

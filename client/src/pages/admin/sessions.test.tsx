@@ -300,7 +300,6 @@ const foldedGenres = () => genres().getByRole('button', { name: 'modifier les ge
 const pinnedGenres = () => genres().queryAllByRole('button', { name: /^retirer / }).map((button) => button.getAttribute('aria-label')!.replace(/^retirer /, ''))
 
 describe('The list of sessions', () => {
-
   it('says which day a session ends on, when it lasts several days, and on its page too', async () => {
     // From 18:00 on Friday to 2:00 on Sunday.
     const weekend = { ...SESSION, start: '2026-11-13T23:00:00.000Z', end: '2026-11-15T07:00:00.000Z', durationMinutes: 1920 }

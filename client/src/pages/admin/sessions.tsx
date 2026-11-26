@@ -73,8 +73,8 @@ import { confirmAnnouncing, confirmStatus, useSessionChanges } from './use-sessi
 import type { SessionChanges } from './use-session-changes'
 import { arrayMove, useSortableItem } from './use-sortable'
 
-// The sessions section: every session, whose status is changed, and which is announced, from its row, each one's page,
-// where it's changed or deleted, and so are its sets, and adding one.
+// The sessions section: every session, whose status and announcement are changed from its row, each one's page, where
+// those and the session are changed, or it's deleted, and so are its sets, and adding one.
 
 function BackToSessions({ to = '/admin/sessions' }: { to?: string }) {
   return (
