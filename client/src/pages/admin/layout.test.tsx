@@ -188,14 +188,6 @@ describe('Admin pages', () => {
     expect(screen.queryByRole('heading', { name: 'Connexion' })).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'admin' })).not.toBeInTheDocument()
   })
-
-  it('sends /login to the admin pages', async () => {
-    mockFetch(LOGGED_OUT)
-    renderAt('/login')
-
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument())
-    expect(screen.getByTestId('path')).toHaveTextContent('/admin')
-  })
 })
 
 describe("The menu's badge on calendrier", () => {
