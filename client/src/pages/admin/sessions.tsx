@@ -40,6 +40,7 @@ import {
   flyerUrl,
   formatDuration,
   genreNames,
+  performersGenres,
   raEventKept,
   receivedOn,
   sessionDay,
@@ -1065,7 +1066,8 @@ function setFromApplication(id: string, session: Session): InitialSet {
   return ({ artists, applications }) => {
     const found = findApplication(id, applications, artists)
     if (found === undefined) return newSetFormValues(session)
-    return found?.artist ? { ...newSetFormValues(session), ...setValuesFromApplication(found.application, found.artist) } : null
+    // Its artist is among `artists`, which were loaded, since it was found.
+    return found?.artist ? { ...newSetFormValues(session), ...setValuesFromApplication(found.application, found.artist, performersGenres([found.artist], artists!)) } : null
   }
 }
 
@@ -1100,7 +1102,8 @@ function SessionFormWithChoices({
   if (collectives.kind === 'loading' || applications.kind === 'loading') return null
   const applicationList = applications.kind === 'loaded' ? applications.value.applications : null
   const artists = fromApplication?.artists
-  const found = fromApplication && findApplication(fromApplication.id, applicationList, artists?.kind === 'loaded' ? artists.value.artists : null)
+  const artistList = artists?.kind === 'loaded' ? artists.value.artists : null
+  const found = fromApplication && findApplication(fromApplication.id, applicationList, artistList)
   // The artists are only waited for when the application is an artist's.
   if (found === undefined && artists?.kind === 'loading') return null
 
@@ -1130,7 +1133,8 @@ function SessionFormWithChoices({
               }
             : initial
         }
-        sets={found?.artist ? [listedSetFromApplication(found.application, found.artist)] : sets}
+        // Its artist is among the artists, which were loaded, since it was found.
+        sets={found?.artist ? [listedSetFromApplication(found.application, found.artist, performersGenres([found.artist], artistList!))] : sets}
         collectives={collectiveList}
         applications={applicationList}
         raEvents={raEvents}

@@ -289,6 +289,12 @@ function sentSession(request: RequestInit) {
   return JSON.parse((request.body as FormData).get('session') as string)
 }
 
+// The genres of the set whose form is open, as it shows them while they're folded, and those pinned, in order, once
+// they're unfolded.
+const genres = () => within(screen.getByRole('group', { name: 'Genres' }))
+const foldedGenres = () => genres().getByRole('button', { name: 'modifier les genres' }).parentElement!.textContent!.replace(/ modifier$/, '')
+const pinnedGenres = () => genres().queryAllByRole('button', { name: /^retirer / }).map((button) => button.getAttribute('aria-label')!.replace(/^retirer /, ''))
+
 describe('The list of sessions', () => {
   const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
 
@@ -2163,12 +2169,10 @@ describe("A set's form", () => {
     fireEvent.click(screen.getByLabelText('DJ'))
 
     // Their first genres, in the order of a collective's genres, up to 3.
-    expect(screen.getByText(/^Genres de ses artistes : house, techno, acid\./)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'reprendre les genres des artistes' }))
-    expect(screen.getByRole('button', { name: 'retirer house' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'reprendre les genres des artistes' })).not.toBeInTheDocument()
-    // Aurore first, dragged up by her handle.
+    expect(foldedGenres()).toBe('house, techno, acid')
+    // Aurore first, dragged up by her handle, and her genres with her.
     await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner Aurore' }), -1)
+    expect(foldedGenres()).toBe('techno, house, acid')
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
@@ -2178,12 +2182,69 @@ describe("A set's form", () => {
       durationMinutes: 30,
       performanceTypes: ['dj'],
       otherPerformanceType: '',
-      genres: ['house', 'techno', 'acid'],
+      genres: ['techno', 'house', 'acid'],
       soundcloudTrack: null,
       youtubeVideo: null,
       // Aurore's, picked as she was added, Cyan's being planned already.
       application: 'application-3',
     })
+  })
+
+  it('folds its genres behind « modifier », which unfolds them for good while the form is open, focusing the tags', async () => {
+    mockFetch(SET_PAGE)
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    expect(foldedGenres()).toBe('-')
+    expect(screen.queryByRole('group', { name: 'Tous les genres' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'modifier les genres' }))
+    expect(screen.getByRole('group', { name: 'Tous les genres' })).toHaveFocus()
+    expect(screen.queryByRole('button', { name: 'modifier les genres' })).not.toBeInTheDocument()
+    pick('Aurore')
+    expect(pinnedGenres()).toEqual(['techno', 'acid'])
+    expect(screen.queryByRole('button', { name: 'modifier les genres' })).not.toBeInTheDocument()
+
+    // Folded again in the next form.
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+    await openNew()
+    expect(foldedGenres()).toBe('-')
+  })
+
+  it("takes its performers' genres each time they change, replacing those picked by hand", async () => {
+    mockFetch(SET_PAGE)
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Aurore')
+    expect(foldedGenres()).toBe('techno, acid')
+    fireEvent.click(screen.getByRole('button', { name: 'modifier les genres' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Tous les genres' })).getByRole('button', { name: 'ambient' }))
+    fireEvent.click(screen.getByRole('button', { name: 'retirer techno' }))
+    expect(pinnedGenres()).toEqual(['acid', 'ambient'])
+    pick('Cyan')
+    expect(pinnedGenres()).toEqual(['techno', 'house', 'acid'])
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
+    expect(pinnedGenres()).toEqual(['house', 'techno'])
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
+    expect(pinnedGenres()).toEqual([])
+  })
+
+  it("opens a set with its genres as they are, which become its performers' once they change, even none, and even when it's done", async () => {
+    const artists = { '/api/admin/artists': { ok: true, artists: [AURORE, BRUME, { ...CYAN, genres: [] }] } }
+    mockFetch({ ...SET_PAGE, ...artists, 'PATCH /api/admin/sets/set-2': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
+    await screen.findByRole('heading', { name: 'Set de Cyan' })
+    // Not its performer's, who has none.
+    expect(foldedGenres()).toBe('ambient')
+    pick('Aurore')
+    expect(foldedGenres()).toBe('techno, acid')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
+    expect(foldedGenres()).toBe('-')
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sets/set-2')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sets/set-2')[0])).toMatchObject({ performers: [{ id: 'artist-3' }], genres: [] })
   })
 
   it('shows the session as the server has it once a set is added, which can make it planifiée again', async () => {
@@ -2214,7 +2275,7 @@ describe("A set's form", () => {
     expect(durationValues()).toEqual(['1', '30'])
     expect(screen.getByLabelText('Performance Live')).toBeChecked()
     expect(screen.getByLabelText('Autre')).toHaveValue('Synthé')
-    expect(screen.getByRole('button', { name: 'retirer ambient' })).toBeInTheDocument()
+    expect(foldedGenres()).toBe('ambient')
     expect(screen.getByText(/^Ajouté par admin@example.com le/)).toBeInTheDocument()
 
     fireEvent.change(duration().getByLabelText('heures'), { target: { value: '5' } })
@@ -2659,6 +2720,12 @@ describe("A set's form", () => {
     await openNew()
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
     expect(screen.getByRole('combobox', { name: 'Ajouter un artiste' })).toBeDisabled()
+
+    // Its performers' genres aren't known: taking one out leaves the set's as they are.
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore et Brume' }))
+    await screen.findByRole('heading', { name: 'Set de Aurore et Brume' })
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Brume' }))
+    expect(foldedGenres()).toBe('techno')
   })
 
   describe("in a takeover's set", () => {
@@ -3383,11 +3450,11 @@ describe("A new session's sets", () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/))
-    const empty = { performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null }
-    // With their artists' applications, picked as they were added.
+    const empty = { performanceTypes: [], otherPerformanceType: '', soundcloudTrack: null }
+    // With their artists' genres and applications, picked as they were added.
     expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0]).sets).toEqual([
-      { ...empty, performers: [{ id: 'artist-1' }], durationMinutes: null, youtubeVideo: 'dQw4w9WgXcQ', application: 'application-3' },
-      { ...empty, performers: [{ id: 'artist-2' }], durationMinutes: 60, youtubeVideo: null, application: 'application-4' },
+      { ...empty, performers: [{ id: 'artist-1' }], durationMinutes: null, genres: ['techno', 'acid'], youtubeVideo: 'dQw4w9WgXcQ', application: 'application-3' },
+      { ...empty, performers: [{ id: 'artist-2' }], durationMinutes: 60, genres: ['ambient'], youtubeVideo: null, application: 'application-4' },
     ])
   })
 
@@ -3470,6 +3537,8 @@ describe("A new session's sets", () => {
     await addSet('Cyan')
     fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume' }))
     await screen.findByRole('heading', { name: 'Set de Brume' })
+    // Its genres are folded, as in a session's page's sets.
+    expect(foldedGenres()).toBe('ambient')
     lasting('1', '30')(setForm('Set de Brume'))
 
     // Aurore's, before it in the list: the focus goes to the next set's ×.
@@ -3623,7 +3692,8 @@ describe('From an application', () => {
         durationMinutes: 30,
         performanceTypes: ['dj', 'vinyl'],
         otherPerformanceType: 'Synthé',
-        genres: [],
+        // Aurore's.
+        genres: ['techno', 'acid'],
         soundcloudTrack: null,
         youtubeVideo: null,
         application: 'application-3',
@@ -3712,7 +3782,8 @@ describe('From an application', () => {
             durationMinutes: null,
             performanceTypes: ['dj', 'vinyl'],
             otherPerformanceType: 'Synthé',
-            genres: [],
+            // Aurore's.
+            genres: ['techno', 'acid'],
             soundcloudTrack: null,
             youtubeVideo: null,
             application: 'application-3',

@@ -11,6 +11,7 @@ import {
   formatShortDay,
   formatWeekdayAndNumber,
   membersGenres,
+  performersGenres,
   sessionDay,
   sessionHours,
   sessionName,
@@ -46,6 +47,18 @@ describe('membersGenres', () => {
     expect(membersGenres([{ id: 'd' }, { id: 'unknown' }, { id: 'b' }], artists)).toEqual(['house'])
     expect(membersGenres([{ id: 'd' }], artists)).toEqual([])
     expect(membersGenres([], artists)).toEqual([])
+  })
+})
+
+describe('performersGenres', () => {
+  const artists = [
+    { id: 'a', genres: ['techno', 'acid', 'ambient'] },
+    { id: 'b', genres: ['house'] },
+  ] as unknown as Artist[]
+
+  it("gives a set its performers' first 3, in the order of a collective's genres", () => {
+    expect(performersGenres([{ id: 'a' }, { id: 'b' }], artists)).toEqual(['techno', 'house', 'acid'])
+    expect(performersGenres([{ id: 'b' }], artists)).toEqual(['house'])
   })
 })
 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import type { Application } from '../../application-fields'
-import type { Artist, GenreId } from '../../artist-profile'
+import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxFilter } from '../../combobox'
@@ -12,7 +12,7 @@ import { checkSet, performersApplications, pickedApplication } from '../../sessi
 import type { Reference, SessionStatus, SetFields, SetFormValues } from '../../session-fields'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
-import { artistOption, genreNames, membersGenres } from './describe'
+import { artistOption, performersGenres } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
 import { ApplicationsFailure, ArtistsFailure, TakeoverFailure } from './profile-details'
@@ -23,17 +23,14 @@ import type { GroupProps } from './profile-fields'
 // checked as the server checks it (see `checkSet`), and says what's wrong once it's been left, or once the form is sent,
 // and the server's error is shown if it refuses the set anyway.
 
-// How many of its performers' genres a set's form suggests.
-const SUGGESTED_GENRES = 3
-
 // The collective of a takeover, whose artists its sets' forms offer first.
 export type TakeoverCollective = Pick<Collective, 'name' | 'members'>
 
 type SetFormProps = {
   // What the form starts with: a set's, to change it, or what a new one starts with.
   initial: SetFormValues
-  // The artists the performers are picked from, or null when they couldn't be loaded, which leaves those of the set as
-  // they are.
+  // The artists the performers are picked from, and whose genres the set takes, or null when they couldn't be loaded,
+  // which leaves the set's performers as they are, and its genres as they are when the performers change.
   artists: Artist[] | null
   // The applications the set's is picked from, or null when they couldn't be loaded, which leaves the set's as it is.
   applications: Application[] | null
@@ -55,10 +52,6 @@ export function SetForm({ initial, artists, applications, takeover, status = 'pl
   // There are fields, since there are no errors by then.
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!, form))
 
-  // The performers' first genres, in the order of a collective's genres, which are suggested while the set has none.
-  const suggested =
-    artists && form.genres.length === 0 ? membersGenres(form.performers, new Map(artists.map((artist) => [artist.id, artist]))).slice(0, SUGGESTED_GENRES) : []
-
   const candidates = performersApplications(applications, form.performers)
   const artistName = (application: Application) => (artists ?? form.performers).find((artist) => artist.id === application.artistId)?.name
 
@@ -76,10 +69,13 @@ export function SetForm({ initial, artists, applications, takeover, status = 'pl
         artists={artists}
         takeover={takeover}
         onChange={(performers) => {
-          // Its application changes as an artist is added or taken out, but not as they're reordered.
-          if (sameArtists(performers, form.performers)) return update({ performers })
-          const candidates = applications && performersApplications(applications, performers)
-          update({ performers, application: pickedApplication(form.application, candidates, status === 'planned') })
+          // Its genres become its performers' as they change in any way, unless their genres aren't known, and its
+          // application as an artist is added or taken out, but not as they're reordered.
+          const genres = artists ? performersGenres(performers, artists) : form.genres
+          const application = sameArtists(performers, form.performers)
+            ? form.application
+            : pickedApplication(form.application, applications && performersApplications(applications, performers), status === 'planned')
+          update({ performers, genres, application })
         }}
         error={shown('performers')}
         onLeave={leave('performers')}
@@ -113,9 +109,7 @@ export function SetForm({ initial, artists, applications, takeover, status = 'pl
         onLeave={leave('otherPerformanceType')}
       />
 
-      <GenresField genres={form.genres} onChange={(genres) => update({ genres })} error={shown('genres')} onLeave={leave('genres')}>
-        {suggested.length > 0 && <GenresSuggestion genres={suggested} onPick={() => update({ genres: suggested })} />}
-      </GenresField>
+      <GenresField genres={form.genres} onChange={(genres) => update({ genres })} error={shown('genres')} onLeave={leave('genres')} foldable />
 
       <Labeled label="SoundCloud" error={shown('soundcloudTrack')}>
         <input {...input('soundcloudTrack')} type="url" placeholder="https://soundcloud.com/…" />
@@ -183,17 +177,6 @@ export function SetFormWithChoices({
       {takeover?.kind === 'error' && <TakeoverFailure message={takeover.message} />}
       <SetForm {...props} initial={values} {...choices} takeover={takeover?.kind === 'loaded' ? takeover.value : null} />
     </section>
-  )
-}
-
-function GenresSuggestion({ genres, onPick }: { genres: GenreId[]; onPick: () => void }) {
-  return (
-    <p className="admin-hint">
-      Genres de ses artistes&nbsp;: {genreNames(genres)}.{' '}
-      <button type="button" onClick={onPick}>
-        reprendre les genres des artistes
-      </button>
-    </p>
   )
 }
 

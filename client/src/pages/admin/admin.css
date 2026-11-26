@@ -708,6 +708,11 @@ dl.admin-record {
   margin: -0.25rem 0 0;
 }
 
+/* A field folded behind "modifier", showing only its value. */
+.admin-form fieldset .admin-folded {
+  margin: 0;
+}
+
 /* Radio buttons and checkboxes, side by side, each with its label to its right. */
 .admin-form .admin-choices {
   display: flex;

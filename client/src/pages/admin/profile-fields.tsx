@@ -1,9 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
 import { GENRES, LINK_SITES, PHOTO_MAX_BYTES, PHOTO_TYPES, parseLink } from '../../artist-profile'
 import type { ArtistLinks, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
-import { COUNTRY_OPTIONS, genreName } from './describe'
+import { COUNTRY_OPTIONS, genreName, genreNames } from './describe'
 import { leaving } from './checked-form'
 import { FieldError } from './fields'
 
@@ -207,35 +206,65 @@ export function LinksField({
 }
 
 // Every genre, as a tag: clicking one pins it, or unpins it if it was. The genres pinned are listed first, in the order
-// they were pinned, which is their order of importance. `children` come before them, e.g. genres to suggest.
-export function GenresField({ genres, onChange, error, onLeave, children }: GroupProps<GenreId[]> & { genres: GenreId[]; children?: ReactNode }) {
+// they were pinned, which is their order of importance.
+export function GenresField({
+  genres,
+  onChange,
+  error,
+  onLeave,
+  foldable = false,
+}: GroupProps<GenreId[]> & {
+  genres: GenreId[]
+  // Whether it starts folded, showing only the genres and "modifier", which unfolds it for good, giving the focus to the
+  // tags.
+  foldable?: boolean
+}) {
+  const [folded, setFolded] = useState(foldable)
+  const tags = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (foldable && !folded) tags.current?.focus()
+  }, [foldable, folded])
   const toggle = (genre: GenreId) => onChange(genres.includes(genre) ? genres.filter((other) => other !== genre) : [...genres, genre])
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Genres</legend>
-      <p className="admin-hint">Le premier choisi est le genre principal.</p>
-      {children}
-      {genres.length > 0 && (
-        <ol className="admin-chosen">
-          {genres.map((genre, index) => (
-            <li key={genre}>
-              <b>{index + 1}</b>
-              {genreName(genre)}
-              <button type="button" aria-label={`retirer ${genreName(genre)}`} onClick={() => toggle(genre)}>
-                ×
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
-      {/* Focused when the genres are the first thing to fix, which is why it can be focused. */}
-      <div className="admin-tags" role="group" aria-label="Tous les genres" aria-invalid={error ? true : undefined} tabIndex={-1}>
-        {GENRES.map((genre) => (
-          <button key={genre} type="button" aria-pressed={genres.includes(genre)} onClick={() => toggle(genre)}>
-            {genreName(genre)}
+      {folded ? (
+        <p className="admin-folded">
+          {genreNames(genres)}{' '}
+          <button
+            type="button"
+            aria-label="modifier les genres"
+            onClick={() => setFolded(false)}
+          >
+            modifier
           </button>
-        ))}
-      </div>
+        </p>
+      ) : (
+        <>
+          <p className="admin-hint">Le premier choisi est le genre principal.</p>
+          {genres.length > 0 && (
+            <ol className="admin-chosen">
+              {genres.map((genre, index) => (
+                <li key={genre}>
+                  <b>{index + 1}</b>
+                  {genreName(genre)}
+                  <button type="button" aria-label={`retirer ${genreName(genre)}`} onClick={() => toggle(genre)}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          {/* Focused when the genres are the first thing to fix, or once they're unfolded, which is why it can be focused. */}
+          <div ref={tags} className="admin-tags" role="group" aria-label="Tous les genres" aria-invalid={error ? true : undefined} tabIndex={-1}>
+            {GENRES.map((genre) => (
+              <button key={genre} type="button" aria-pressed={genres.includes(genre)} onClick={() => toggle(genre)}>
+                {genreName(genre)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <FieldError message={error} />
     </fieldset>
   )
