@@ -107,7 +107,7 @@ export async function eventsRoutes(app: FastifyInstance, { store, photos }: Even
       config: { tool: { title: 'Voir les événements publics' } },
       schema: {
         operationId: 'list_events',
-        summary: `Parking Radio's public events, which are its announced sessions, with their sets, upcoming and past: every upcoming one and the ${RECENT_PAST_EVENTS} most recent past ones, or every one that starts in a time range when one is given`,
+        summary: `Parking Radio's public events, which are its announced sessions, upcoming and past: every upcoming one and the ${RECENT_PAST_EVENTS} most recent past ones, or every one that starts in a time range when one is given`,
         tags: ['Events'],
         querystring: z.object(startRange('events')).refine(...fromBeforeTo),
         response: { 200: Events },

@@ -131,10 +131,10 @@ A tool that succeeds gives the endpoint's response, as JSON, without spaces. One
 the status and the error, with all its fields, e.g. the `session` and `set` in the way of a 409 (see
 [Rules](sessions.md#rules)). There are three exceptions.
 
-**Summaries.** The tools that list artists, collectives, applications and sessions give a summary of each one, and
-`get_calendar` of each of its sessions, with the rest of their endpoint's response as it is, e.g. its `total`, so that
-their lists fit in what apps take as they grow, e.g. about 150,000 characters in claude.ai. Their descriptions say so,
-and which tool gives all of one, e.g. `get_session`. A summary has these fields of the full item, with the same names
+**Summaries.** The tools that list artists, collectives, applications, sessions and events give a summary of each one,
+and `get_calendar` of each of its sessions, with the rest of their endpoint's response as it is, e.g. its `total`, so
+that their lists fit in what apps take as they grow, e.g. about 150,000 characters in claude.ai. Their descriptions say
+so, and which tool gives all of one, e.g. `get_session`. A summary has these fields of the full item, with the same names
 and shapes:
 
 | Endpoint | Fields |
@@ -144,6 +144,7 @@ and shapes:
 | `GET /api/admin/applications` | `id`, `artistId`, `collectiveId`, `receivedAt`, `status`, `dates`, `sets` and `sessions`, and `name`, the name of its artist or collective, which the tool looks up |
 | `GET /api/admin/sessions` | `id`, `start`, `end`, `durationMinutes`, `type`, `title`, `takeover`, `application`, `status`, `announced` and `sets`, each with its `id`, `durationMinutes`, `status`, `performers` and `application` |
 | `GET /api/admin/calendar` | `sessions` and `undatedSessions`, each with `id`, `start`, `end`, `durationMinutes`, `type`, `title`, `takeover`, `application`, `status` and `announced`: the summary of `GET /api/admin/sessions` without `sets` |
+| `GET /api/events` | `upcoming` and `past`, each with `id`, `title`, `type`, `start`, `end`, `cancelled`, `raEvent`, `takeover` and `lineup`. An event has its session's id, and `get_session` gives all of that session |
 
 **Contact details.** The email and the phone of artists and collectives are never in what tools give, whether they
 succeed or fail: whatever a tool gives is sent to the model's provider, and these are people's personal contact details.

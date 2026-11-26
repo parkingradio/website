@@ -2588,7 +2588,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Parking Radio's public events, which are its announced sessions, with their sets, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given */
+        /** Parking Radio's public events, which are its announced sessions, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given */
         get: operations["list_events"];
         put?: never;
         post?: never;

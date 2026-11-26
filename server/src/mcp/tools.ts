@@ -224,9 +224,13 @@ type Send = (method: string, url: string, payload?: Payload) => Promise<Answer>
 // The fields of a session's summary, but its sets.
 const SESSION_SUMMARY = ['id', 'start', 'end', 'durationMinutes', 'type', 'title', 'takeover', 'application', 'status', 'announced']
 
-// What the tools that list artists, collectives, applications and sessions give of each one, and `get_calendar` of each
-// of its sessions, so that their lists fit in what apps take as they grow: these fields of the full item, as they are.
-// Their descriptions say so, and which tool gives all of one: for `list_<items>`, `get_<item>`, unless it `says` otherwise.
+// The fields of an event's summary.
+const EVENT_SUMMARY = ['id', 'title', 'type', 'start', 'end', 'cancelled', 'raEvent', 'takeover', 'lineup']
+
+// What the tools that list artists, collectives, applications, sessions and events give of each one, and `get_calendar`
+// of each of its sessions, so that their lists fit in what apps take as they grow: these fields of the full item, as they
+// are. Their descriptions say so, and which tool gives all of one: for `list_<items>`, `get_<item>`, unless it `says`
+// otherwise.
 type Summary = { says?: string; summarize: (body: JsonObject, send: Send) => Promise<JsonObject> }
 const SUMMARIES: Record<string, Summary> = {
   list_artists: {
@@ -267,6 +271,10 @@ const SUMMARIES: Record<string, Summary> = {
       sessions: pick(sessions, SESSION_SUMMARY),
       undatedSessions: pick(undatedSessions, SESSION_SUMMARY),
     }),
+  },
+  list_events: {
+    says: "Gives a summary of each event, with its lineup rather than its sets: an event has its session's id, and `get_session` gives all of that session.",
+    summarize: async ({ upcoming, past, ...rest }) => ({ ...rest, upcoming: pick(upcoming, EVENT_SUMMARY), past: pick(past, EVENT_SUMMARY) }),
   },
 }
 

@@ -25,6 +25,12 @@ const store = { findAccessToken: vi.fn<OAuthStore['findAccessToken']>(async () =
 
 const FEED_LINK = 'https://example.com/private-secret.ics'
 
+// What the tool gives of a public event: its summary.
+const EVENT = {
+  ...{ id: 'e', title: 'GUEST MIXES', type: 'guest-mixes', start: '2026-11-24T21:00:00-05:00', end: '2026-11-24T23:00:00-05:00', cancelled: false },
+  ...{ raEvent: null, takeover: null, lineup: [{ id: 'a', name: 'Aurore' }] },
+}
+
 // The profile of the tests' multipart route, like an artist's.
 const Profile = z.object({ name: z.string(), email: z.string().nullable(), phone: z.string() })
 let saved: z.infer<typeof Profile>
@@ -178,6 +184,15 @@ async function buildApp(logs?: string[], environment = 'test') {
         const unprotectedSessions = [{ id: 'u', title: 'GUEST MIXES', start: '2026-11-24T21:00:00-05:00', end: '2026-11-24T23:00:00-05:00' }]
         const conflicts = [{ things: [{ kind: 'session', id: 's' }] }]
         return { ok: true, today: '2026-11-23', feeds, sessions: [full], availability, conflicts, unprotectedSessions, undatedSessions: [full] }
+      },
+    )
+    // Like the public events, which are summarized with their lineup but not their sets.
+    api.get(
+      '/api/events',
+      { config: { tool: { title: 'Voir les événements publics' } }, schema: { operationId: 'list_events', summary: 'The events' } },
+      async () => {
+        const full = { ...EVENT, description: 'Long', flyer: { w320: '/api/events/flyers/x/w320.webp' }, sets: [{ id: 'set' }] }
+        return { ok: true, upcoming: [full], past: [{ ...full, id: 'p', cancelled: true, lineup: [] }] }
       },
     )
   })
@@ -415,6 +430,7 @@ describe('the MCP server', () => {
       const tools = response.json().result.tools as { name: string; title: string; description: string; annotations: object; inputSchema: object }[]
       expect(tools.map(({ name }) => name)).toEqual([
         ...['get_thing', 'update_thing', 'get_artist', 'create_artist', 'update_artist', 'update_session', 'create_times', 'create_things', 'get_calendar_feed', 'list_artists', 'get_calendar'],
+        'list_events',
         'read_documentation',
       ])
       const get = tools.find(({ name }) => name === 'get_thing')!
@@ -589,6 +605,11 @@ describe('the MCP server', () => {
         unprotectedSessions: [{ id: 'u', title: 'GUEST MIXES', start: '2026-11-24T21:00:00-05:00', end: '2026-11-24T23:00:00-05:00' }],
         undatedSessions: [session],
       })
+    })
+
+    it('summarize the events, upcoming and past, with their lineup but not their sets, description or flyer', async () => {
+      const app = await buildApp()
+      expect((await call(app, 'list_events')).body).toEqual({ ok: true, upcoming: [EVENT], past: [{ ...EVENT, id: 'p', cancelled: true, lineup: [] }] })
     })
 
     it("read the rules of an area, from the server's design documents", async () => {
