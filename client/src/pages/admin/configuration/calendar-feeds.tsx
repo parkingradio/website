@@ -128,8 +128,7 @@ function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
 }
 
 // A row across the table's four columns, e.g. the form that changes a feed. `headers` is the id of the header its cell
-// is under, rather than the columns'. `continued` when the next row continues it, e.g. the line under the form, so that
-// it has no border under it.
+// is under, rather than the columns'. `continued` when the next row continues it, e.g. the line under the form.
 function SpanRow({ headers, continued, children }: { headers?: string; continued?: boolean; children: ReactNode }) {
   return (
     <tr className={continued ? 'admin-table-continued' : undefined}>
