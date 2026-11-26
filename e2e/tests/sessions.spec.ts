@@ -48,6 +48,11 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   const undated = rowsOf(page, 'LES SŒURS ONDES TAKEOVER')
   await expect(undated).toContainText('date à déterminer')
   await expect(undated).toContainText('3 h')
+  // Which can't be announced, which its greyed-out dropdown says.
+  const undatedAnnounced = undated.getByRole('combobox', { name: /^Annonce : / })
+  await expect(undatedAnnounced).toHaveText('non annoncée')
+  await expect(undatedAnnounced).toHaveAttribute('aria-disabled', 'true')
+  await expect(undatedAnnounced).toHaveAccessibleDescription("La session n'a pas de date.")
   await undated.getByRole('link', { name: 'date à déterminer' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'LES SŒURS ONDES TAKEOVER' })).toBeVisible()
   const sets = page.getByRole('table', { name: 'Sets' })
@@ -71,7 +76,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^annulées/ }).click()
   await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annulée')
   // Which stays announced.
-  await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annoncée')
+  await expect(rowsOf(page, 'Les Nuits Basses').getByRole('combobox', { name: /^Annonce : / })).toHaveValue('true')
 
   // Those of the other types, among which a synth meetup, which has no sets: the one that's been played.
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
@@ -586,13 +591,24 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await adminMenu(page).getByRole('link', { name: 'sessions' }).click()
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill(unique)
   const row = page.getByRole('row').filter({ has: page.locator(`a[href="${sessionPage}"]`) })
+  const rowAnnounced = row.getByRole('combobox', { name: /^Annonce : / })
   await expect(row).toContainText(mine.artist.name)
-  await expect(row).toContainText('annoncée')
+  await expect(rowAnnounced).toHaveValue('true')
   const announced = page.getByRole('group', { name: 'Annonce' })
   await announced.getByRole('button', { name: /^non annoncées/ }).click()
   await expect(row).toHaveCount(0)
   await announced.getByRole('button', { name: /^annoncées/ }).click()
   await expect(row).toHaveCount(1)
+  // Un-announced from its row, which takes it out of the announced sessions, then announced again from its row among
+  // those that aren't.
+  await rowAnnounced.selectOption('false')
+  await expect(row).toHaveCount(0)
+  await announced.getByRole('button', { name: /^non annoncées/ }).click()
+  await expect(rowAnnounced).toHaveValue('false')
+  await rowAnnounced.selectOption('true')
+  await expect(row).toHaveCount(0)
+  await announced.getByRole('button', { name: /^annoncées/ }).click()
+  await expect(rowAnnounced).toHaveValue('true')
   await page.goto(`/admin/artistes/${mine.artist.id}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
 
