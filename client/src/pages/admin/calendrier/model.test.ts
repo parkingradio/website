@@ -331,6 +331,9 @@ describe('the days of the month', () => {
     ])
     expect(toDayEnd(shown, '2026-11-24')).toEqual([['22 h – 2 h', true]])
     expect(toDayEnd(shown, '2026-11-25')).toEqual([["jusqu'à 2 h", false]])
+    // All of a 25-hour day, the clocks going back.
+    const fall = { feedId: 'o', start: '2026-11-01T00:00:00-04:00', end: '2026-11-02T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
+    expect(toDayEnd(calendarDays(calendar({ occupations: [fall], holds: [] }), gridDays('2026-11')), '2026-11-01')).toEqual([['toute la journée', true]])
   })
 
   it('list what started on an earlier day first, by start, then end, then the free time', () => {

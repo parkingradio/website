@@ -281,6 +281,8 @@
   text-align: left;
 }
 
+/* Its height, which grows to fit what's on its day, is load-bearing: the height of what's in it, .calendar-cell, is a
+   percentage of it, which only works since the cell has a height of its own. */
 .calendar-month td {
   height: 6.5rem;
   padding: 3px;
@@ -306,7 +308,7 @@
 
 /* What's in a day's cell, which fills it, even when another day makes its row taller, so that what lasts until the end
    of the day can stretch down to its bottom. Its height is a percentage of the cell's, which only works since the cell
-   has a height of its own (see above). */
+   has a height of its own (see .calendar-month td). */
 .calendar-cell {
   display: flex;
   flex-direction: column;

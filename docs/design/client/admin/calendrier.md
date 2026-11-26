@@ -130,9 +130,10 @@ overlaps the other thing takes some of. Screen readers read each thing's kind be
 « , avec » between its title and its calendar or performers, e.g. « occupation : RÉPARATION, calendrier Calendrier de
 l'équipe », « session : HAUTE RIVE TAKEOVER, avec Aurore, Brume ».
 
-What lasts until 00:00 or later stretches down to fill the room left in the day: things, e.g. "toute la journée", "dès
-15 h" or "21 h – 1 h", and free time, "disponible" or "dispo dès 11 h". When several do, they share that room equally,
-and what follows them goes below them, at the bottom of the day. The rest is as tall as its words.
+What lasts until the end of the day, 00:00, or later stretches down to fill the room left in the day: things, e.g.
+"toute la journée", "dès 15 h" or "21 h – 1 h", and free time, "disponible" or "dispo dès 11 h". When several do, they
+share that room equally, and what follows them goes below them, at the bottom of the day. The rest is as tall as its
+words.
 
 Clicking a day chooses it, and clicking it again unchooses it. Clicking a session opens its page, without choosing its
 day.

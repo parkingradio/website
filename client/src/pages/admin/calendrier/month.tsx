@@ -155,7 +155,7 @@ function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
     <ul id={id} className="calendar-things">
       {entries.map((entry, i) =>
         isFree(entry) ? (
-          <li key={i} className={['calendar-free', entry.toDayEnd && 'calendar-to-day-end'].filter(Boolean).join(' ')}>
+          <li key={i} className={entry.toDayEnd ? 'calendar-free calendar-to-day-end' : 'calendar-free'}>
             {entry.wholeDay ? 'disponible' : `dispo ${entry.part}`}
           </li>
         ) : (

@@ -178,8 +178,8 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   // The stay stretches down to the bottom of its first day, which it lasts until the end of, and not of the next. Phones
   // show marks in place of the words.
   if (!isMobile) {
-    expect(await reachesCellBottom(cell.locator('.calendar-occupation').filter({ hasText: stays }))).toBe(true)
-    expect(await reachesCellBottom(next.locator('.calendar-occupation'))).toBe(false)
+    await expect.poll(() => reachesCellBottom(cell.locator('.calendar-occupation').filter({ hasText: stays }))).toBe(true)
+    await expect.poll(() => reachesCellBottom(next.locator('.calendar-occupation'))).toBe(false)
   }
   // Which the day's button reads, as its description, whose spaces can be non-breaking ones, and where the browser can
   // put one before the separator's comma.
@@ -277,7 +277,7 @@ test('free time is the protected time that nothing takes, and the sessions outsi
   await expect(free(next)).toHaveText(['dispo dès 17 h'])
   // Which stretches down to the bottom of its day, which it lasts until the end of. Phones show marks in place of the
   // words.
-  if (!isMobile) expect(await reachesCellBottom(free(next))).toBe(true)
+  if (!isMobile) await expect.poll(() => reachesCellBottom(free(next))).toBe(true)
   await expect(dayCell(page, next)).not.toContainText('protégée')
   await expect(dayCell(page, addDays(day, -1)).locator('.calendar-free, .calendar-mark-free')).toHaveCount(0)
   if (isMobile) await expect(dayCell(page, day).locator('.calendar-mark-free')).toBeVisible()
