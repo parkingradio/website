@@ -241,6 +241,8 @@ const SESSIONS: Session[] = [
   },
   { ...SESSION, id: 'session-4', start: '2026-09-01T00:00:00.000Z', end: '2026-09-01T01:00:00.000Z', durationMinutes: 60, type: 'live-performance', takeover: null, name: '', title: 'LIVE PERFORMANCE', raEvent: null, sets: [], status: 'cancelled' },
 ]
+// The list of sessions, with all of them.
+const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
 
 function CurrentPath() {
   const location = useLocation()
@@ -267,6 +269,8 @@ const rows = (table: HTMLElement | null = screen.queryByRole('table')) =>
         .map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? spaced(visibleText(cell))),
     )
 const days = () => rows().map((row) => row[0])
+// What the buttons of the group named `name` say, with how many sessions each one shows.
+const counts = (name: string) => within(screen.getByRole('group', { name })).getAllByRole('button').map((button) => button.textContent)
 
 async function expectSearch(query: string, found: string[]) {
   const field = await screen.findByRole('searchbox', { name: 'Rechercher' })
@@ -296,7 +300,6 @@ const foldedGenres = () => genres().getByRole('button', { name: 'modifier les ge
 const pinnedGenres = () => genres().queryAllByRole('button', { name: /^retirer / }).map((button) => button.getAttribute('aria-label')!.replace(/^retirer /, ''))
 
 describe('The list of sessions', () => {
-  const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
 
   it('says which day a session ends on, when it lasts several days, and on its page too', async () => {
     // From 18:00 on Friday to 2:00 on Sunday.
@@ -425,13 +428,11 @@ describe('The list of sessions', () => {
 })
 
 describe('Announcing a session from the list', () => {
-  const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
   const PUT = 'PUT /api/admin/sessions/session-1/announced'
   const ANNOUNCED = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
   // SOIRÉE, which is announced, un-announced.
   const UNANNOUNCE_SOIREE = { 'PUT /api/admin/sessions/session-3/announced': { ok: true, session: { ...SESSIONS[2], announced: false } } }
   const select = (of: string) => screen.findByRole('combobox', { name: named(`Annonce : ${of}`) })
-  const counts = (name: string) => within(screen.getByRole('group', { name })).getAllByRole('button').map((button) => button.textContent)
 
   it('offers « non annoncée » and « annoncée », by a name that tells the sessions apart', async () => {
     mockFetch(LIST)
@@ -441,7 +442,7 @@ describe('Announcing a session from the list', () => {
     expect(planned).toHaveValue('false')
     expect(within(planned).getAllByRole('option').map((option) => option.textContent)).toEqual(['non annoncée', 'annoncée'])
     expect(await select('SOIRÉE, ven. 2 oct. 2026')).toHaveValue('true')
-    expect(screen.getAllByRole('combobox').map((each) => spaced(each.getAttribute('aria-label')))).toEqual([
+    expect(screen.getAllByRole('combobox', { name: /^Annonce/ }).map((each) => spaced(each.getAttribute('aria-label')))).toEqual([
       'Annonce : GUEST MIXES, date à déterminer',
       'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026',
       'Annonce : SOIRÉE, ven. 2 oct. 2026',
@@ -557,6 +558,119 @@ describe('Announcing a session from the list', () => {
     fireEvent.change(other, { target: { value: 'false' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await waitFor(() => expect(other).toBeEnabled())
+  })
+})
+
+describe("Changing a session's status from the list", () => {
+  const select = (of: string) => screen.findByRole('combobox', { name: named(`Statut : ${of}`) })
+  // ONDES TAKEOVER, done, its planned set with it.
+  const PLAYED = { ...SESSION, status: 'done', sets: SESSION.sets.map((set) => (set.status === 'planned' ? { ...set, status: 'done' } : set)) }
+  const CANCELLED = withStatus(SESSION, 'cancelled')
+
+  it('offers « planifiée », « jouée » and « annulée », by a name that tells the sessions apart', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    const planned = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    expect(planned).toHaveValue('planned')
+    expect(within(planned).getAllByRole('option').map((option) => option.textContent)).toEqual(['planifiée', 'jouée', 'annulée'])
+    expect(await select('SOIRÉE, ven. 2 oct. 2026')).toHaveValue('done')
+    expect(await select('LIVE PERFORMANCE, lun. 31 août 2026')).toHaveValue('cancelled')
+    expect(screen.getAllByRole('combobox', { name: /^Statut/ }).map((each) => spaced(each.getAttribute('aria-label')))).toEqual([
+      'Statut : GUEST MIXES, date à déterminer',
+      'Statut : ONDES TAKEOVER, sam. 14 nov. 2026',
+      'Statut : SOIRÉE, ven. 2 oct. 2026',
+      'Statut : LIVE PERFORMANCE, lun. 31 août 2026',
+    ])
+  })
+
+  it('takes a session out of the planned ones once it is marked jouée, after asking, since it marks its planned sets, without loading the list again', async () => {
+    mockFetch({ ...LIST, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: PLAYED } })
+    renderAt('/admin/sessions')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    fireEvent.change(changed, { target: { value: 'done' } })
+    expect(confirm).toHaveBeenLastCalledWith('Le set planifié sera aussi marqué comme joué\u00a0:\n• Set de Aurore et Brume\nMarquer la session comme jouée ?')
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('planned')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
+
+    fireEvent.change(changed, { target: { value: 'done' } })
+    await waitFor(() => expect(days()).toEqual(['date à déterminer']))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'done' })
+    expect(requestsTo('GET', '/api/admin/sessions')).toHaveLength(1)
+    expect(counts('Statut')).toEqual(['toutes (4)', 'planifiées (1)', 'jouées (2)', 'annulées (1)'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions$/)
+  })
+
+  it('keeps a session listed among all of them, with its new status, once its cancelling is confirmed, naming its sets and saying that its event on RA stays', async () => {
+    mockFetch({ ...LIST, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: CANCELLED } })
+    renderAt('/admin/sessions?status=all')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    fireEvent.change(changed, { target: { value: 'cancelled' } })
+    expect(confirm).toHaveBeenLastCalledWith(
+      "Ces sets seront aussi annulés\u00a0:\n• Set de Aurore et Brume\n• Set de Cyan (joué)\nL'événement sur RA ne sera pas modifié.\nAnnuler la session ?",
+    )
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('planned')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
+
+    fireEvent.change(changed, { target: { value: 'cancelled' } })
+    await waitFor(() => expect(counts('Statut')).toEqual(['toutes (4)', 'planifiées (1)', 'jouées (1)', 'annulées (2)']))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'cancelled' })
+    expect(changed).toHaveValue('cancelled')
+    expect(changed.closest('tr')).toHaveClass('admin-status-cancelled')
+    expect(rows()).toHaveLength(4)
+  })
+
+  it('asks nothing when the change leaves the sets as they are', async () => {
+    const live = SESSIONS[3]
+    mockFetch({ ...LIST, 'PUT /api/admin/sessions/session-4/status': { ok: true, session: { ...live, status: 'planned' } } })
+    renderAt('/admin/sessions?status=all')
+
+    const confirm = vi.spyOn(window, 'confirm')
+    const changed = await select('LIVE PERFORMANCE, lun. 31 août 2026')
+    fireEvent.change(changed, { target: { value: 'planned' } })
+    await waitFor(() => expect(changed.closest('tr')).toHaveClass('admin-status-planned'))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-4/status')[0])).toEqual({ status: 'planned' })
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('shows the status picked and keeps only that dropdown from being changed while it is saved', async () => {
+    mockFetch({ ...LIST, 'PUT /api/admin/sessions/session-3/status': { ok: true, session: { ...SESSIONS[2], status: 'planned' } } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('SOIRÉE, ven. 2 oct. 2026')
+    fireEvent.change(changed, { target: { value: 'planned' } })
+
+    expect(changed).toBeDisabled()
+    expect(changed).toHaveValue('planned')
+    expect(screen.getByRole('combobox', { name: named('Annonce : SOIRÉE, ven. 2 oct. 2026') })).toBeEnabled()
+    expect(await select('ONDES TAKEOVER, sam. 14 nov. 2026')).toBeEnabled()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('planned')
+  })
+
+  it('says why it could not be changed, above the list, naming the session and linking to the one in the way, which keeps its value', async () => {
+    const error = { ok: false, error: 'Another session overlaps this one', session: SESSIONS[2], set: null }
+    mockFetch({ ...LIST, 'PUT /api/admin/sessions/session-4/status': error })
+    renderAt('/admin/sessions?status=cancelled')
+
+    const changed = await select('LIVE PERFORMANCE, lun. 31 août 2026')
+    fireEvent.change(changed, { target: { value: 'planned' } })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      "Le statut de « LIVE PERFORMANCE, lun. 31 août 2026 » n'a pas pu être changé : Another session overlaps this one (SOIRÉE, ven. 2 oct. 2026)",
+    )
+    expect(within(alert).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-3')
+    expect(Boolean(alert.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('cancelled')
+    expect(rows()).toHaveLength(1)
   })
 })
 

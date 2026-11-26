@@ -51,8 +51,10 @@ and who last changed it. A button changes the collective in a form in its place,
 and is saved the same way. The artists it adds by name are created with its profile, and are the collective's artists in
 the form from then on, so that sending it again doesn't create them twice.
 Under it, its applications are listed like an artist's, with a button to create another one, then the sessions of its
-takeovers, like in [Sessions](sessions.md), announced from their rows, but without their type, with a button to add
-another one as its takeover ("nouvelle session"), and the list can't be searched, filtered or sorted either. At the
+takeovers, like in [Sessions](sessions.md), their status changed and announced from their rows, but without their type,
+with a button to add another one as its takeover ("nouvelle session"), and the list can't be searched, filtered or
+sorted either. Once a takeover's status is changed there, the page loads its applications again, since that can change
+theirs (see [Status, in Applications](../../server/applications.md#status)). At the
 bottom, the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its
 artists stay, and so do their own applications. A collective that has takeovers can't be deleted (see [Types and
 names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used, saying
@@ -114,9 +116,10 @@ one is either:
 - `GET /api/admin/collectives/:id/photo?width=1280`, for its photo, on its page and in its form, which links to
   `GET /api/admin/collectives/:id/photo`, the photo as it was sent.
 - `GET /api/admin/artists?collective=<id>`, for its genres, again each time it's saved.
-- `GET /api/admin/applications?collective=<id>`, for its applications.
-- `GET /api/admin/sessions?takeover=<id>`, for the sessions of its takeovers, and `PUT /api/admin/sessions/:id/announced`,
-  to announce one or un-announce it.
+- `GET /api/admin/applications?collective=<id>`, for its applications, again each time a takeover's status is changed
+  from its page.
+- `GET /api/admin/sessions?takeover=<id>`, for the sessions of its takeovers, and `PUT /api/admin/sessions/:id/status`
+  and `PUT /api/admin/sessions/:id/announced`, to change one's status, and to announce it or un-announce it.
 - `GET /api/admin/artists`, in a collective's form and in "ajouter un collectif", to pick its artists, each time the
   form opens.
 - `POST /api/admin/collectives`, for "ajouter un collectif".
