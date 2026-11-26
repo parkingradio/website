@@ -684,9 +684,10 @@ describe('Calendrier', () => {
       const form = newSession()!
       const slots = within(within(form).getByRole('group', { name: 'Plages horaires' }))
 
-      // Pressing one doesn't take the focus (see `SlotChoices`).
+      // Pressing one doesn't take the focus, but clicking it does, once the times are filled in (see `SlotChoices`).
       expect(fireEvent.mouseDown(slots.getByRole('button', { name: '13 h – 17 h' }))).toBe(false)
       fireEvent.click(slots.getByRole('button', { name: '13 h – 17 h' }))
+      expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveFocus()
       expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
       expect(shownTime(timeField('Début'))).toBe('13 h 00')
       expect(shownTime(timeField('Fin'))).toBe('17 h 00')

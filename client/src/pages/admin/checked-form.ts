@@ -4,9 +4,11 @@ import type { FocusEvent, FormEvent, ReactNode } from 'react'
 // How the forms for artists and applications check their fields and send them.
 
 // A blur handler that calls `onLeave` once the focus leaves the element and everything in it, rather than moving
-// within it, e.g. from one of a fieldset's inputs to another.
+// within it, e.g. from one of a fieldset's inputs to another. The page itself losing the focus, e.g. to another window,
+// or to a date field's picker, which browsers show as one, doesn't leave it: the field keeps the focus.
 export function leaving(onLeave: () => void) {
   return (event: FocusEvent<HTMLElement>) => {
+    if (document.activeElement === event.target) return
     if (!event.currentTarget.contains(event.relatedTarget)) onLeave()
   }
 }

@@ -279,13 +279,23 @@ function TimesField({
 export const To = () => <span className="admin-times-to">à</span>
 
 // The programmation's time slots, as suggestions under a session's times, which they fill in, with the one `picked`, if
-// any, pressed (see "The session form" in docs/design/client/admin/sessions.md). Clicking or tapping one leaves the focus
-// where it is, e.g. in a time, which leaving would say what's wrong with, moving the slots down before the click lands.
+// any, pressed (see "The session form" in docs/design/client/admin/sessions.md). Pressing one leaves the focus where it
+// is until it's clicked, e.g. in a time, which leaving would say what's wrong with, moving the slots down before the click
+// lands. The click then takes the focus, once the times are filled in, so that an hour typed in part, e.g. "1" for 18,
+// isn't finished by what's typed in it once it has the focus again.
 export function SlotChoices({ picked, onPick }: { picked: TimeSlotId | null; onPick: (slot: TimeSlot) => void }) {
   return (
     <div className="admin-slots admin-status-buttons" role="group" aria-label="Plages horaires">
       {TIME_SLOTS.map((slot) => (
-        <Button key={slot.id} aria-pressed={slot.id === picked} onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(slot)}>
+        <Button
+          key={slot.id}
+          aria-pressed={slot.id === picked}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            onPick(slot)
+            event.currentTarget.focus()
+          }}
+        >
           {slot.label}
         </Button>
       ))}

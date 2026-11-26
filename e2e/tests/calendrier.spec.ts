@@ -112,9 +112,11 @@ test('a session is in its month, and on its day, where a new session is added', 
   const end = form.getByRole('group', { name: 'Fin', exact: true })
   const slots = form.getByRole('group', { name: 'Plages horaires' })
   await expect(start.getByRole('spinbutton').first()).toBeFocused()
-  // A time slot, under its times, fills them in, and leaves the focus where it was, so that they can be typed over.
+  // A time slot, under its times, fills them in, even while an hour is typed in part, and takes the focus, so that what's
+  // typed in the hour once it has it again isn't the end of the hour typed before, e.g. "1" then "8", for 18.
+  await page.keyboard.type('1')
   await slots.getByRole('button', { name: '13 h – 17 h' }).click()
-  await expect(start.getByRole('spinbutton').first()).toBeFocused()
+  await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toBeFocused()
   await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
   await expect(start).toHaveText('\u206613 h 00\u2069')
   await expect(end).toHaveText('\u206617 h 00\u2069')
