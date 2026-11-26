@@ -276,8 +276,9 @@ test('free time shows where nothing takes the protected time, and the sessions o
   })
   await logIn(page, { at: `/admin/calendrier?month=${day.slice(0, 7)}` })
 
-  // Free time around what takes the protected time, and none where it isn't protected, even where nothing takes it, on
-  // a day with a session too. The month says nothing of the session outside protected time.
+  // The stretches the server gives, cut to each day, around what takes the protected time, and none where it isn't
+  // protected, even where nothing takes it, on a day with a session too. The month says nothing of the session outside
+  // protected time.
   const free = (day: string) => dayCell(page, day).locator('.calendar-free')
   await expect(free(day)).toHaveText(['dispo 11 h – 12 h', 'dispo 13 h – 15 h', 'dispo 17 h – 18 h'])
   await expect(free(next)).toHaveText(['dispo dès 17 h'])
@@ -443,7 +444,7 @@ test("the legend says what each kind is, in tooltips, and links to the admin's o
   const tips = {
     session: 'Toutes les sessions qui ont une date.',
     occupation: "Période où le studio n'est pas disponible pour des sessions.",
-    disponible: 'Plage protégée pour les sessions, que ni session ni occupation ne prend.',
+    disponible: "Plage protégée pour les sessions, qu'aucune session ni occupation ne prend.",
     conflit: 'Une session et une occupation, ou deux occupations, qui se chevauchent.',
   }
   for (const [name, tip] of Object.entries(tips)) {

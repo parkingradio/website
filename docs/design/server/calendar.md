@@ -109,11 +109,11 @@ day after its last, e.g. a month:
 Its occupations and holds are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can
 be out of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read
 yet, e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or
-when it hasn't been read yet: for an `occupations` feed, conflicts can then be missing or out of date, and so can free
-time, and for a `holds` feed, free time can be missing or out of date, and sessions can wrongly be, or not be, outside
-protected time. Apps can have every feed read again first when they
-need the calendar to be up to date, e.g. right after the admin changed an event, but not before every calendar they ask
-for, since that waits for every read. Occupations and holds also only cover what a read keeps, from a year before it to
+when it hasn't been read yet: for an `occupations` feed, conflicts can then be missing or out of date, and free time can
+be there wrongly, or out of date, and for a `holds` feed, free time can be missing or out of date, and sessions can
+wrongly be, or not be, outside protected time. Apps can have every feed read again first when they need the calendar to
+be up to date, e.g. right after the admin changed an event, but not before every calendar they ask for, since that waits
+for every read. Occupations and holds also only cover what a read keeps, from a year before it to
 two years after it (see [Events](#events)), so the calendar of days outside that can lack them.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
@@ -173,6 +173,9 @@ included, to 00:00 on the day 365 days later. It's in stretches, each from when 
 midnight, only cut where these 365 days start and end: two stretches never overlap or follow each other. Time that
 nothing takes but that isn't protected isn't free time: while there's no `holds` feed, there's none.
 
+Free time is where sessions can go: a session placed within a stretch is within protected time, and overlaps nothing.
+The part of today that's over is still in it, so apps shouldn't suggest it.
+
 A stretch has its `start` and `end`. The calendar gives those that take some of the days asked for, whole, like holds,
 e.g. one that goes on after the last day.
 
@@ -195,7 +198,7 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `today` | string | Today in Québec, `YYYY-MM-DD`, which the conflicts and the sessions outside protected time are counted from |
+| `today` | string | Today in Québec, `YYYY-MM-DD`, which the conflicts, the sessions outside protected time and the free time are counted from |
 | `feeds` | list of feeds | Every feed, as [`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them |
 | `sessions` | list of sessions | The sessions with a start that take some of the days, whatever their status, as [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) gives them, by start |
 | `occupations` | list of occupations | The occupations that take some of the days, by start, then end |

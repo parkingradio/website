@@ -48,10 +48,13 @@ export function unprotectedSessions<Session extends CalendarSession>(
 // The free time of `window`, the 365 days from today: the time `holds` protect, of any feeds, that nothing of `taking`
 // takes, as stretches that don't overlap or follow each other, by start, cut only at the window's edges. `taking` is what
 // takes the studio: the sessions that aren't cancelled, with a start, and the occupations.
-export function freeTime(holds: Span[], taking: Span[], { from, to }: Period): Span[] {
-  const taken = [...taking].sort((a, b) => a.start.getTime() - b.start.getTime())
+export function freeTime(holds: Span[], taking: Span[], window: Period): Span[] {
+  const { from, to } = window
+  // Only what takes some of the window, rather than all that reads keep, from a year before them to two years after.
+  const inWindow = takesSomeOf(window)
+  const taken = taking.filter(inWindow).sort((a, b) => a.start.getTime() - b.start.getTime())
   const stretches: Span[] = []
-  for (const period of protectedTime(holds)) {
+  for (const period of protectedTime(holds.filter(inWindow))) {
     const end = period.end < to ? period.end : to
     let free = period.start > from ? period.start : from
     for (const { start, end: takenUntil } of taken) {

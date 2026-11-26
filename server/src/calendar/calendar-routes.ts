@@ -77,7 +77,7 @@ const Conflict = z
 
 const CalendarResponse = z.object({
   ok: z.literal(true),
-  today: Day.meta({ description: 'The day the conflicts and the sessions outside protected time are counted from: today, in Québec' }),
+  today: Day.meta({ description: 'The day the conflicts, the sessions outside protected time and the free time are counted from: today, in Québec' }),
   feeds: z.array(Feed).meta({ description: 'Every feed, in the order they were added, with when each was last read, and why that failed' }),
   sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start' }),
   occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, by start, then end' }),
@@ -170,8 +170,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
         holds: holds.filter(inRange).sort(byStartThenEnd).map(holdBody),
         freeTime: freeTime(holds, takingThings(counted, occupations), window).filter(inRange).map(timesBody),
         conflicts: found.map(({ start, end, things: [first, second] }) => ({
-          start: start.toISOString(),
-          end: end.toISOString(),
+          ...timesBody({ start, end }),
           things: [thingBody(first), thingBody(second)] as [z.infer<typeof Thing>, z.infer<typeof Thing>],
         })),
         unprotectedSessions: unprotected.map(({ id, title, start, end }) => ({ id, title, ...timesBody({ start, end }) })),

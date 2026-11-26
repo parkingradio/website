@@ -7834,7 +7834,7 @@ export interface operations {
                         ok: true;
                         /**
                          * Format: date
-                         * @description The day the conflicts and the sessions outside protected time are counted from: today, in Québec
+                         * @description The day the conflicts, the sessions outside protected time and the free time are counted from: today, in Québec
                          */
                         today: string;
                         /** @description Every feed, in the order they were added, with when each was last read, and why that failed */
