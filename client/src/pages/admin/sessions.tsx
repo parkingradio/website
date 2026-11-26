@@ -40,6 +40,7 @@ import {
   flyerUrl,
   formatDuration,
   genreNames,
+  raEventKept,
   receivedOn,
   sessionDay,
   sessionHours,
@@ -67,7 +68,7 @@ import { Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet, TakeoverCollective } from './set-form'
 import { DragHandle, SortableList } from './sortable'
-import { useAnnouncing } from './use-announcing'
+import { confirmAnnouncing, useAnnouncing } from './use-announcing'
 import type { Announcing } from './use-announcing'
 import { arrayMove, useSortableItem } from './use-sortable'
 
@@ -587,12 +588,13 @@ function LoadedSession({ loaded }: { loaded: Session }) {
 
   const changeStatus = async (status: SessionStatus) => {
     // Cancelling it cancels its sets that aren't cancelled, played ones included, so they're named, saying which were
-    // played.
-    const uncancelled = session.sets.filter((set) => set.status !== 'cancelled')
-    if (status === 'cancelled' && uncancelled.length > 0) {
+    // played, and leaves its event on RA as it is.
+    if (status === 'cancelled' && session.status !== 'cancelled') {
+      const uncancelled = session.sets.filter((set) => set.status !== 'cancelled')
       const cancelled = uncancelled.length === 1 ? 'Ce set sera aussi annulé' : 'Ces sets seront aussi annulés'
       const names = uncancelled.map((set) => `• ${setTitle(set)}${set.status === 'done' ? ` (${SET_STATUS_LABELS.done})` : ''}`).join('\n')
-      if (!window.confirm(`${cancelled}\u00a0:\n${names}\nAnnuler la session ?`)) return
+      const warning = (uncancelled.length > 0 ? `${cancelled}\u00a0:\n${names}\n` : '') + raEventKept(session)
+      if (warning && !window.confirm(`${warning}Annuler la session ?`)) return
     }
     // Marking it done marks its planned sets done, which could be a set that didn't happen, so they're named.
     const planned = session.sets.filter((set) => set.status === 'planned')
@@ -612,6 +614,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   }
 
   const changeAnnounced = async (announced: Announced) => {
+    if (!confirmAnnouncing(session, announced)) return
     setBusy(true)
     setAnnouncedError(null)
     const result = await api.PUT('/api/admin/sessions/{id}/announced', { params, body: { announced: announced === 'true' } })
@@ -682,7 +685,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
 
   const remove = async () => {
     const sets = session.sets.length
-    if (!window.confirm(`Supprimer définitivement cette session${sets > 0 ? ` et ${sets === 1 ? 'son set' : `ses ${sets} sets`}` : ''} ?`)) return
+    if (!window.confirm(`${raEventKept(session)}Supprimer définitivement cette session${sets > 0 ? ` et ${sets === 1 ? 'son set' : `ses ${sets} sets`}` : ''} ?`)) return
     setBusy(true)
     setError(null)
     const result = await api.DELETE('/api/admin/sessions/{id}', { params })

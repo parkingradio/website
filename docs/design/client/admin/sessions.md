@@ -58,8 +58,10 @@ The section lists the sessions, each with its day ("Date"), linking to its page,
 [Times](#times)), its title ("Nom"), its type ("Type"), which for a takeover links to its collective, its sets'
 performers ("Artistes"), set by set in their order, the sets separated by "·", each artist linking to their page, its
 status ("Statut"), and whether it's announced ("Annonce"), as a dropdown, "non annoncée" or "annoncée", that announces it
-or un-announces it as soon as the other value is picked, without confirming. A session without a date can't be announced:
-its dropdown can't be used, and says « La session n'a pas de date. » (see
+or un-announces it as soon as the other value is picked, without confirming, except that un-announcing a session that
+has an event on RA first asks to confirm, saying « L'événement sur RA ne sera pas modifié. » (see
+[Events on RA](../../server/sessions.md#events-on-ra)), and when it isn't confirmed, its row keeps its value. A session
+without a date can't be announced: its dropdown can't be used, and says « La session n'a pas de date. » (see
 [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 It opens on "planifiées", its default view (see [Searching lists](layout.md#searching-lists)), by date, the earliest
@@ -85,11 +87,14 @@ Clicking a session opens it at `/admin/sessions/<id>`, with the list's parameter
 [Going through a list](layout.md#going-through-a-list)), titled as it's called (see [Names](#names)). Under the title, it
 says who added it and when, and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
-- "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
-  sets that aren't cancelled first asks to confirm, naming them, marking those that are "joué", and saying that they'll
-  be cancelled too (see [Status](../../server/sessions.md#status)). Marking it "jouée" while it has "planifié" sets
-  first asks to confirm too, naming them and saying that they'll be marked "joué". Under it, likewise, whether the
-  session is announced, as "non annoncée" and "annoncée". Each says why it couldn't be changed under its own buttons.
+- "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session first
+  asks to confirm when it has sets that aren't cancelled, naming them, marking those that are "joué", and saying that
+  they'll be cancelled too (see [Status](../../server/sessions.md#status)), or an event on RA, saying « L'événement sur
+  RA ne sera pas modifié. » (see [Events on RA](../../server/sessions.md#events-on-ra)), after its sets when it has
+  both. Marking it "jouée" while it has "planifié" sets first asks to confirm too, naming them and saying that they'll
+  be marked "joué". Under it, likewise, whether the session is announced, as "non annoncée" and "annoncée".
+  Un-announcing a session that has an event on RA first asks to confirm too, saying « L'événement sur RA ne sera pas
+  modifié. ». Each says why it couldn't be changed under its own buttons.
   While the session has no date, "annoncée" can't be used, and says « La session n'a pas de date. » (see
   [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 - "Session": the session's details, which "modifier" changes in a form in their place (see
@@ -144,7 +149,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   [Warnings](layout.md#warnings)), e.g. « ⚠ Les sets durent 4 h 58, plus que la session (1 h). ». The warning doesn't
   prevent anything, since a session and its sets are changed one at a time.
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming, then shows the list as
-  "← sessions" does. Its sets' artists, and its takeover's collective, stay, which the page says of those it has.
+  "← sessions" does. Its sets' artists, and its takeover's collective, stay, which the page says of those it has. When
+  the session has an event on RA, the confirmation first says « L'événement sur RA ne sera pas modifié. ».
 
 Only one form is open at a time on a session's page, the session's, the panel of its event on RA (see
 [Creating its event on RA](#creating-its-event-on-ra)), a set's, or the panel that moves a set to another session (see

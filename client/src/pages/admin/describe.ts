@@ -22,6 +22,10 @@ export type Announced = 'true' | 'false'
 export const ANNOUNCED_LABELS: Record<Announced, string> = { true: 'annoncée', false: 'non annoncée' }
 export const ANNOUNCED_PLURALS: Record<Announced, string> = { true: 'annoncées', false: 'non annoncées' }
 
+// The line a confirmation says before its question when the session has an event on RA, which un-announcing,
+// cancelling or deleting the session leaves as it is (see "Events on RA" in docs/design/server/sessions.md), or nothing.
+export const raEventKept = (session: Session) => (session.raEvent ? "L'événement sur RA ne sera pas modifié.\n" : '')
+
 // A session's type.
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
   'guest-mixes': 'Guest mixes',
