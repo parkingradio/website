@@ -56,7 +56,12 @@ export async function signSessionToken(
   { seconds = SESSION_IDLE_SECONDS, loggedInAt }: { seconds?: number; loggedInAt?: number } = {},
 ): Promise<string> {
   const now = nowSeconds()
-  return new SignJWT({ email: user.email, ver: user.sessionVersion, auth_time: loggedInAt ?? now })
+  return sign(user, { now, seconds, loggedInAt: loggedInAt ?? now })
+}
+
+// As signSessionToken, signed at `now`.
+function sign(user: AdminSession, { now, seconds, loggedInAt }: { now: number; seconds: number; loggedInAt: number }) {
+  return new SignJWT({ email: user.email, ver: user.sessionVersion, auth_time: loggedInAt })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
     .setIssuedAt(now)
@@ -66,8 +71,8 @@ export async function signSessionToken(
 
 // The session a token is, with the version its admin's sessions had when it started. Null if the token isn't one we
 // signed, or has expired. Sessions that started before there were versions have none, and are of the first one, 0.
-// Those that started before they were renewed don't say when their admin logged in, which is when they were signed,
-// since only logging in signed them.
+// Those signed before tokens had `auth_time` don't say when their admin logged in, which is when they were signed, since
+// only logging in signed them.
 export async function verifySessionToken(token: string): Promise<VerifiedSession | null> {
   try {
     const { payload } = await jwtVerify(token, jwtSecretKey(), { requiredClaims: ['iat', 'exp'] })
@@ -83,9 +88,12 @@ export async function verifySessionToken(token: string): Promise<VerifiedSession
 
 // Sets the session cookie to a new token for `user`'s session, which they logged in to at `loggedInAt`, now unless told
 // otherwise: it lasts SESSION_IDLE_SECONDS, or until SESSION_MAX_SECONDS after logging in if that's sooner.
-export async function setSessionCookie(reply: FastifyReply, user: AdminSession, loggedInAt = nowSeconds()): Promise<void> {
-  const seconds = Math.min(SESSION_IDLE_SECONDS, loggedInAt + SESSION_MAX_SECONDS - nowSeconds())
-  reply.setCookie(config.sessionCookie, await signSessionToken(user, { seconds, loggedInAt }), {
+export async function setSessionCookie(reply: FastifyReply, user: AdminSession, loggedInAt?: number): Promise<void> {
+  // One instant, so that the token and the cookie expire together.
+  const now = nowSeconds()
+  const loggedIn = loggedInAt ?? now
+  const seconds = Math.min(SESSION_IDLE_SECONDS, loggedIn + SESSION_MAX_SECONDS - now)
+  reply.setCookie(config.sessionCookie, await sign(user, { now, seconds, loggedInAt: loggedIn }), {
     httpOnly: true,
     sameSite: 'lax',
     secure: config.isProduction,
@@ -129,8 +137,8 @@ export const UNAUTHORIZED: ApiError = { ok: false, error: 'Unauthorized' }
 // Routes with zod schemas get it with `config: { admin: true }` (see api/schemas.ts). It returns the reply when it refuses
 // a request, so that Fastify waits for it to be sent.
 //
-// A request still being answered when its admin logs out, the day's first, can renew the session after the logout's
-// response cleared the cookie, and so put it back.
+// A request still being answered when its session's cookie is cleared, e.g. by logging out or accepting an invite, can
+// renew the session after the response that cleared it, if it's the session's first in a day, and so put it back.
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | undefined> {
   if (isCrossOrigin(request)) {
     return reply.code(403).send({ ok: false, error: 'Cross-origin request refused' } satisfies ApiError)

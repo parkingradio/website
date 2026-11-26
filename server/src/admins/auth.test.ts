@@ -21,7 +21,7 @@ import { sessionCookies } from './test-sessions.js'
 const DAY = 24 * 60 * 60
 const ADMIN = { id: 'user-1', email: 'admin@example.com', sessionVersion: 0 }
 
-// A token with `claims`, signed with the test secret, e.g. one signed before sessions were renewed.
+// A token with `claims`, signed with the test secret, e.g. one signed before tokens had `auth_time`.
 function signed(claims: Record<string, unknown>) {
   return new SignJWT(claims).setProtectedHeader({ alg: 'HS256' }).sign(new TextEncoder().encode('test-secret'))
 }
@@ -76,7 +76,7 @@ describe('session tokens', () => {
     expect((await verifySessionToken(token))?.admin).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })
   })
 
-  it('reads the tokens signed before sessions were renewed as logged in when they were signed', async () => {
+  it('reads the tokens signed before they had auth_time as logged in when they were signed', async () => {
     const issuedAt = now() - DAY
     const token = await signed({ sub: 'user-1', email: 'admin@example.com', ver: 0, iat: issuedAt, exp: now() + 3600 })
     expect(await verifySessionToken(token)).toEqual({ admin: ADMIN, issuedAt, loggedInAt: issuedAt })
@@ -311,7 +311,7 @@ describe('renewing sessions', () => {
     expect(await send(app, cookie!.value)).toEqual({ status: 401, cookie: undefined })
   })
 
-  it('counts the 30 days of the sessions that started before they were renewed from when they were signed', async () => {
+  it('counts the 30 days of the tokens signed before they had auth_time from when they were signed', async () => {
     const app = await buildApp()
     const signedAt = now()
     const token = await signed({ sub: ADMIN.id, email: ADMIN.email, ver: 0, iat: signedAt, exp: signedAt + SESSION_IDLE_SECONDS })
