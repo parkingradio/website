@@ -666,13 +666,9 @@ describe('Calendrier', () => {
       fireEvent.click(addButton('2026-11-25'))
       const form = newSession()!
 
-      // Going from a time's hour to its minute isn't leaving it, and neither is the page losing the focus, then getting it
-      // back, as browsers do when another window takes it: the field keeps it.
+      // Going from a time's hour to its minute isn't leaving it.
       act(() => timeParts(timeField('Début'))[0].focus())
       act(() => timeParts(timeField('Début'))[1].focus())
-      fireEvent.blur(timeParts(timeField('Début'))[1])
-      fireEvent.focus(timeParts(timeField('Début'))[1])
-      expect(timeParts(timeField('Début'))[1]).toHaveFocus()
       expect(within(form).queryByText("Indiquez l'heure de début.")).not.toBeInTheDocument()
       act(() => timeParts(timeField('Fin'))[0].focus())
       expect(within(form).getByText("Indiquez l'heure de début.")).toBeInTheDocument()

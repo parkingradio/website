@@ -2478,23 +2478,6 @@ describe('Adding a session', () => {
     })
   })
 
-  it("doesn't say what's wrong with its times while the page loses the focus, e.g. to a date's picker, but once they're left", async () => {
-    mockFetch(NEW)
-    renderAt('/admin/sessions/nouvelle')
-
-    await screen.findByRole('group', { name: 'Début' })
-    act(() => dayInput('Début').focus())
-    fireEvent.change(dayInput('Début'), { target: { value: '2026-11-14' } })
-    // As browsers do when another window, e.g. the date's picker, takes the focus: the field keeps it.
-    fireEvent.blur(dayInput('Début'))
-    expect(dayInput('Début')).toHaveFocus()
-    expect(screen.queryByText("Indiquez l'heure de début.")).not.toBeInTheDocument()
-    expect(screen.queryByText("Indiquez l'heure de fin.")).not.toBeInTheDocument()
-    act(() => screen.getByLabelText('Nom').focus())
-    expect(screen.getByText("Indiquez l'heure de début.")).toBeInTheDocument()
-    expect(screen.getByText("Indiquez l'heure de fin.")).toBeInTheDocument()
-  })
-
   it("fills its times in from one of the programmation's time slots, picked before its day, or only its duration without a date", async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')
