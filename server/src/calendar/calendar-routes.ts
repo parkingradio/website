@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Day, addDays, dayStart, dayWith, daysBetween } from '../api/formats.js'
+import { Day, addDays, dayStart, daysBetween, queryDay, toNotBeforeFrom } from '../api/formats.js'
 import { Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { Status } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
@@ -16,26 +16,14 @@ import { unprotectedSessions } from './protected-time.js'
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
 
-// The days of the years 2000 to 2999, like the instants that requests send (see `EARLIEST_INSTANT` and `LATEST_INSTANT`
-// in api/formats.ts).
-const FIRST_DAY = '2000-01-01'
-const LAST_DAY = '2999-12-31'
 const MAX_DAYS = 400
-
-// A day of the calendar, `from` or `to`, which are days, unlike the instants of the lists of sessions and of events.
-function calendarDay(name: 'from' | 'to', description: string) {
-  const message = `\`${name}\` must be a single day, YYYY-MM-DD, without a time, from ${FIRST_DAY} to ${LAST_DAY}`
-  return dayWith(message)
-    .refine((day) => day >= FIRST_DAY && day <= LAST_DAY, message)
-    .meta({ description })
-}
 
 const CalendarQuery = z
   .object({
-    from: calendarDay('from', 'The first day, in Québec, e.g. "2026-11-01"'),
-    to: calendarDay('to', `The last day, in Québec, included, e.g. "2026-11-30": at most ${MAX_DAYS} days from \`from\`, both included`),
+    from: queryDay('from', 'The first day, in Québec, e.g. "2026-11-01"'),
+    to: queryDay('to', `The last day, in Québec, included, e.g. "2026-11-30": at most ${MAX_DAYS} days from \`from\`, both included`),
   })
-  .refine(({ from, to }) => to >= from, "`to` can't be before `from`")
+  .refine(...toNotBeforeFrom)
   .refine(({ from, to }) => daysBetween(from, to) < MAX_DAYS, `The calendar has at most ${MAX_DAYS} days, \`from\` and \`to\` included`)
 
 const Occupation = z

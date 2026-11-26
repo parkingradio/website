@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
-import { ApiError, ById, Day, Ok, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
+import { queryDay, toNotBeforeFrom } from '../api/formats.js'
+import { ApiError, ById, Day, Ok, Timestamp, Total, changesTo, firstIssue, objectError, repeatable, zodRoutes } from '../api/schemas.js'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
 import { ApplicationLinks, NO_LINKS, linksByApplication } from '../sessions/routes.js'
 import type { SessionsStore, StoredSession } from '../sessions/store.js'
@@ -187,7 +188,8 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       config: { admin: true, tool: { title: 'Lister les candidatures' } },
       schema: {
         operationId: 'list_applications',
-        summary: "Every application, or an artist's or a collective's, the most recently received first",
+        summary:
+          "Every application, or an artist's or a collective's, the most recently received first: when they're given, only those with one of the statuses and with at least one of their dates in the range of days",
         tags: ['Applications'],
         querystring: z
           .object({
@@ -199,15 +201,28 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
               .string({ error: 'The collective must be a single id' })
               .optional()
               .meta({ description: "Only this collective's applications. An unknown collective has none. Not with `artist`" }),
+            status: repeatable(ApplicationStatus)
+              .optional()
+              .meta({ description: 'Only the applications with any of these statuses' }),
+            from: queryDay(
+              'from',
+              'The first day of a range of days, YYYY-MM-DD, in Québec, e.g. "2026-12-01": a day, not an instant. Only the applications with at least one of their dates from `from` to `to`, both included, either of which can be left out',
+            ).optional(),
+            to: queryDay(
+              'to',
+              'The last day of the range, YYYY-MM-DD, in Québec, included: a day, not an instant. E.g. `from` and `to` both "2026-12-12" give the applications with December 12 among their dates',
+            ).optional(),
           })
-          .refine((query) => query.artist === undefined || query.collective === undefined, 'Only one of artist and collective can be given'),
+          .refine((query) => query.artist === undefined || query.collective === undefined, 'Only one of artist and collective can be given')
+          .refine(...toNotBeforeFrom),
         response: { 200: z.object({ ok: z.literal(true), total: Total, applications: z.array(Application) }) },
       },
     },
     async (request) => {
-      const owner = ownerOf(request.query.artist, request.query.collective)
-      const rows = await store.list(owner)
-      const applications = withLinks(rows, await sessions.ofApplications(rows.map(({ id }) => id)))
+      const { status, ...filter } = request.query
+      const rows = await store.list(filter)
+      const listed = withLinks(rows, await sessions.ofApplications(rows.map(({ id }) => id)))
+      const applications = status ? listed.filter((application) => status.includes(application.status)) : listed
       return { ok: true as const, total: applications.length, applications }
     },
   )

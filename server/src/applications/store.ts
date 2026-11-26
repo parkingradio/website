@@ -1,4 +1,5 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Queryable } from '../db/connection.js'
 import { applications } from '../db/schema.js'
@@ -38,8 +39,10 @@ export type ApplicationOwner = { artistId: string; collectiveId?: undefined } | 
 // Where applications are stored. Methods that take an application's id return null if it doesn't exist, including
 // when the id isn't a UUID.
 export type ApplicationsStore = {
-  // The most recently received first, then the most recently created. With an owner, only their applications.
-  list(owner?: ApplicationOwner): Promise<StoredApplication[]>
+  // The most recently received first, then the most recently created. With `artist` or `collective`, only their
+  // applications: none when there's no such artist or collective. With `from` or `to`, days, only those with at least one
+  // of their dates from `from` to `to`, both included.
+  list(filter?: { artist?: string; collective?: string; from?: string; to?: string }): Promise<StoredApplication[]>
   get(id: string): Promise<StoredApplication | null>
   // `createdBy` is the email of the admin who creates the application, or null if the artist sends it themselves.
   // `receivedAt` is when the artist sent it, now if it's left out. Throws a NoSuchArtist or a NoSuchCollective.
@@ -57,11 +60,6 @@ function ownerId(owner: ApplicationOwner): string {
   return owner.artistId !== undefined ? owner.artistId : owner.collectiveId
 }
 
-// The condition on the applications of `owner`.
-function ownedBy(owner: ApplicationOwner) {
-  return owner.artistId !== undefined ? eq(applications.artistId, owner.artistId) : eq(applications.collectiveId, owner.collectiveId)
-}
-
 export function applicationsStore(db: Queryable): ApplicationsStore {
   // Changes the application `id` in `tx`.
   async function changeIn(tx: Queryable, id: string, changes: Partial<typeof applications.$inferInsert>) {
@@ -71,12 +69,20 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
   }
 
   return {
-    async list(owner) {
-      if (owner && !isUuid(ownerId(owner))) return []
+    async list({ artist, collective, from, to } = {}) {
+      if ((artist !== undefined && !isUuid(artist)) || (collective !== undefined && !isUuid(collective))) return []
+      const conditions: SQL[] = []
+      if (artist !== undefined) conditions.push(eq(applications.artistId, artist))
+      if (collective !== undefined) conditions.push(eq(applications.collectiveId, collective))
+      if (from !== undefined || to !== undefined) {
+        // Both bounds on the same date, rather than one date after `from` and another before `to`.
+        const range = sql`${from ?? '-infinity'}::date and ${to ?? 'infinity'}::date`
+        conditions.push(sql`exists (select 1 from unnest(${applications.dates}) as dates(day) where day between ${range})`)
+      }
       return db
         .select()
         .from(applications)
-        .where(owner && ownedBy(owner))
+        .where(and(...conditions))
         .orderBy(desc(applications.receivedAt), desc(applications.createdAt))
     },
 

@@ -34,9 +34,10 @@ function change(id: string, changes: Partial<StoredApplication>) {
 }
 
 const store: ApplicationsStore = {
-  list: async (owner) =>
+  list: async ({ artist, collective, from, to } = {}) =>
     rows
-      .filter((row) => owner === undefined || (owner.artistId !== undefined ? row.artistId === owner.artistId : row.collectiveId === owner.collectiveId))
+      .filter((row) => (artist === undefined || row.artistId === artist) && (collective === undefined || row.collectiveId === collective))
+      .filter((row) => (from === undefined && to === undefined) || row.dates.some((day) => (from === undefined || day >= from) && (to === undefined || day <= to)))
       .toReversed(),
   get: async (id) => rows.find((row) => row.id === id) ?? null,
   create: vi.fn<ApplicationsStore['create']>(async ({ receivedAt, ...application }) => {
@@ -464,6 +465,61 @@ describe('applications routes', () => {
       const both = await send(app, 'GET', '/api/admin/applications?artist=artist-1&collective=collective-1')
       expect(both.statusCode).toBe(400)
       expect(both.json()).toEqual({ ok: false, error: 'Only one of artist and collective can be given' })
+    })
+
+    // The ids of the applications that `query` lists, and their total, which counts them.
+    async function listed(app: App, query: string) {
+      const response = await send(app, 'GET', `/api/admin/applications?${query}`)
+      expect(response.statusCode, query).toBe(200)
+      const { total, applications } = response.json()
+      expect(total, query).toBe(applications.length)
+      return applications.map((row: { id: string }) => row.id)
+    }
+
+    it('lists only the applications with one of the statuses it is given, as their sets and sessions make them, with the other filters', async () => {
+      const app = await buildApp()
+      for (let i = 0; i < 4; i++) await create(app)
+      await create(app, { artistId: 'artist-2' })
+      await send(app, 'PUT', '/api/admin/applications/application-2/decision', { decision: 'accepted' })
+      await send(app, 'PUT', '/api/admin/applications/application-4/decision', { decision: 'rejected' })
+      // Planned by its set, though it's still new.
+      linked = [storedSession({ sets: [storedSet({ applicationId: 'application-3', application: { id: 'application-3', receivedAt: new Date() } })] })]
+
+      expect(await listed(app, 'status=new')).toEqual(['application-5', 'application-1'])
+      expect(await listed(app, 'status=planned')).toEqual(['application-3'])
+      expect(await listed(app, 'status=new&status=planned')).toEqual(['application-5', 'application-3', 'application-1'])
+      expect(await listed(app, 'status=planned&status=new&status=planned')).toEqual(['application-5', 'application-3', 'application-1'])
+      expect(await listed(app, 'status=accepted&status=rejected')).toEqual(['application-4', 'application-2'])
+      expect(await listed(app, 'status=done')).toEqual([])
+      expect(await listed(app, 'status=new&artist=artist-1')).toEqual(['application-1'])
+      expect(await listed(app, 'status=new&from=2026-12-10&to=2026-12-10')).toEqual(['application-5', 'application-1'])
+      expect(await listed(app, 'status=new&from=2026-12-11&to=2027-01-14')).toEqual([])
+    })
+
+    it('refuses a status that is not one, and days that are not single days from 2000 to 2999, or that are in the wrong order', async () => {
+      const app = await buildApp()
+      await create(app)
+      const NOT_A_STATUS = 'The status must be one of new, accepted, planned, done, rejected'
+      const notADay = (name: string) => `\`${name}\` must be a single day, YYYY-MM-DD, without a time, from 2000-01-01 to 2999-12-31`
+      const refused: [string, string][] = [
+        ['status=maybe', NOT_A_STATUS],
+        ['status=', NOT_A_STATUS],
+        ['status=new&status=nouvelle', NOT_A_STATUS],
+        ['from=', notADay('from')],
+        ['from=2026-02-30', notADay('from')],
+        ['from=1999-12-31', notADay('from')],
+        ['from=2026-12-10&from=2026-12-11', notADay('from')],
+        ['to=2026-12-10T00:00-05:00', notADay('to')],
+        ['to=3000-01-01', notADay('to')],
+        ['to=2026-12-10&to=2026-12-11', notADay('to')],
+        ['from=2026-12-11&to=2026-12-10', "`to` can't be before `from`"],
+      ]
+      for (const [query, error] of refused) {
+        const response = await send(app, 'GET', `/api/admin/applications?${query}`)
+        expect(response.statusCode, query).toBe(400)
+        expect(response.json(), query).toEqual({ ok: false, error })
+      }
+      expect(await listed(app, 'from=2000-01-01&to=2999-12-31')).toEqual(['application-1'])
     })
   })
 

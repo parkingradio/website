@@ -197,7 +197,7 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo if no other collective has it, and its applications, but not its members |
 | [`GET /api/collectives/:id`](collectives.md#get-apicollectivesid) | public | A public collective's profile, with its members |
 | [`GET /api/collectives/photos/:image/:size`](collectives.md#get-apicollectivesphotosimagesize) | public | One of the sizes of a photo that a public collective has |
-| [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
+| [`GET /api/admin/applications`](applications.md#get-apiadminapplications-admin) | admin | Every application, or an artist's or a collective's: when they're given, only those with one of the statuses and with at least one of their dates in the range of days |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
 | [`PATCH /api/admin/applications/:id`](applications.md#patch-apiadminapplicationsid-admin) | admin | Changing an application, only the fields it's sent |

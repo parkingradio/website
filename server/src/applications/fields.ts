@@ -35,8 +35,10 @@ export type ApplicationDecision = z.infer<typeof ApplicationDecision>
 // An application's status, worked out from its decision and its sets' or sessions' statuses (see `applicationStatus`), in
 // the order applications usually go through them.
 export const APPLICATION_STATUSES = ['new', 'accepted', 'planned', 'done', 'rejected'] as const
+// Only admins see the error, e.g. when they list the applications with some statuses.
+const BAD_STATUS = `The status must be one of ${APPLICATION_STATUSES.join(', ')}`
 export const ApplicationStatus = z
-  .enum(APPLICATION_STATUSES)
+  .enum(APPLICATION_STATUSES, { error: BAD_STATUS })
   .meta({ id: 'ApplicationStatus', description: 'Worked out from what admins decided and from the statuses of its sets or sessions' })
 export type ApplicationStatus = z.infer<typeof ApplicationStatus>
 

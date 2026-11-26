@@ -353,7 +353,8 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       const body: JsonObject = {}
       for (const [arg, value] of Object.entries(args)) {
         const part = parts.get(arg)
-        if (part === 'query' && value !== undefined) query.set(arg, String(value))
+        // A list, e.g. `list_applications`' statuses, is the parameter given once per value.
+        if (part === 'query' && value !== undefined) for (const item of [value].flat()) query.append(arg, String(item))
         if (part === 'body' || part === 'json') body[arg] = value
       }
       for (const field of nullable) if (!(field in body)) body[field] = null

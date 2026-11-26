@@ -100,6 +100,14 @@ describe('the tools of the API', () => {
     // Only what admins decide: sets and sessions make applications planned or done.
     const decide = tools.find(({ name }) => name === 'update_application_decision')!
     expect(decide.inputSchema.properties).toMatchObject({ decision: { enum: ['new', 'accepted', 'rejected'] } })
+    // Applications are listed by some of their statuses, as a list, and by a range of days, which are days, `to` included.
+    const listApplications = tools.find(({ name }) => name === 'list_applications')!
+    expect(listApplications.inputSchema.properties).toMatchObject({
+      status: { type: 'array', items: { enum: ['new', 'accepted', 'planned', 'done', 'rejected'] } },
+      from: { type: 'string', format: 'date' },
+      to: { type: 'string', format: 'date', description: expect.stringContaining('included') },
+    })
+    expect(listApplications.inputSchema.required).toEqual([])
   })
 
   it("can't be led to another endpoint by an id that's another route's segment", async () => {
