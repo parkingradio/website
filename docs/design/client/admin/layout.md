@@ -36,7 +36,7 @@ conflicts "À régler" shows. When it can't be read, the badge stays as it was, 
 
 When logging out fails, the admin stays logged in, and the menu says so under "se déconnecter". The section itself is
 shown to the right of the menu. On narrow screens like phones, the menu becomes a row above the section instead.
-`/admin` shows the first section, Calendrier. `/login`, where logging in used to be, leads to `/admin`.
+`/admin` shows the first section, Calendrier.
 
 The admin pages show "-" in place of what an admin left out of an artist's or a collective's profile (see
 [Profiles](../../server/artists.md#profiles) and [Profiles](../../server/collectives.md#profiles)), or only the city or

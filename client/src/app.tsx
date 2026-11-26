@@ -22,8 +22,6 @@ function App() {
           <Route path="synth-meetups" element={<SynthMeetups />} />
           <Route path="appliquer" element={<Appliquer />} />
           <Route path="contribuer" element={<Contribuer />} />
-          {/* Logging in happens on the admin pages themselves. This keeps older links working. */}
-          <Route path="login" element={<Navigate to="/admin" replace />} />
           {/* Where apps send admins once they're done connecting. It loads with the public pages, needing nothing of the admin ones. */}
           <Route path="autoriser/termine" element={<AutoriserTermine />} />
           <Route element={<AdminShell />}>
