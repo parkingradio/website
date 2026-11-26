@@ -58,9 +58,6 @@ that admins tell their environments' calendars apart. It asks apps to read it ag
 (`REFRESH-INTERVAL;VALUE=DURATION:PT15M` and `X-PUBLISHED-TTL:PT15M`), which some of them do, while others keep their
 own schedule, e.g. up to a day.
 
-**A year back** is 00:00 on the day 365 days before today, in Québec. Each calendar keeps what ends after then, whole,
-even when it started before, so that calendar apps keep the past: how far ahead each one goes is in its section.
-
 Its events are `VEVENT`s, each with a `UID`, which stays the same as long as it's the same event, so that a change
 updates it in calendars rather than adding another one, a `DTSTAMP`, the time of the request, a `DTSTART` and a `DTEND`,
 and `TRANSP:TRANSPARENT`, so that calendar apps don't show the admin as busy then: these calendars are about the studio,
@@ -68,6 +65,9 @@ not the admin's own time. Times are in UTC, e.g. `20261115T020000Z`, and what ta
 occupations and the events about feeds whose last read failed, has dates (`VALUE=DATE`), in Québec, e.g. `20261115`,
 with the day after the last one as `DTEND`. Text values are escaped and folded as in
 [`GET /calendar.ics`](events.md#get-calendarics).
+
+**A year back** is 00:00 on the day 365 days before today, in Québec. Each calendar keeps what ends after then, whole,
+even when it started before, so that calendar apps keep the past: how far ahead each one goes is in its section.
 
 ## `GET /sessions.ics`
 

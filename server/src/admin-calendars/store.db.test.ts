@@ -149,7 +149,7 @@ describe('AdminCalendarsStore.sessions', () => {
     await change(`/api/admin/sessions/${await createSession('2025-11-13T23:00-05:00', 60)}/status`, { status: 'cancelled' })
     await createSession(null)
     const ids = [
-      // One that ends a minute after `since`, and one that starts then.
+      // One that started before `since` and ends a minute after it, and one that starts then.
       await createSession('2025-11-13T23:00-05:00', 61),
       await createSession('2025-11-14T00:01-05:00'),
       await createSession('2026-06-01T21:00-04:00'),
@@ -159,14 +159,6 @@ describe('AdminCalendarsStore.sessions', () => {
     await change(`/api/admin/sessions/${ids[1]}/status`, { status: 'cancelled' })
     await change(`/api/admin/sessions/${ids[2]}/status`, { status: 'done' })
     expect(await idsOf()).toEqual(ids.toSorted())
-  })
-
-  it('has a session that started long before `since`, whole, while it has not ended then', async () => {
-    // Two years long, until January 1st, 2027, at 21:00.
-    const id = await createSession('2025-01-01T21:00-05:00', 2 * 365 * 24 * 60)
-    const [session] = await store.sessions(since)
-    expect(session.id).toBe(id)
-    expect(session.startAt).toEqual(new Date('2025-01-01T21:00-05:00'))
   })
 })
 

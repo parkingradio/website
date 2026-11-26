@@ -12,9 +12,9 @@ import { availableTime } from './protected-time.js'
 // What the studio's calendar is worked out from (see "The calendar" in docs/design/server/calendar.md), which both
 // GET /api/admin/calendar and the admins' calendar of available time take from here, so that they agree.
 
-// The year ahead's days, from today, which the conflicts, the sessions outside protected time and the calendar's available
-// time are those of.
-const YEAR_AHEAD_DAYS = 365
+// A year's days: the year ahead's, from today, which the conflicts, the sessions outside protected time and the calendar's
+// available time are those of, and how far back the admins' calendars' year back is (see admin-calendars.md).
+export const YEAR_DAYS = 365
 
 // A session, as the calendar counts it.
 function calendarSession(row: SessionWithoutSets): CalendarSession {
@@ -33,16 +33,16 @@ type Sources = { feeds: CalendarFeedsStore; reads: CalendarReads; sessions: Pick
 //   ties keep (see `thingOrder` in conflicts.ts), the holds being null without a `holds` feed, when nothing is known to
 //   be protected or not;
 // - the sessions `forCalendar` gives: `given`, and every one the calendar counts, as it counts them (`counted`);
-// - and `available`, the available time of the year ahead, or the stretches of it that end after `since` until the year
-//   ahead's end, from all of these.
+// - and `available`, the available time of the year ahead, or, with `since`, that from `since` to the year ahead's end,
+//   with the stretch going on at `since` whole, from all of these.
 // Without `range`, `forCalendar` gives the year ahead's sessions with their sets, which only `given` has and its callers
 // then don't need: loading them costs little, as /sessions.ics loads more.
 export async function calendarInputs({ feeds, reads, sessions }: Sources, { now, range, since }: { now: Date; range?: Period; since?: Date }) {
   const today = quebecDay(now)
-  const window: Period = { from: dayStart(today), to: dayStart(addDays(today, YEAR_AHEAD_DAYS)) }
-  // With `since`, the available time is worked out from 365 days before it, so that the stretch going on then has its own
+  const window: Period = { from: dayStart(today), to: dayStart(addDays(today, YEAR_DAYS)) }
+  // With `since`, the available time is worked out from a year before it, so that the stretch going on then has its own
   // start, unless protected time goes on from even further back, which doesn't matter for a calendar's oldest stretch.
-  const availableWindow: Period = since === undefined ? window : { from: dayStart(addDays(quebecDay(since), -YEAR_AHEAD_DAYS)), to: window.to }
+  const availableWindow: Period = since === undefined ? window : { from: dayStart(addDays(quebecDay(since), -YEAR_DAYS)), to: window.to }
   const [listed, { given, others }] = await Promise.all([feeds.list(), sessions.forCalendar(range ?? window, availableWindow)])
   const withReads: { feed: StoredFeed; read: FeedRead | undefined }[] = listed.map((feed) => ({ feed, read: reads.of(feed) }))
   const eventsOf = <Item>(kind: FeedKind, item: (feedId: string, event: CalendarEvent) => Item) =>

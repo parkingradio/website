@@ -4,7 +4,7 @@ import { UNAUTHORIZED } from '../admins/auth.js'
 import { addDays, dayStart, quebecDay } from '../api/formats.js'
 import { ApiError, zodRoutes } from '../api/schemas.js'
 import type { CalendarFeedsStore } from '../calendar/feeds.js'
-import { calendarInputs } from '../calendar/inputs.js'
+import { YEAR_DAYS, calendarInputs } from '../calendar/inputs.js'
 import type { CalendarReads, FeedRead } from '../calendar/reads.js'
 import type { SessionsStore } from '../sessions/store.js'
 import { availabilityCalendar, occupationsCalendar, sessionsCalendar } from './calendars.js'
@@ -25,7 +25,7 @@ const NOT_AN_ADMINS_TOKEN: ApiError = { ok: false, error: "The link's token isn'
 const NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds of occupations haven't all been read yet, with their links, since the server started" }
 const FEEDS_NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds haven't all been read yet, with their links, since the server started" }
 // A year back at `now`, which each calendar keeps what ends after: 00:00 on the day 365 days before today, in Québec.
-const yearBack = (now: Date) => dayStart(addDays(quebecDay(now), -365))
+const yearBack = (now: Date) => dayStart(addDays(quebecDay(now), -YEAR_DAYS))
 
 // Whether something was read from the feed since the server started, with the link it has (see `CalendarReads.of`).
 const isRead = <Feed>(withRead: { feed: Feed; read: FeedRead | undefined }): withRead is { feed: Feed; read: FeedRead } => withRead.read !== undefined
