@@ -83,43 +83,45 @@ export function Month({ month, grid, nameId, today, chosen, days, onChoose, onAd
               const stopProps = { tabIndex: day === stop ? 0 : -1, onFocus: () => setFocused(day), onKeyDown: (event: KeyboardEvent) => onKeyDown(event, day) }
               return (
                 <td key={day} className={classes.filter(Boolean).join(' ') || undefined} onClick={(event) => onClick(event, day)}>
-                  <div className="calendar-day-top">
-                    <button
-                      type="button"
-                      className={day === today ? 'calendar-number calendar-today' : 'calendar-number'}
-                      data-day={day}
-                      aria-label={formatDay(day)}
-                      aria-describedby={entriesId}
-                      aria-pressed={day === chosen}
-                      aria-current={day === today ? 'date' : undefined}
-                      {...stopProps}
-                    >
-                      {Number(day.slice(8))}
-                    </button>
-                    {day >= today && day <= LAST_DAY && (
+                  <div className="calendar-cell">
+                    <div className="calendar-day-top">
                       <button
                         type="button"
-                        className="calendar-add"
-                        data-add={day}
-                        aria-label={`nouvelle session le ${formatDay(day)}`}
-                        title="nouvelle session"
+                        className={day === today ? 'calendar-number calendar-today' : 'calendar-number'}
+                        data-day={day}
+                        aria-label={formatDay(day)}
+                        aria-describedby={entriesId}
+                        aria-pressed={day === chosen}
+                        aria-current={day === today ? 'date' : undefined}
                         {...stopProps}
-                        onClick={(event) => {
-                          // Rather than choosing the day, or unchoosing it, as its cell does.
-                          event.stopPropagation()
-                          onAdd(day)
-                        }}
                       >
-                        +
+                        {Number(day.slice(8))}
                       </button>
+                      {day >= today && day <= LAST_DAY && (
+                        <button
+                          type="button"
+                          className="calendar-add"
+                          data-add={day}
+                          aria-label={`nouvelle session le ${formatDay(day)}`}
+                          title="nouvelle session"
+                          {...stopProps}
+                          onClick={(event) => {
+                            // Rather than choosing the day, or unchoosing it, as its cell does.
+                            event.stopPropagation()
+                            onAdd(day)
+                          }}
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                    {entriesId && (
+                      <>
+                        <DayMarks entries={entries} />
+                        <DayCell id={entriesId} entries={entries} />
+                      </>
                     )}
                   </div>
-                  {entriesId && (
-                    <>
-                      <DayMarks entries={entries} />
-                      <DayCell id={entriesId} entries={entries} />
-                    </>
-                  )}
                 </td>
               )
             })}
@@ -146,13 +148,14 @@ function DayMarks({ entries }: { entries: CalendarDay }) {
   )
 }
 
-// What's on a day: its things and the stretches of its free time, in order of time.
+// What's on a day: its things and the stretches of its free time, in order of time, what lasts until the end of the day
+// stretching down to fill the room left in it.
 function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
   return (
     <ul id={id} className="calendar-things">
       {entries.map((entry, i) =>
         isFree(entry) ? (
-          <li key={i} className="calendar-free">
+          <li key={i} className={entry.toDayEnd ? 'calendar-free calendar-to-day-end' : 'calendar-free'}>
             {entry.wholeDay ? 'disponible' : `dispo ${entry.part}`}
           </li>
         ) : (
@@ -165,8 +168,8 @@ function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
 
 // A thing, in a day of the month: its part of the day, and what it is, after its kind for screen readers, and "conflit"
 // when one of its conflicts is on that day.
-function MonthThing({ dayThing: { thing, part, conflicts } }: { dayThing: DayThing }) {
-  const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && `admin-status-${thing.status}`, conflicts.length > 0 && 'calendar-conflict']
+function MonthThing({ dayThing: { thing, part, conflicts, toDayEnd } }: { dayThing: DayThing }) {
+  const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && `admin-status-${thing.status}`, conflicts.length > 0 && 'calendar-conflict', toDayEnd && 'calendar-to-day-end']
   // A session's performers, which screen readers read after ", avec", or an occupation's calendar, after its title.
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   const detail = performers ? (

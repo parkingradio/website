@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { addDays, quebecDayAndTime, quebecInstant } from '../../client/src/quebec-time.ts'
 import { test, expect, adminMenu, fillTime, logIn, longDay, NARROW, own, scrollsSideways, withCalendar } from './fixtures.ts'
 import type { CalendarExtra } from './fixtures.ts'
@@ -64,6 +64,15 @@ const weekdayAndNumber = (day: string) => new Intl.DateTimeFormat('fr-CA', { wee
 type Box = { x: number; y: number; width: number; height: number }
 const fingerSized = (box: Box) => box.width >= 24 && box.height >= 24
 const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+// Whether an entry of the month ends at the bottom of its day's cell, within its padding and border.
+const reachesCellBottom = (entry: Locator) =>
+  entry.evaluate((li) => {
+    const cell = li.closest('td')!
+    const style = getComputedStyle(cell)
+    const bottom = cell.getBoundingClientRect().bottom - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth)
+    return Math.abs(bottom - li.getBoundingClientRect().bottom) <= 1
+  })
 
 // Where the navigation bar, which stays at the top of the screen, ends.
 async function underTheBar(page: Page): Promise<number> {
@@ -151,7 +160,7 @@ test('a session is in its month, and on its day, where a new session is added', 
   for (const added of [id, newId]) expect((await page.request.delete(`/api/admin/sessions/${added}`)).ok()).toBe(true)
 })
 
-test('occupations and their conflicts are shown in the month, on their day, in "À régler" and in the menu', async ({ page }, testInfo) => {
+test('occupations and their conflicts are shown in the month, on their day, in "À régler" and in the menu', async ({ page, isMobile }, testInfo) => {
   const { unique } = own(testInfo)
   const day = soon()
   const { extra, team, stays } = ownCalendar(unique, day)
@@ -166,6 +175,12 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   const next = dayCell(page, addDays(day, 1))
   await expect(next.locator('.calendar-occupation')).toHaveText(`jusqu'à 11 hoccupation : ${stays}`)
   await expect(next.locator('.calendar-free')).toHaveCount(0)
+  // The stay stretches down to the bottom of its first day, which it lasts until the end of, and not of the next. Phones
+  // show marks in place of the words.
+  if (!isMobile) {
+    await expect.poll(() => reachesCellBottom(cell.locator('.calendar-occupation').filter({ hasText: stays }))).toBe(true)
+    await expect.poll(() => reachesCellBottom(next.locator('.calendar-occupation'))).toBe(false)
+  }
   // Which the day's button reads, as its description, whose spaces can be non-breaking ones, and where the browser can
   // put one before the separator's comma.
   const description = new RegExp(`10 h – 16 h occupation : RÉPARATION ${unique}, calendrier ${team} conflit`.replaceAll(' ', '\\s').replace(',', '\\s?,'), 'i')
@@ -260,6 +275,9 @@ test('free time is the protected time that nothing takes, and the sessions outsi
   const free = (day: string) => dayCell(page, day).locator('.calendar-free')
   await expect(free(day)).toHaveText(['dispo 11 h – 12 h', 'dispo 13 h – 15 h', 'dispo 17 h – 18 h'])
   await expect(free(next)).toHaveText(['dispo dès 17 h'])
+  // Which stretches down to the bottom of its day, which it lasts until the end of. Phones show marks in place of the
+  // words.
+  if (!isMobile) await expect.poll(() => reachesCellBottom(free(next))).toBe(true)
   await expect(dayCell(page, next)).not.toContainText('protégée')
   await expect(dayCell(page, addDays(day, -1)).locator('.calendar-free, .calendar-mark-free')).toHaveCount(0)
   if (isMobile) await expect(dayCell(page, day).locator('.calendar-mark-free')).toBeVisible()

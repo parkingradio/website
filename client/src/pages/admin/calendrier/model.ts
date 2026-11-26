@@ -99,6 +99,9 @@ function takesSomeOf({ start, end }: Times, day: string): boolean {
   return Date.parse(start) < dayStart(addDays(day, 1)) && Date.parse(end) > dayStart(day)
 }
 
+// Whether something lasts until the end of `day`, 00:00 the next day, or later.
+const lastsToEndOf = ({ end }: Times, day: string) => Date.parse(end) >= dayStart(addDays(day, 1))
+
 // What a thing takes of a day when that's all of it, and the free time of a day that's all free time.
 const WHOLE_DAY = 'toute la journée'
 
@@ -126,7 +129,7 @@ export function briefTimes(times: Times, day: string): string {
   // From the start of the day: since an earlier day, or 00:00.
   if (from <= dayStart(day)) {
     if (last > day) return `→ ${lastDay()}`
-    return to >= dayStart(addDays(day, 1)) ? 'journée' : `→ ${timeOf(to)}`
+    return lastsToEndOf(times, day) ? 'journée' : `→ ${timeOf(to)}`
   }
   return endsByItsTime(times.start, times.end) ? shortTimes(times) : fromTo(timeOf(from), lastDay(), '→')
 }
@@ -160,8 +163,8 @@ export function startDay({ start }: Times, near: string): string {
 export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar))
 
 // A stretch of free time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h", "dès 11 h" or
-// "11 h – 15 h", and whether it's the whole day.
-export type FreeStretch = { part: string; wholeDay: boolean }
+// "11 h – 15 h", whether it's the whole day, and whether it lasts until the end of the day.
+export type FreeStretch = { part: string; wholeDay: boolean; toDayEnd: boolean }
 
 // A stretch of time, in milliseconds.
 type Period = [number, number]
@@ -200,7 +203,10 @@ function freeStretches(day: string, protectedPeriods: Period[], busy: Times[]): 
     if (to === dayTo) return `dès ${timeOf(from)}`
     return fromTo(timeOf(from), timeOf(to))
   }
-  return stretches.map(([from, to]) => ({ start: from, stretch: { part: part(from, to), wholeDay: from === dayFrom && to === dayTo } }))
+  return stretches.map(([from, to]) => {
+    const toDayEnd = to === dayTo
+    return { start: from, stretch: { part: part(from, to), wholeDay: from === dayFrom && toDayEnd, toDayEnd } }
+  })
 }
 
 // The free time of `day`, the time `holds` protect that nothing of `busy` takes, stretch by stretch.
@@ -280,8 +286,9 @@ export function thingsWithConflicts(calendar: Calendar): ThingWithConflicts[] {
     })
 }
 
-// A thing on a day: its part of the day, and its conflicts whose overlap takes some of the day.
-export type DayThing = { thing: Thing; part: string; conflicts: ThingConflict[] }
+// A thing on a day: its part of the day, its conflicts whose overlap takes some of the day, and whether it lasts until the
+// end of the day, 00:00 or later.
+export type DayThing = { thing: Thing; part: string; conflicts: ThingConflict[]; toDayEnd: boolean }
 
 // What's on a day of the grid, in order of time: what takes some of it, by start, then end, and the stretches of its free
 // time, if it has any (see "Free time" in docs/design/client/admin/calendrier.md), among them.
@@ -296,7 +303,7 @@ export function calendarDays(calendar: Calendar, days: string[]): Map<string, Ca
   const protectedPeriods = protectedTime(calendar.holds)
   for (const { thing, conflicts } of thingsWithConflicts(calendar)) {
     for (const day of daysOf(thing, [days[0], days.at(-1)!])) {
-      byDay.get(day)!.push({ thing, part: partOfDay(thing, day), conflicts: conflicts.filter(({ conflict }) => takesSomeOf(conflict, day)) })
+      byDay.get(day)!.push({ thing, part: partOfDay(thing, day), conflicts: conflicts.filter(({ conflict }) => takesSomeOf(conflict, day)), toDayEnd: lastsToEndOf(thing, day) })
     }
   }
   return new Map([...byDay].map(([day, dayThings]) => [day, withFreeTime(day, dayThings, protectedPeriods, calendar.today)]))

@@ -270,6 +270,18 @@ describe('Calendrier', () => {
       expect(cell('2026-11-22').querySelectorAll('.calendar-conflict')).toHaveLength(2)
     })
 
+    it('stretches what lasts until the end of the day, things and free time, down to its bottom', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      const stretching = (day: string) => [...cell(day).querySelectorAll('.calendar-things > li')].map((li) => li.classList.contains('calendar-to-day-end'))
+      // The stay, all day, and the session, until 1 h the next day, then their ends, and the free time after them (see
+      // model.test.ts).
+      expect(stretching('2026-11-21')).toEqual([true, true])
+      expect(stretching('2026-11-22')).toEqual([false, false, true])
+    })
+
     it("shows the free time of the month's own days, a day that nothing takes as available", async () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
       renderAt('/admin/calendrier')
