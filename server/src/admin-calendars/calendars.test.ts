@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import ICAL from 'ical.js'
 import type { StoredSession } from '../sessions/store.js'
 import { storedSession as session, storedSet as set } from '../sessions/test-rows.js'
-import { occupationsCalendar, sessionsCalendar } from './calendars.js'
+import { availabilityCalendar, occupationsCalendar, sessionsCalendar } from './calendars.js'
 import type { CalendarOptions, FeedWithRead } from './calendars.js'
 
 // Admins' calendars, as iCalendar (see docs/design/server/admin-calendars.md). An iCalendar parser, ical.js, reads
@@ -169,5 +169,62 @@ describe('occupationsCalendar', () => {
     const failed = { feed: feed(), read: read({ error: 'Failed' }) }
     const [event] = vevents(occupationsCalendar([failed], { ...OPTIONS, now: new Date('2026-11-20T03:00:00Z') }))
     expect(event.time('dtstart').toString()).toBe('2026-11-19')
+  })
+})
+
+describe('availabilityCalendar', () => {
+  const stretch = (start: string, end: string) => ({ start: new Date(start), end: new Date(end) })
+
+  it('is named after the available time, in French, and the environment outside production, and asks to be read again every 15 minutes', () => {
+    const body = availabilityCalendar([], [], OPTIONS)
+    expect(calendarName(body)).toBe('Parking Radio · disponibilités')
+    expect(body).toContain('\r\nNAME:Parking Radio · disponibilités\r\n')
+    expect(body).toContain('\r\nREFRESH-INTERVAL;VALUE=DURATION:PT15M\r\n')
+    expect(vevents(body)).toEqual([])
+    expect(calendarName(availabilityCalendar([], [], { ...OPTIONS, environment: 'test' }))).toBe('Parking Radio (test) · disponibilités')
+  })
+
+  it('has each stretch, with a UID from the environment and its start, its times in UTC, free rather than busy, and a link to its day in Calendrier', () => {
+    // From 21:00 on November 20th in Québec, already the 21st in UTC, to 15:00 on the 22nd: one event across midnight.
+    const body = availabilityCalendar([stretch('2026-11-21T02:00:00Z', '2026-11-22T20:00:00Z')], [], OPTIONS)
+    const [{ vevent, value }] = vevents(body)
+    expect(vevents(body)).toHaveLength(1)
+    expect(value('uid')).toBe('availability-production-20261121T020000Z@parking.radio')
+    expect(vevent.getFirstProperty('dtstart')!.toICALString()).toBe('DTSTART:20261121T020000Z')
+    expect(vevent.getFirstProperty('dtend')!.toICALString()).toBe('DTEND:20261122T200000Z')
+    expect(vevent.getFirstProperty('dtstamp')!.toICALString()).toBe('DTSTAMP:20261119T153000Z')
+    expect(value('summary')).toBe('disponible')
+    expect(value('transp')).toBe('TRANSPARENT')
+    expect(value('url')).toBe('https://parking.radio/admin/calendrier?day=2026-11-20')
+    expect(value('description')).toBeNull()
+    const [other] = vevents(availabilityCalendar([stretch('2026-11-21T02:00:00Z', '2026-11-22T20:00:00Z')], [], { ...OPTIONS, environment: 'test' }))
+    expect(other.value('uid')).toBe('availability-test-20261121T020000Z@parking.radio')
+  })
+
+  it('gives times, rather than dates, to a stretch from 00:00 to 00:00, even over the night the clocks go back', () => {
+    // From 00:00 on Saturday, October 31st, to 00:00 on Monday, November 2nd, 2026, in Québec.
+    const body = availabilityCalendar([stretch('2026-10-31T04:00:00Z', '2026-11-02T05:00:00Z')], [], OPTIONS)
+    expect(body).toContain('\r\nDTSTART:20261031T040000Z\r\nDTEND:20261102T050000Z\r\n')
+    const [{ time, value }] = vevents(body)
+    expect(time('dtstart').isDate).toBe(false)
+    expect(value('url')).toBe('https://parking.radio/admin/calendrier?day=2026-10-31')
+  })
+
+  it('has the stretches by start, then a whole-day event on today about each feed whose last read failed, with a UID of its own', () => {
+    const failed = { feed: feed({ id: 'feed-2', name: 'Loft' }), read: read({ readAt: null, error: "The link's server can't be reached" }) }
+    const stretches = [stretch('2026-11-20T14:00:00Z', '2026-11-20T16:00:00Z'), stretch('2026-11-21T14:00:00Z', '2026-11-21T16:00:00Z')]
+    // Already November 20th in UTC, still the 19th in Québec.
+    const events = vevents(availabilityCalendar(stretches, [{ feed: feed(), read: read() }, failed], { ...OPTIONS, now: new Date('2026-11-20T03:00:00Z') }))
+    expect(events.map(({ value }) => value('summary'))).toEqual(['disponible', 'disponible', '[REFRESH ERROR] Loft'])
+    const [, , error] = events
+    expect(error.value('uid')).toBe('availability-feed-feed-2@parking.radio')
+    expect(error.time('dtstart').isDate).toBe(true)
+    expect(error.time('dtstart').toString()).toBe('2026-11-19')
+    expect(error.time('dtend').toString()).toBe('2026-11-20')
+    expect(error.value('description')).toBe(
+      "The last read of this calendar feed failed. The link's server can't be reached.\nIt hasn't been read successfully since the server started.",
+    )
+    expect(error.value('transp')).toBe('TRANSPARENT')
+    expect(error.value('url')).toBe('https://parking.radio/admin/calendrier')
   })
 })

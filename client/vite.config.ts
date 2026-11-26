@@ -26,6 +26,7 @@ export default defineConfig({
       '/calendar.ics': server,
       '/sessions.ics': server,
       '/occupations.ics': server,
+      '/availability.ics': server,
       // The metadata documents of OAuth, which apps read to connect to the dev server, whose address is the issuer, and the
       // MCP server they connect to.
       '/.well-known': server,

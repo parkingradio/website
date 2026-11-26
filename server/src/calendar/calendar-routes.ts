@@ -1,18 +1,17 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Day, addDays, dayStart, dayWith, daysBetween, quebecDay } from '../api/formats.js'
+import { Day, addDays, dayStart, dayWith, daysBetween } from '../api/formats.js'
 import { Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
-import { Status, after, sessionTitle } from '../sessions/fields.js'
+import { Status } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
-import type { SessionWithoutSets, SessionsStore } from '../sessions/store.js'
-import { compareStrings, conflicts, takesSomeOf, takingThings, thingOrder } from './conflicts.js'
-import type { CalendarSession, OccupationThing, Thing } from './conflicts.js'
-import type { CalendarEvent } from './events.js'
+import type { SessionsStore } from '../sessions/store.js'
+import { compareStrings, conflicts, takesSomeOf, thingOrder } from './conflicts.js'
+import type { OccupationThing, Thing } from './conflicts.js'
 import type { CalendarFeedsStore } from './feeds.js'
-import type { FeedKind } from './fields.js'
 import type { CalendarReads } from './reads.js'
 import { Feed, feedBody } from './feeds-routes.js'
-import { availableTime, unprotectedSessions } from './protected-time.js'
+import { calendarInputs } from './inputs.js'
+import { unprotectedSessions } from './protected-time.js'
 
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
@@ -22,8 +21,6 @@ import { availableTime, unprotectedSessions } from './protected-time.js'
 const FIRST_DAY = '2000-01-01'
 const LAST_DAY = '2999-12-31'
 const MAX_DAYS = 400
-// The conflicts, the sessions outside protected time and the available time are those of the days from today.
-const CONFLICT_DAYS = 365
 
 // A day of the calendar, `from` or `to`, which are days, unlike the instants of the lists of sessions and of events.
 function calendarDay(name: 'from' | 'to', description: string) {
@@ -100,12 +97,6 @@ function thingBody(thing: Thing): z.infer<typeof Thing> {
   return { kind, id, title, start: start.toISOString(), end: end.toISOString(), status }
 }
 
-// A session, as the calendar counts it.
-function calendarSession(row: SessionWithoutSets): CalendarSession {
-  const { id, startAt: start, durationMinutes, status } = row
-  return { id, title: sessionTitle(row), start, end: start && after(start, durationMinutes), status }
-}
-
 type Options = { feeds: CalendarFeedsStore; reads: CalendarReads; sessions: SessionsStore }
 
 export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, sessions }: Options) {
@@ -131,19 +122,8 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const range = { from: dayStart(from), to: dayStart(addDays(to, 1)) }
       // The same instant for today and for whether sessions have ended, so that they can't disagree around midnight.
       const now = new Date()
-      const today = quebecDay(now)
-      const window = { from: dayStart(today), to: dayStart(addDays(today, CONFLICT_DAYS)) }
-
-      const [listed, { given, others }] = await Promise.all([feeds.list(), sessions.forCalendar(range, window)])
+      const { today, window, withReads, occupations, holds, given, counted, available } = await calendarInputs({ feeds, reads, sessions }, { now, range })
       const inRange = takesSomeOf(range)
-      // What was read from each feed is taken once, so that its status and its events are from the same read, that of the
-      // feed as it is now, whose kind says what its events are. The events are in the order of the feeds, then as they
-      // were read, which ties keep (see `thingOrder`).
-      const withReads = listed.map((feed) => ({ feed, read: reads.of(feed) }))
-      const eventsOf = <Item>(kind: FeedKind, item: (feedId: string, event: CalendarEvent) => Item) =>
-        withReads.filter(({ feed }) => feed.kind === kind).flatMap(({ feed, read }) => (read?.events ?? []).map((event) => item(feed.id, event)))
-      const occupations: OccupationThing[] = eventsOf('occupations', (feedId, event) => ({ kind: 'occupation' as const, feedId, ...event }))
-      const holds = eventsOf('holds', (_feedId, event) => event)
 
       const sessionsInRange = given
         .filter((row) => row.startAt !== null)
@@ -151,10 +131,8 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const undated = given
         .filter((row) => row.startAt === null)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || compareStrings(a.id, b.id))
-      const counted = [...given, ...others].map(calendarSession)
       const found = conflicts(counted, occupations, window)
-      // Without a `holds` feed, nothing is known to be protected or not.
-      const unprotected = unprotectedSessions(counted, listed.some((feed) => feed.kind === 'holds') ? holds : null, { window, now })
+      const unprotected = unprotectedSessions(counted, holds, { window, now })
 
       return {
         ok: true as const,
@@ -162,7 +140,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
         feeds: withReads.map(({ feed, read }) => feedBody(feed, read)),
         sessions: sessionsInRange.map(sessionBody),
         occupations: occupations.filter(inRange).sort(thingOrder).map(occupationBody),
-        availability: availableTime(holds, takingThings(counted, occupations), window).filter(inRange).map(timesBody),
+        availability: available.filter(inRange).map(timesBody),
         conflicts: found.map(({ start, end, things: [first, second] }) => ({
           ...timesBody({ start, end }),
           things: [thingBody(first), thingBody(second)] as [z.infer<typeof Thing>, z.infer<typeof Thing>],

@@ -248,13 +248,14 @@ toolbar's heading, "À venir".
 
 ## Subscribing
 
-In the legend, "session" and "occupation" are each followed by a small icon, a calendar with a plus, in the legend's
-grey, which stands out when it's hovered or has the focus. It's a link to the admin's own calendar of the sessions, or
-of the occupations (see [Admins' calendars](../../server/admin-calendars.md)), which opens the calendar app, as
-Programmation's does: `webcal://<site's host>/sessions.ics?token=<token>` or `…/occupations.ics?token=<token>`. Screen
-readers name them « s'abonner au calendrier des sessions » and « s'abonner au calendrier des occupations », which the
-browser also shows when they're hovered. They're only there once the admin's token is read, and not at all when it
-can't be. Intégrations says that the links are personal, and replaces them (see
+In the legend, "session", "occupation" and "disponible" are each followed by a small icon, a calendar with a plus, in
+the legend's grey, which stands out when it's hovered or has the focus. It's a link to the admin's own calendar of the
+sessions, of the occupations, or of the available time (see [Admins' calendars](../../server/admin-calendars.md)), which
+opens the calendar app, as Programmation's does: `webcal://<site's host>/sessions.ics?token=<token>`,
+`…/occupations.ics?token=<token>` or `…/availability.ics?token=<token>`. Screen readers name them « s'abonner au
+calendrier des sessions », « s'abonner au calendrier des occupations » and « s'abonner au calendrier des
+disponibilités », which the browser also shows when they're hovered. They're only there once the admin's token is read,
+and not at all when it can't be. Intégrations says that the links are personal, and replaces them (see
 [Calendriers, in Intégrations](integrations.md#calendriers)).
 
 ## Loading and errors

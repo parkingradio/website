@@ -1366,7 +1366,7 @@ describe("Calendrier's links to the admin's calendars", () => {
   const link = (calendar: string) => within(legend()).getByRole('link', { name: `s'abonner au calendrier des ${calendar}` })
   const webcal = (calendar: string) => `webcal://${location.host}/${calendar}.ics?token=${TOKEN}`
 
-  it('are in the legend, after "session" and "occupation", read once whatever the view or the month', async () => {
+  it('are in the legend, after "session", "occupation" and "disponible", read once whatever the view or the month', async () => {
     mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY, [LIST]: LIST_CALENDAR })
     renderAt('/admin/calendrier')
 
@@ -1375,12 +1375,14 @@ describe("Calendrier's links to the admin's calendars", () => {
     expect(link('sessions')).toHaveAttribute('title', "s'abonner au calendrier des sessions")
     expect(link('occupations')).toHaveAttribute('href', webcal('occupations'))
     expect(link('occupations')).toHaveAttribute('title', "s'abonner au calendrier des occupations")
-    // Only "session" and "occupation" have one.
+    expect(link('disponibilités')).toHaveAttribute('href', webcal('availability'))
+    expect(link('disponibilités')).toHaveAttribute('title', "s'abonner au calendrier des disponibilités")
+    // Only "session", "occupation" and "disponible" have one.
     expect(
       within(legend())
         .getAllByRole('listitem')
         .map((item) => within(item).queryByRole('link') !== null),
-    ).toEqual([true, true, false, false, false, false])
+    ).toEqual([true, true, true, false, false, false])
 
     // Not read again when the month or the view changes.
     fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
