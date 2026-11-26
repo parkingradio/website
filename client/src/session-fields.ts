@@ -34,26 +34,15 @@ export type RaEventLink = Schema<'SessionLink'>
 export type ApplicationLink = Schema<'ApplicationLink'>
 // Who an application belongs to, by their id.
 type ApplicationOwner = Pick<Schema<'Application'>, 'id' | 'artistId' | 'collectiveId'>
-// Who the applications a session or a set can come from belong to, or null when they couldn't be loaded, which leaves
-// checking them to the server.
-export type ApplicationOwners = ApplicationOwner[] | null
-
-// Whether an application can be that of a set of `performers`, or of a takeover of the collective `takeover` (see
-// "Applications" in docs/design/server/sessions.md).
-export const isPerformersApplication = (application: ApplicationOwner, performers: { id: string }[]) =>
-  performers.some(({ id }) => id === application.artistId)
-export const isCollectivesApplication = (application: ApplicationOwner, takeover: { id: string } | null) =>
-  takeover !== null && application.collectiveId === takeover.id
 
 // The applications, among `applications`, that a set of `performers` can have, in their order, each performer's on their
-// own, or that a takeover of the collective `takeover` can have. None when they couldn't be loaded (null).
+// own, or that a takeover of the collective `takeover` can have (see "Applications" in docs/design/server/sessions.md).
+// None when they couldn't be loaded (null).
 export const performersApplications = <A extends ApplicationOwner>(applications: A[] | null, performers: { id: string }[]) =>
-  performers.flatMap((performer) => applications?.filter((application) => isPerformersApplication(application, [performer])) ?? [])
+  performers.flatMap(({ id }) => applications?.filter(({ artistId }) => artistId === id) ?? [])
 export const collectivesApplications = <A extends ApplicationOwner>(applications: A[] | null, takeover: { id: string } | null) =>
-  applications?.filter((application) => isCollectivesApplication(application, takeover)) ?? []
+  (takeover && applications?.filter(({ collectiveId }) => collectiveId === takeover.id)) ?? []
 
-const NOT_THE_SETS_APPLICATION = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
-const NOT_THE_SESSIONS_APPLICATION = 'La candidature doit être celle du collectif du takeover\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0».'
 const ANNOUNCED_HAS_A_DATE = "Une session annoncée a une date\u00a0: retirez d'abord son annonce."
 
 // In the order sessions and sets go through them (see describe.ts for their names).
@@ -308,14 +297,13 @@ export function pickedSlot({ undated, day, start, endDay, end }: SessionFormValu
   return TIME_SLOTS.find((slot) => slot.start === start && slot.end === end)?.id ?? null
 }
 
-// Checks a session as it's being filled in the form, with its `times` if they're worked out already, who the
-// `applications` it can come from belong to, and whether it's `announced`, which it has to have a date for, and returns
+// Checks a session as it's being filled in the form, with its `times` if they're worked out already, and whether it's
+// `announced`, which it has to have a date for, and returns
 // what the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from
 // UTC, and the event on RA by its id.
 export function checkSession(
   form: SessionFormValues,
   times = sessionTimes(form),
-  applications: ApplicationOwners = null,
   announced = false,
 ): { fields: SessionFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SessionFormValues> } {
   const errors: FieldErrors<SessionFormValues> = 'errors' in times ? { ...times.errors } : {}
@@ -324,8 +312,6 @@ export function checkSession(
   const takeover = form.type === 'takeover' ? form.takeover : null
   if (form.type === 'takeover' && !takeover) errors.takeover = 'Choisissez le collectif du takeover.'
   const application = form.type === 'takeover' ? form.application : null
-  const owner = applications?.find(({ id }) => id === application?.id)
-  if (takeover && owner && !isCollectivesApplication(owner, takeover)) errors.application = NOT_THE_SESSIONS_APPLICATION
   const name = checkLine(form.name, 'Le nom', NAME_MAX_LENGTH, form.type === 'other' ? 'Indiquez le nom de la session.' : null)
   if (name.error) errors.name = name.error
   // Each \r\n or \r becomes \n, as the server has it, but its spaces and line breaks are kept.
@@ -409,17 +395,11 @@ export function newSetFormValues(session: Parameters<typeof newSetDuration>[0]):
   return { ...EMPTY_SET_FORM, duration: durationOf(newSetDuration(session)) }
 }
 
-// Checks a set as it's being filled in the form, and who the `applications` it can come from belong to, and returns
-// what the server would be sent, or what's wrong with each field instead. Links are sent as they're typed, but trimmed,
+// Checks a set as it's being filled in the form, and returns what the server would be sent, or what's wrong with each field instead. Links are sent as they're typed, but trimmed,
 // or null for none.
-export function checkSet(
-  form: SetFormValues,
-  applications: ApplicationOwners = null,
-): { fields: SetFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SetFormValues> } {
+export function checkSet(form: SetFormValues): { fields: SetFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SetFormValues> } {
   const errors: FieldErrors<SetFormValues> = {}
   if (form.performers.length === 0) errors.performers = 'Choisissez au moins un artiste.'
-  const owner = applications?.find(({ id }) => id === form.application?.id)
-  if (owner && !isPerformersApplication(owner, form.performers)) errors.application = NOT_THE_SETS_APPLICATION
   const durationMinutes = minutesOf(form.duration)
   if (durationMinutes === undefined || durationMinutes === 0) errors.duration = 'La durée est invalide.'
   const otherPerformanceType = checkLine(form.otherPerformanceType, 'La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, null)
@@ -474,17 +454,19 @@ export function listedSetFields({ performers, application, ...fields }: ListedSe
 // An application, as a set or a session that comes from it gives it.
 export const applicationLink = ({ id, receivedAt }: Pick<ApplicationLink, 'id' | 'receivedAt'>): ApplicationLink => ({ id, receivedAt })
 
-// The application a planned set's or session's form has once its performers or its collective change, from the one it
-// has, `application`, and `candidates`, the applications of its performers or its collective then: their only one that's
-// new or accepted, in place of none, or of one that isn't theirs anymore, or else the one it has (see "Applications" in
-// docs/design/client/admin/sessions.md).
+// The application a set's or a session's form has once its performers or its collective change, from the one it has,
+// `application`, and `candidates`, the applications of its performers or its collective then, or null when they couldn't
+// be loaded, which leaves it as it is (see "Applications" in docs/design/client/admin/sessions.md): the one it has, while
+// it's theirs, or else, for a planned set or session (`planned`), their only one that's new or accepted, if there's only
+// one, or else none.
 export function pickedApplication(
   application: ApplicationLink | null,
-  candidates: Pick<Schema<'Application'>, 'id' | 'receivedAt' | 'status'>[],
+  candidates: Pick<Schema<'Application'>, 'id' | 'receivedAt' | 'status'>[] | null,
+  planned: boolean,
 ): ApplicationLink | null {
-  if (application && candidates.some(({ id }) => id === application.id)) return application
-  const eligible = candidates.filter(({ status }) => status === 'new' || status === 'accepted')
-  return eligible.length === 1 ? applicationLink(eligible[0]) : application
+  if (candidates === null || (application && candidates.some(({ id }) => id === application.id))) return application
+  const eligible = planned ? candidates.filter(({ status }) => status === 'new' || status === 'accepted') : []
+  return eligible.length === 1 ? applicationLink(eligible[0]) : null
 }
 
 // The application whose id is `id`, among `applications`, and its artist, among `artists`, for an artist's, or null for a

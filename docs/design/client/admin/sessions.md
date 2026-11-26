@@ -343,30 +343,29 @@ When there's nothing to pick, the field says why: "Choisissez d'abord les artist
 collectif." when none are picked yet, or else "Aucune candidature de cet artiste.", "Aucune candidature de ces
 artistes." or "Aucune candidature de ce collectif.".
 
-The set's or the session's own application is always among the options, and so is the one picked. That's true even
-when it no longer belongs to the performers or the collective, e.g. once its artist is taken out of the set.
+Those are the only options: the set's or the session's own application is among them only while it's its performers' or
+its collective's, e.g. not once its artist is taken out of the set.
 
-While a planned set's or session's form, a new one's included, has no application, or one that isn't its performers' or
-its collective's anymore, adding an artist to the performers or taking one out, or picking the takeover's collective,
-picks their application when they have exactly one that's new or accepted (see
-[Status, in Applications](../../server/applications.md#status)). With none, or several, nothing is picked. A planned
-application isn't picked, since it's already a planned set's or session's, but it can be picked by hand. Reordering the
-performers picks nothing, and neither does opening the form of a set or a session that's already there, since it can be
-meant to have none. A done or cancelled set's or session's form picks nothing either, since that would make the
-application done, or accepted.
+When an artist is added to the performers or taken out of them, or the takeover's collective is picked, the form looks at
+its application:
 
-The forms never take the application away on their own: they only replace it as above. When the set's performers, or
-the takeover's collective, change so that the application isn't theirs anymore, and it isn't replaced, the field shows
-an error right away, which screen readers announce, e.g.
-« La candidature doit être celle d'un des artistes du set : choisissez-en une autre, ou « Aucune candidature ». ». The
-form can't be sent until another application, or "Aucune candidature", is picked. The one exception is a session saved
-as another type than a takeover: it loses its application, as it loses its collective (see
-[The session form](#the-session-form)).
+- One that's still theirs stays.
+- In a planned set's or session's form, a new one's included, one that isn't theirs anymore, or none, becomes their
+  application when they have exactly one that's new or accepted (see
+  [Status, in Applications](../../server/applications.md#status)), or else none. A planned application isn't picked,
+  since it's already a planned set's or session's, but it can be picked by hand.
+- In a done or cancelled set's or session's form, one that isn't theirs anymore is taken away, and none is picked, since
+  that would make the application done, or accepted.
+
+Reordering the performers changes nothing, and neither does opening the form of a set or a session that's already there,
+since it can be meant to have no application. So the form's application is always its performers' or its collective's,
+as the server needs (see [Applications, in Sessions](../../server/sessions.md#applications)). A session saved as
+another type than a takeover has none, since it has no collective (see [The session form](#the-session-form)).
 
 The applications are loaded each time a form opens, along with the artists or the collectives. When they can't be
 loaded, the form says so above it, and only "Aucune candidature" and the set's or the session's own application, named
-by when it was received, can be picked. The form then can't tell whose an application is, so the server's check is the
-one that counts (see [Errors](#errors)).
+by when it was received, can be picked. The form then can't tell whose an application is: changing the performers or
+the collective leaves it as it is, and the server's check is the one that counts (see [Errors](#errors)).
 
 ## From an application
 

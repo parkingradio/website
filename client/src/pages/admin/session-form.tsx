@@ -22,7 +22,7 @@ import {
   startChanges,
   typeName,
 } from '../../session-fields'
-import type { ApplicationLink, ListedSet, RaEventLink, Reference, SessionFields, SessionFormValues, SessionStatus, SessionType } from '../../session-fields'
+import type { ListedSet, RaEventLink, Reference, SessionFields, SessionFormValues, SessionStatus, SessionType } from '../../session-fields'
 import { raEventId } from '../../session-links'
 import { TIME_SLOTS } from '../../time-slots'
 import type { TimeSlot, TimeSlotId } from '../../time-slots'
@@ -49,9 +49,6 @@ export type SessionFormProps = {
   announced?: boolean
   // The session's status, which a new one has as planned.
   status?: SessionStatus
-  // Whether the takeover's collective that the form starts with was picked for it, e.g. from the collective's page, which
-  // then picks its application as picking it in the form does.
-  takeoverPicked?: boolean
   // The address of the session's flyer, if it has one.
   flyer?: string | null
   // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
@@ -77,7 +74,6 @@ export function SessionForm({
   initial,
   announced = false,
   status = 'planned',
-  takeoverPicked = false,
   flyer: current = null,
   collectives,
   applications,
@@ -88,18 +84,14 @@ export function SessionForm({
   onCancel,
 }: SessionFormProps) {
   const formId = useId()
-  // The application a planned session has once its takeover's collective is picked (see "Applications" in
-  // docs/design/client/admin/sessions.md).
-  const pickedWith = (takeover: Reference | null, application: ApplicationLink | null) =>
-    status === 'planned' ? pickedApplication(application, collectivesApplications(applications, takeover)) : application
-  const [form, setForm] = useState(() => (takeoverPicked ? { ...initial, application: pickedWith(initial.takeover, initial.application) } : initial))
+  const [form, setForm] = useState(initial)
   const [sets, setSets] = useState(initialSets)
   const update = (changes: Partial<SessionFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const [flyer, setFlyer] = useState<File | null>(null)
   // Whether to remove the session's flyer, which only happens once the form is sent.
   const [removeFlyer, setRemoveFlyer] = useState(false)
   const times = sessionTimes(form)
-  const checked = checkSession(form, times, applications, announced)
+  const checked = checkSession(form, times, announced)
   const errors: Partial<Record<keyof SessionFormValues | 'flyer', string>> = { ...checked.errors }
   const flyerProblem = pickedPhotoError(flyer, 'flyer')
   if (flyerProblem) errors.flyer = flyerProblem
@@ -142,9 +134,8 @@ export function SessionForm({
               takeover={form.takeover}
               collectives={collectives}
               onChange={(takeover) => {
-                update({ takeover, application: pickedWith(takeover, form.application) })
-                // So that it says right away when its application isn't the collective's.
-                leave('application')()
+                const candidates = applications && collectivesApplications(applications, takeover)
+                update({ takeover, application: pickedApplication(form.application, candidates, status === 'planned') })
               }}
               error={shown('takeover')}
               onLeave={leave('takeover')}
@@ -157,8 +148,6 @@ export function SessionForm({
               cancelled={status === 'cancelled'}
               empty={form.takeover ? 'Aucune candidature de ce collectif.' : "Choisissez d'abord le collectif."}
               onChange={(application) => update({ application })}
-              error={shown('application')}
-              onLeave={leave('application')}
             />
           </>
         )}

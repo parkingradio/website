@@ -1063,7 +1063,7 @@ describe("A session's page", () => {
   const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
   const vagues = application('application-5', { collectiveId: 'collective-2' }, '2026-09-10T16:00:00.000Z', 'new', ['2026-12-12'])
 
-  it("picks a takeover's application among its collective's, which it keeps while another type is picked, but only a takeover sends", async () => {
+  it("picks a takeover's application among its collective's only, which it keeps while another type is picked, but only a takeover sends", async () => {
     const MAREES: Collective = { ...ONDES, id: 'collective-3', name: 'Marées', email: 'marees@example.com' }
     mockFetch({
       ...PAGE,
@@ -1081,19 +1081,17 @@ describe("A session's page", () => {
     expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026retenue · 14 nov. 2026, 21 nov. 2026'])
     fireEvent.keyDown(picker(), { key: 'Escape' })
 
-    // Another collective, without an application, says right away that the application isn't its, and keeps it.
-    const error = 'La candidature doit être celle du collectif du takeover : choisissez-en une autre, ou « Aucune candidature ».'
+    // Another collective, without an application, takes it away, and it's no longer offered.
     fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
     fireEvent.mouseDown(screen.getByRole('option', { name: /^Marées/ }))
-    expect(screen.getByText(error)).toBeInTheDocument()
-    expect(picker()).toHaveValue('Reçue le 1 septembre 2026')
-    // One with a single new or accepted application gives it that one in its place.
+    expect(picker()).toHaveValue('')
+    expect(picker()).toHaveAttribute('placeholder', 'Aucune candidature de ce collectif.')
+    // One with a single new or accepted application gives it that one.
     fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
     fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
     expect(picker()).toHaveValue('Reçue le 10 septembre 2026')
-    expect(screen.queryByText(error)).not.toBeInTheDocument()
     fireEvent.click(picker())
-    expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026retenue · 14 nov. 2026, 21 nov. 2026', 'Reçue le 10 septembre 2026nouvelle · 12 déc. 2026'])
+    expect(options()).toEqual(['Aucune candidature', 'Reçue le 10 septembre 2026nouvelle · 12 déc. 2026'])
     fireEvent.keyDown(picker(), { key: 'Escape' })
 
     // Hidden with the collective for another type, and back with it.
@@ -2105,11 +2103,9 @@ describe("A set's form", () => {
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
   })
 
-  // As the page shows it, with its non-breaking spaces as spaces.
-  const SET_ERROR = "La candidature doit être celle d'un des artistes du set : choisissez-en une autre, ou « Aucune candidature »."
   const applicationPicker = () => screen.getByRole('combobox', { name: 'Candidature' })
 
-  it("picks the set's application among its performers', which it says right away once it isn't one of theirs anymore", async () => {
+  it("picks the set's application among its performers' only, which is taken away once it isn't one of theirs anymore", async () => {
     // Brume's is planned already, so that none is picked in place of Aurore's once she's taken out.
     const applications = APPLICATIONS_LIST.map((each) => (each.id === 'application-4' ? { ...each, status: 'planned' as const } : each))
     mockFetch({ ...SET_PAGE, '/api/admin/applications': { ok: true, total: 4, applications }, 'PATCH /api/admin/sets/set-1': { ok: true, session: SESSION } })
@@ -2128,15 +2124,15 @@ describe("A set's form", () => {
     fireEvent.mouseDown(screen.getByRole('option', { name: /^Aurore, reçue le 15 août 2026/ }))
     expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
 
-    // Taking Aurore out of the set says so before the form is sent, and keeps the application among the options.
+    // Taking Aurore out of the set takes it away, and it's no longer offered.
     fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
-    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
-    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
-    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    expect(requestsTo('PATCH', '/api/admin/sets/set-1')).toHaveLength(0)
-    // Adding her back makes it right again.
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+    fireEvent.click(applicationPicker())
+    expect(options()).toEqual(['Aucune candidature', 'Brume, reçue le 20 août 2026planifiée · 5 déc. 2026'])
+    fireEvent.keyDown(applicationPicker(), { key: 'Escape' })
+    // Adding her back picks it again, as her only one.
     pick('Aurore')
-    expect(screen.queryByText(SET_ERROR)).not.toBeInTheDocument()
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sets/set-1')).toHaveLength(1))
     expect(jsonBody(requestsTo('PATCH', '/api/admin/sets/set-1')[0])).toMatchObject({ performers: [{ id: 'artist-2' }, { id: 'artist-1' }], application: 'application-3' })
@@ -2224,32 +2220,52 @@ describe("A set's form", () => {
 
     await openNew()
     pick('Aurore')
+    pick('Cyan')
+    // Cyan's is planned already: Brume's is then the only one.
     fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
-    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
     pick('Brume')
     expect(applicationPicker()).toHaveValue('Brume, reçue le 20 août 2026')
-    expect(screen.queryByText(SET_ERROR)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toMatchObject({ performers: [{ id: 'artist-2' }], application: 'application-4' })
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toMatchObject({ performers: [{ id: 'artist-3' }, { id: 'artist-2' }], application: 'application-4' })
   })
 
-  it("keeps an application that isn't its performers' anymore, saying so, when they have none that's new or accepted, or several", async () => {
+  it("takes away an application that isn't its performers' anymore when they have none that's new or accepted, or several", async () => {
     const brumes = application('application-6', { artistId: 'artist-2' }, '2026-09-05T16:00:00.000Z', 'new', ['2026-12-12'])
     mockFetch({ ...SET_PAGE, '/api/admin/applications': { ok: true, total: 5, applications: [brumes, ...APPLICATIONS_LIST] } })
     renderAt('/admin/sessions/session-1')
 
+    // Cyan's is planned already.
     await openNew()
     pick('Aurore')
-    // Cyan's is planned already.
     pick('Cyan')
     fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
-    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
-    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+
     // Brume has two.
+    await openNew()
+    pick('Aurore')
     pick('Brume')
     expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
-    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+  })
+
+  it.each(['done', 'cancelled'] as const)("takes a %s set's application away once it isn't its performers', without picking another", async (status) => {
+    mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: withStatus(SESSION, status) } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
+    await screen.findByRole('heading', { name: 'Set de Cyan' })
+    expect(applicationPicker()).toHaveValue('Cyan, reçue le 2 septembre 2026')
+    pick('Aurore')
+    expect(applicationPicker()).toHaveValue('Cyan, reçue le 2 septembre 2026')
+    // Not Aurore's, though it's her only one, and no longer its own.
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+    fireEvent.click(applicationPicker())
+    expect(options()).toEqual(['Aucune candidature', 'Aurore, reçue le 15 août 2026nouvelle · 14 nov. 2026, 21 nov. 2026, 28 nov. 2026 (+1)'])
   })
 
   it("doesn't pick a planned application, which can be picked by hand, but picks a new one alongside it", async () => {
@@ -2325,7 +2341,10 @@ describe("A set's form", () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom")
-    // Named by when it was received only, since whose it is isn't known.
+    // Named by when it was received only, since whose it is isn't known, which changing the performers doesn't change.
+    expect(applicationPicker()).toHaveValue('Reçue le 2 septembre 2026')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
+    pick('Aurore')
     expect(applicationPicker()).toHaveValue('Reçue le 2 septembre 2026')
     fireEvent.click(applicationPicker())
     expect(options()).toEqual(['Aucune candidature', 'Reçue le 2 septembre 2026'])
@@ -2905,21 +2924,21 @@ describe('Adding a session', () => {
     expect(screen.queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
   })
 
-  it("picks the application of the collective of the link as when the collective is picked, not as the session's own", async () => {
+  it("picks the application of the collective of the link as when the collective is picked in the form", async () => {
     const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
     mockFetch({ ...NEW, '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] } })
     renderAt('/admin/sessions/nouvelle?takeover=collective-1')
 
     const picker = await screen.findByRole('combobox', { name: 'Candidature' })
     expect(picker).toHaveValue('Reçue le 1 septembre 2026')
+    // Taken away with another collective, which has none, and picked again with Ondes.
     fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
     fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
-    expect(picker).toHaveValue('Reçue le 1 septembre 2026')
-    fireEvent.click(picker)
-    fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucune candidature' }))
-    // Not offered anymore, as Vagues has none.
     expect(picker).toHaveValue('')
     expect(picker).toHaveAttribute('placeholder', 'Aucune candidature de ce collectif.')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Ondes/ }))
+    expect(picker).toHaveValue('Reçue le 1 septembre 2026')
   })
 
   it("says when there is no application to pick, before the takeover's collective is picked, or when it has none", async () => {

@@ -50,7 +50,7 @@ type SetFormProps = {
 export function SetForm({ initial, artists, applications, takeover, status = 'planned', submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
-  const checked = checkSet(form, applications)
+  const checked = checkSet(form)
   const errors = checked.errors ?? {}
   // There are fields, since there are no errors by then.
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!, form))
@@ -76,11 +76,10 @@ export function SetForm({ initial, artists, applications, takeover, status = 'pl
         artists={artists}
         takeover={takeover}
         onChange={(performers) => {
-          // A planned set's application is picked as an artist is added or taken out, but not as they're reordered.
-          const picks = status === 'planned' && !sameArtists(performers, form.performers)
-          update({ performers, ...(picks && { application: pickedApplication(form.application, performersApplications(applications, performers)) }) })
-          // So that it says right away when its application isn't one of theirs anymore.
-          leave('application')()
+          // Its application changes as an artist is added or taken out, but not as they're reordered.
+          if (sameArtists(performers, form.performers)) return update({ performers })
+          const candidates = applications && performersApplications(applications, performers)
+          update({ performers, application: pickedApplication(form.application, candidates, status === 'planned') })
         }}
         error={shown('performers')}
         onLeave={leave('performers')}
@@ -99,8 +98,6 @@ export function SetForm({ initial, artists, applications, takeover, status = 'pl
             : `Aucune candidature ${form.performers.length === 1 ? 'de cet artiste' : 'de ces artistes'}.`
         }
         onChange={(application) => update({ application })}
-        error={shown('application')}
-        onLeave={leave('application')}
       />
 
       <div onBlur={leaving(leave('duration'))}>

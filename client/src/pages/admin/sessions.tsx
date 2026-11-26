@@ -9,10 +9,12 @@ import {
   EMPTY_SESSION_FORM,
   STATUSES,
   applicationLink,
+  collectivesApplications,
   findApplication,
   listedSetFields,
   listedSetFromApplication,
   newSetFormValues,
+  pickedApplication,
   sessionFormValues,
   setFormValues,
   setValuesFromApplication,
@@ -1068,12 +1070,13 @@ function SessionFormWithChoices({
                 ...initial,
                 type: 'takeover',
                 takeover: { id: takeover.id, name: takeover.name },
-                application: fromCollective ? applicationLink(fromCollective) : initial.application,
+                // From the collective's page, its application is picked as when the collective is picked in the form.
+                application: fromCollective
+                  ? applicationLink(fromCollective)
+                  : pickedApplication(initial.application, applicationList && collectivesApplications(applicationList, takeover), true),
               }
             : initial
         }
-        // From the collective's page, its application is picked as when the collective is picked in the form.
-        takeoverPicked={!!takeover && !fromCollective}
         sets={found?.artist ? [listedSetFromApplication(found.application, found.artist)] : sets}
         collectives={collectiveList}
         applications={applicationList}
