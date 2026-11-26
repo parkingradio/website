@@ -490,6 +490,7 @@ describe('Announcing a session from the list', () => {
     expect(requestsTo('PUT', '/api/admin/sessions/session-3/announced')).toHaveLength(0)
 
     fireEvent.change(changed, { target: { value: 'false' } })
+    expect(confirm).toHaveBeenCalledTimes(2)
     await waitFor(() => expect(rows()).toEqual([]))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-3/announced')[0])).toEqual({ announced: false })
   })
@@ -1717,7 +1718,7 @@ describe("A session's page", () => {
 
   it('deletes the session once confirmed, and goes back to the list', async () => {
     mockFetch({ ...PAGE, 'DELETE /api/admin/sessions/session-1': { ok: true }, '/api/admin/sessions': { ok: true, sessions: [] } })
-    renderAt('/admin/sessions/session-1')
+    const page = renderAt('/admin/sessions/session-1')
 
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(await screen.findByRole('button', { name: 'supprimer la session' }))
@@ -1726,6 +1727,15 @@ describe("A session's page", () => {
     // Saying that its event on RA stays.
     expect(confirm).toHaveBeenLastCalledWith("L'événement sur RA ne sera pas modifié.\nSupprimer définitivement cette session et ses 3 sets ?")
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions$/))
+    page.unmount()
+
+    // Without an event on RA, only the question.
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    renderAt('/admin/sessions/session-2')
+    confirm.mockReturnValueOnce(false)
+    fireEvent.click(await screen.findByRole('button', { name: 'supprimer la session' }))
+    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement cette session et ses 2 sets ?')
+    expect(requestsTo('DELETE', '/api/admin/sessions/session-2')).toHaveLength(0)
   })
 
   it('says when the session could not be loaded', async () => {

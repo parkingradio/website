@@ -88,13 +88,13 @@ Clicking a session opens it at `/admin/sessions/<id>`, with the list's parameter
 says who added it and when, and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session first
-  asks to confirm when it has sets that aren't cancelled, naming them, marking those that are "joué", and saying that
-  they'll be cancelled too (see [Status](../../server/sessions.md#status)), or an event on RA, saying « L'événement sur
-  RA ne sera pas modifié. » (see [Events on RA](../../server/sessions.md#events-on-ra)), after its sets when it has
-  both. Marking it "jouée" while it has "planifié" sets first asks to confirm too, naming them and saying that they'll
-  be marked "joué". Under it, likewise, whether the session is announced, as "non annoncée" and "annoncée".
-  Un-announcing a session that has an event on RA first asks to confirm too, saying « L'événement sur RA ne sera pas
-  modifié. ». Each says why it couldn't be changed under its own buttons.
+  asks to confirm when it has sets that aren't cancelled or an event on RA: the confirmation names those sets, marking
+  those that are "joué", and says that they'll be cancelled too (see [Status](../../server/sessions.md#status)), then
+  says « L'événement sur RA ne sera pas modifié. » for an event on RA (see
+  [Events on RA](../../server/sessions.md#events-on-ra)). Marking it "jouée" while it has "planifié" sets first asks to
+  confirm too, naming them and saying that they'll be marked "joué". Under it, likewise, whether the session is
+  announced, as "non annoncée" and "annoncée". Un-announcing a session that has an event on RA first asks to confirm
+  too, saying « L'événement sur RA ne sera pas modifié. ». Each says why it couldn't be changed under its own buttons.
   While the session has no date, "annoncée" can't be used, and says « La session n'a pas de date. » (see
   [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 - "Session": the session's details, which "modifier" changes in a form in their place (see
@@ -150,7 +150,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   prevent anything, since a session and its sets are changed one at a time.
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming, then shows the list as
   "← sessions" does. Its sets' artists, and its takeover's collective, stay, which the page says of those it has. When
-  the session has an event on RA, the confirmation first says « L'événement sur RA ne sera pas modifié. ».
+  the session has an event on RA, the confirmation first says « L'événement sur RA ne sera pas modifié. » (see
+  [Events on RA](../../server/sessions.md#events-on-ra)).
 
 Only one form is open at a time on a session's page, the session's, the panel of its event on RA (see
 [Creating its event on RA](#creating-its-event-on-ra)), a set's, or the panel that moves a set to another session (see

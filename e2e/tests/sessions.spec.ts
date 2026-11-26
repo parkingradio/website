@@ -685,10 +685,9 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(statusOf(sets.getByRole('row').nth(1))).toHaveText('annulé')
   // It stays announced, until it's un-announced, once confirmed.
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  page.once('dialog', (dialog) => dialog.accept())
   // Tapped on phones, since clicking leaves the mouse where it was, over what the page later scrolls under it.
   const unannounce = announcement.getByRole('button', { name: 'non annoncée' })
-  await (isMobile ? unannounce.tap() : unannounce.click())
+  await Promise.all([page.waitForEvent('dialog').then((dialog) => dialog.accept()), isMobile ? unannounce.tap() : unannounce.click()])
   await expect(announcement.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
   // Its set can't be un-cancelled, which the page says above the sets, its status written out, and sets can't be added
   // to it, which the button says, greyed out.

@@ -2,14 +2,14 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../../api/client'
 import type { Session } from '../../session-fields'
-import { raEventKept, sessionName } from './describe'
+import { RA_EVENT_KEPT, sessionName } from './describe'
 import type { Announced } from './describe'
 import { failure } from './session-errors'
 
-// Whether to change whether `session` is `announced`: un-announcing it asks first when it has an event on RA, which stays
-// as it is.
+// Whether to go ahead with making `session` `announced` or not: only un-announcing an announced session with an event on
+// RA asks first, since the event stays as it is.
 export const confirmAnnouncing = (session: Session, announced: Announced) =>
-  announced === 'true' || !session.announced || !session.raEvent || window.confirm(`${raEventKept(session)}Retirer l'annonce de la session ?`)
+  announced === 'true' || !session.announced || !session.raEvent || window.confirm(`${RA_EVENT_KEPT}\nRetirer l'annonce de la session ?`)
 
 // Announcing sessions of a list, or un-announcing them, from their rows: `current` gives the sessions loaded as the
 // changes left them, `announce` changes one, and `error` says why the last change couldn't be made, if it couldn't.
