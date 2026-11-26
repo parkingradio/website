@@ -304,6 +304,15 @@
   outline-offset: -2px;
 }
 
+/* What's in a day's cell, which fills it, even when another day makes its row taller, so that what lasts until the end
+   of the day can stretch down to its bottom. Its height is a percentage of the cell's, which only works since the cell
+   has a height of its own (see above). */
+.calendar-cell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 /* The day's number, and its "+", at the cell's top right. */
 .calendar-day-top {
   display: flex;
@@ -343,6 +352,7 @@
 
 .calendar-things {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
   margin: 3px 0 0;
@@ -351,10 +361,18 @@
   line-height: 1.35;
 }
 
+/* Never shorter than their words, which they'd otherwise be cut to, as they hide what overflows. */
 .calendar-things li {
+  flex-shrink: 0;
   padding: 1px 4px;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+
+/* What lasts until the end of the day stretches down to fill the room left in it, sharing it equally with the rest that
+   does (see "The month" in docs/design/client/admin/calendrier.md). */
+.calendar-to-day-end {
+  flex-grow: 1;
 }
 
 .calendar-things .calendar-part {

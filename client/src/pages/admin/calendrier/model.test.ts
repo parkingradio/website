@@ -304,6 +304,35 @@ describe('the days of the month', () => {
     expect(conflicts('2026-11-22')).toEqual([['session'], ['occupation']])
   })
 
+  it('say what lasts until the end of the day, 00:00 or later, things and free time', () => {
+    const toDayEnd = (shown: Map<string, CalendarDay>, day: string) => shown.get(day)!.map((entry) => [spaced(entry.part), entry.toDayEnd])
+    // The stay, all day, and the session, until 1 h the next day, then their ends, and the free time after them.
+    expect(toDayEnd(days, '2026-11-21')).toEqual([
+      ['toute la journée', true],
+      ['21 h – 1 h', true],
+    ])
+    expect(toDayEnd(days, '2026-11-22')).toEqual([
+      ["jusqu'à 11 h", false],
+      ["jusqu'à 1 h", false],
+      ['dès 11 h', true],
+    ])
+    expect(toDayEnd(days, '2026-11-20')).toEqual([
+      ["jusqu'à 15 h", false],
+      ['dès 15 h', true],
+    ])
+    expect(toDayEnd(days, '2026-11-19')).toEqual([['toute la journée', true]])
+    // Until 00:00, and a cancelled session, which still shows, until the next day.
+    const sessions = [session('evening', '2026-11-23T20:00:00-05:00', '2026-11-23T22:00:00-05:00'), session('night', '2026-11-23T22:00:00-05:00', '2026-11-24T00:00:00-05:00')]
+    const cancelled = session('off', '2026-11-24T22:00:00-05:00', '2026-11-25T02:00:00-05:00', 'cancelled')
+    const shown = calendarDays(calendar({ sessions: [...sessions, cancelled], holds: [] }), gridDays('2026-11'))
+    expect(toDayEnd(shown, '2026-11-23')).toEqual([
+      ['20 h – 22 h', false],
+      ['22 h – 0 h', true],
+    ])
+    expect(toDayEnd(shown, '2026-11-24')).toEqual([['22 h – 2 h', true]])
+    expect(toDayEnd(shown, '2026-11-25')).toEqual([["jusqu'à 2 h", false]])
+  })
+
   it('list what started on an earlier day first, by start, then end, then the free time', () => {
     expect(days.get('2026-11-22')!.map(({ part }) => spaced(part))).toEqual(["jusqu'à 11 h", "jusqu'à 1 h", 'dès 11 h'])
     // A thing before a stretch that starts when it does: a cancelled session, which doesn't take the studio.
