@@ -43,7 +43,7 @@ describe('GET /calendar.ics', () => {
     vi.useRealTimers()
   })
 
-  it('is an iCalendar feed, which can be kept for 5 minutes, of the events since a year before the request', async () => {
+  it('is an iCalendar feed, which can be kept for 5 minutes, of the events that end after a year back', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-19T15:30:00Z') })
     const app = await buildApp()
     const response = await app.inject({ method: 'GET', url: '/calendar.ics' })
@@ -51,7 +51,8 @@ describe('GET /calendar.ics', () => {
     expect(response.headers['content-type']).toBe('text/calendar; charset=utf-8')
     expect(response.headers['cache-control']).toBe('public, max-age=300')
     expect(response.body).toMatch(/^BEGIN:VCALENDAR\r\n[^]*END:VCALENDAR\r\n$/)
-    expect(store.feed).toHaveBeenCalledWith(new Date('2026-11-19T15:30:00Z'))
+    // 00:00 on the day 365 days before today, in Québec (see `yearBack`, which the tests of /sessions.ics go through).
+    expect(store.feed).toHaveBeenCalledExactlyOnceWith(new Date('2025-11-19T05:00:00Z'))
   })
 
   it('answers HEAD, without a body', async () => {

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-// The formats of the API's dates and times, as zod schemas (see api/schemas.ts). They're in a module of their own,
-// which only needs zod, so that the database's schema, which uses the rules of applications (see
-// applications/fields.ts), doesn't load what the routes need.
+// The formats of the API's dates and times, as zod schemas (see api/schemas.ts), and the rules of Québec's days and times
+// that the areas share, e.g. a year back. They're in a module of their own, which only needs zod, so that the database's
+// schema, which uses the rules of applications (see applications/fields.ts), doesn't load what the routes need.
 
 // Québec's time zone, where Parking Radio is (see Times in docs/design/server/README.md). America/Montreal is only a link
 // to it.
@@ -102,6 +102,14 @@ export const addDays = (day: string, days: number) => new Date(Date.parse(day) +
 
 // How many days `to` is after `from`, both "YYYY-MM-DD".
 export const daysBetween = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / DAY_MS
+
+// A year's days: those of the year ahead, from today, which the studio's calendar works out (see "The calendar" in
+// docs/design/server/calendar.md), and those of a year back.
+export const YEAR_DAYS = 365
+
+// A year back at `now`, which the calendars that calendar apps subscribe to keep what ends after: 00:00 on the day 365
+// days before today, in Québec (see "A year back" in docs/design/server/README.md).
+export const yearBack = (now: Date) => dayStart(addDays(quebecDay(now), -YEAR_DAYS))
 
 // An instant, as responses give it: an ISO 8601 string, which is written in Québec time (see `inQuebecTime`) whatever the
 // offset a route gives it with, e.g. a Date's `toISOString`. Every instant of every response is one, which is what makes

@@ -342,25 +342,22 @@ describe('GET /calendar.ics', () => {
 })
 
 describe('EventsStore.feed', () => {
-  const now = new Date('2026-11-14T21:00-05:00')
-  const idsOf = (sessions: { id: string }[]) => sessions.map(({ id }) => id)
+  const since = new Date('2025-11-14T00:00-05:00')
 
-  it('has the events that start at most a year before `now`, past and upcoming', async () => {
-    await createSession('2025-11-14T20:59-05:00', [], { durationMinutes: 1 })
+  it('has the events that end after `since`, whatever their status, however far ahead', async () => {
+    // One that started before `since` and ends a minute after it, cancelled, so that another can take its time, and one
+    // that starts then.
     const ids = [
-      await createSession('2026-11-14T22:00-05:00'),
-      await createSession('2025-11-14T21:00-05:00'),
-      await createSession('2026-06-01T21:00-04:00'),
-    ].map(({ id }) => id)
+      (await createSession('2025-11-13T23:00-05:00', [], { durationMinutes: 61 })).id,
+      (await createSession('2025-11-14T00:01-05:00')).id,
+      (await createSession('2026-06-01T21:00-04:00')).id,
+      (await createSession(FUTURE(1))).id,
+    ]
+    await admin('PUT', `/api/admin/sessions/${ids[0]}/status`, { status: 'cancelled' })
+    // One that ends at `since`, exactly, and one that isn't announced.
+    await createSession('2025-11-13T23:00-05:00', [], { durationMinutes: 60 })
     await createSession('2026-01-01T21:00-05:00', [], { announced: false })
-    expect(idsOf(await events.feed(now)).toSorted()).toEqual(ids.toSorted())
-  })
-
-  it('has an event that started more than a year before `now` while it has not ended', async () => {
-    // Two years long, until January 1st, 2027, at 21:00.
-    const { id } = await createSession('2025-01-01T21:00-05:00', [], { durationMinutes: 2 * 365 * 24 * 60 })
-    expect(idsOf(await events.feed(now))).toEqual([id])
-    expect(idsOf(await events.feed(new Date('2027-02-01T00:00-05:00')))).toEqual([])
+    expect((await events.feed(since)).map(({ id }) => id).toSorted()).toEqual(ids.toSorted())
   })
 })
 

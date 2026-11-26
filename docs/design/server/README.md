@@ -26,6 +26,10 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   offset, e.g. an application's `dates` and `timeSlots`. RA events' `start` and `end` are instants too: Resident Advisor
   gives them as local times, which the server reads in the time zone of the event's venue (see
   [RA events](ra-events.md#times)).
+- **A year back.** The calendars that calendar apps subscribe to, [`GET /calendar.ics`](events.md#get-calendarics) and
+  [the admins'](admin-calendars.md), go back to 00:00 on the day 365 days before the request's, in Québec, which is a
+  year back. They have what ends after then, whole, even when it started before, so that calendar apps keep the past
+  year. How far ahead each one goes is in its section.
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Names.** The API's paths, query parameters and fields, and the values they take from fixed lists (e.g. statuses,
@@ -224,7 +228,7 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
-| [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
+| [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, from a year back, however far ahead, in iCalendar, for calendar apps |
 | [`GET /sessions.ics`](admin-calendars.md#get-sessionsics) | token | An admin's calendar of the sessions, announced or not, from a year back, however far ahead, in iCalendar |
 | [`GET /occupations.ics`](admin-calendars.md#get-occupationsics) | token | An admin's calendar of the occupations, from a year back, in iCalendar, once every calendar feed of occupations has been read, and of those whose last read failed |
 | [`GET /availability.ics`](admin-calendars.md#get-availabilityics) | token | An admin's calendar of the studio's available time, from a year back to the end of the year ahead, in iCalendar: empty without a feed of holds, otherwise once every calendar feed has been read, and with the feeds whose last read failed |

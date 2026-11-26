@@ -1,4 +1,4 @@
-import { addDays, dayStart, quebecDay } from '../api/formats.js'
+import { YEAR_DAYS, addDays, dayStart, quebecDay } from '../api/formats.js'
 import { after, sessionTitle } from '../sessions/fields.js'
 import type { SessionWithoutSets, SessionsStore } from '../sessions/store.js'
 import { takingThings } from './conflicts.js'
@@ -11,10 +11,6 @@ import { availableTime } from './protected-time.js'
 
 // What the studio's calendar is worked out from (see "The calendar" in docs/design/server/calendar.md), which both
 // GET /api/admin/calendar and the admins' calendar of available time take from here, so that they agree.
-
-// A year's days: the year ahead's, from today, which the conflicts, the sessions outside protected time and the calendar's
-// available time are those of, and how far back the admins' calendars' year back is (see admin-calendars.md).
-export const YEAR_DAYS = 365
 
 // A session, as the calendar counts it.
 function calendarSession(row: SessionWithoutSets): CalendarSession {
