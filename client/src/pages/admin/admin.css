@@ -452,7 +452,9 @@
   margin: 0;
 }
 
-.admin-table tr:has(+ tr > .admin-table-span) > * {
+/* A row whose next one continues it has no border under it. A class rather than `tr:has(+ tr > .admin-table-span)`,
+   which makes WebKit slow to move rows, e.g. when a list is sorted (#303). */
+.admin-table tr.admin-table-continued > * {
   border-bottom: none;
 }
 
