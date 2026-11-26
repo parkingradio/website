@@ -176,6 +176,13 @@ sql "update sessions set flyer_key = 'sessions/$(printf '%064d' 0).png', flyer_t
 call update_session "{\"id\":\"${session}\",\"description\":\"Par MCP.\"}"
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\"'
 expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":true'
+
+echo "  once announced, the session is a public event, listed as a summary, without its description, flyer and sets"
+call update_session_announced "{\"id\":\"${session}\",\"announced\":true}"
+expect_body_lacks '"isError"'
+call list_events '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
+expect_body_contains "\\\"upcoming\\\":[],\\\"past\\\":[{\\\"id\\\":\\\"${session}\\\",\\\"title\\\":\\\"MCP\\\",\\\"type\\\":\\\"other\\\",\\\"start\\\":\\\"2026-11-14T21:00:00-05:00\\\",\\\"end\\\":\\\"2026-11-14T23:00:00-05:00\\\",\\\"cancelled\\\":false,\\\"raEvent\\\":null,\\\"takeover\\\":null,\\\"lineup\\\":[]}]"
+
 call delete_session_flyer "{\"id\":\"${session}\"}"
 expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":false'
 call delete_session "{\"id\":\"${session}\"}"

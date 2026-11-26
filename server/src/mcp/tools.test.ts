@@ -96,6 +96,9 @@ describe('the tools of the API', () => {
     expect(description('get_calendar')).toContain(
       'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, whose `from` and `to` are instants, not days,',
     )
+    expect(description('list_events')).toContain(
+      "Gives a summary of each event, with its lineup rather than its sets: an event has its session's id, and `get_session` gives all of that session.",
+    )
     expect(tools.find(({ name }) => name === 'get_calendar')!.inputSchema.required).toEqual(['from', 'to'])
     // Only what admins decide: sets and sessions make applications planned or done.
     const decide = tools.find(({ name }) => name === 'update_application_decision')!
@@ -108,6 +111,14 @@ describe('the tools of the API', () => {
       to: { type: 'string', format: 'date', description: expect.stringContaining('included') },
     })
     expect(listApplications.inputSchema.required).toEqual([])
+  })
+
+  it('only name tools that exist in their descriptions', async () => {
+    const { tools } = await apiTools()
+    const names = new Set([...tools.map(({ name }) => name), 'read_documentation'])
+    for (const { name, description } of tools) {
+      for (const [, named] of description.matchAll(/`([a-z]+(?:_[a-z]+)+)`/g)) expect(names, `${name} names ${named}`).toContain(named)
+    }
   })
 
   it("can't be led to another endpoint by an id that's another route's segment", async () => {
