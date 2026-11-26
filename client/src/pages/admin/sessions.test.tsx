@@ -419,7 +419,7 @@ describe('Announcing a session from the list', () => {
   const ANNOUNCED = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
   // SOIRÉE, which is announced, un-announced.
   const UNANNOUNCE_SOIREE = { 'PUT /api/admin/sessions/session-3/announced': { ok: true, session: { ...SESSIONS[2], announced: false } } }
-  const select = (of: string) => screen.findByRole('combobox', { name: `Annonce : ${of}` })
+  const select = (of: string) => screen.findByRole('combobox', { name: named(`Annonce : ${of}`) })
   const counts = (name: string) => within(screen.getByRole('group', { name })).getAllByRole('button').map((button) => button.textContent)
 
   it('offers « non annoncée » and « annoncée », by a name that tells the sessions apart', async () => {
@@ -430,7 +430,7 @@ describe('Announcing a session from the list', () => {
     expect(planned).toHaveValue('false')
     expect(within(planned).getAllByRole('option').map((option) => option.textContent)).toEqual(['non annoncée', 'annoncée'])
     expect(await select('SOIRÉE, ven. 2 oct. 2026')).toHaveValue('true')
-    expect(screen.getAllByRole('combobox').map((each) => each.getAttribute('aria-label'))).toEqual([
+    expect(screen.getAllByRole('combobox').map((each) => spaced(each.getAttribute('aria-label')))).toEqual([
       'Annonce : GUEST MIXES, date à déterminer',
       'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026',
       'Annonce : SOIRÉE, ven. 2 oct. 2026',
