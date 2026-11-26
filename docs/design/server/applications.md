@@ -96,15 +96,30 @@ application fails with 409 while it has one, but one whose sets and sessions are
 keep it. Then, until it's accepted or made new again, giving it to a set or a session that's planned or done fails with
 400, and un-cancelling one of its sets or sessions, i.e. marking it planned or done, with 409.
 
-## `GET /api/admin/applications[?artist=<id>|?collective=<id>]` (admin)
+## `GET /api/admin/applications` (admin)
+
+Every query parameter can be left out, and the list only has the applications that match all of those given. Like the
+calendar's, and unlike the `from` and `to` of the lists of sessions and of events, which are instants, `from` and `to`
+are days, and `to` is included: e.g. the applications that could play on December 12 are those of
+`from=2026-12-12&to=2026-12-12`.
+
+| Query parameter | |
+|---|---|
+| `artist` | An artist's id: only that artist's applications. An unknown artist has none. Not with `collective` |
+| `collective` | A collective's id: only that collective's applications. An unknown collective has none. Not with `artist` |
+| `status` | A status (see [Status](#status)): only the applications with that status. It can be given more than once, e.g. `status=new&status=accepted`, for the applications with any of them |
+| `from` | A day, `YYYY-MM-DD`, in Québec: only the applications with at least one of their `dates` from `from` to `to`, or from `from` on when there's no `to` |
+| `to` | A day, `YYYY-MM-DD`, in Québec, included: likewise, or up to `to` when there's no `from` |
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
 | `total` | number | How many applications `applications` has (see [Conventions](README.md#conventions)) |
-| `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`). With `artist`, only that artist's applications, and with `collective`, only that collective's. An unknown artist or collective has none |
+| `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`) |
 
-Fails with 400 if `artist` or `collective` is given more than once, or if both are given.
+Fails with 400 if a query parameter other than `status` is given more than once, if both `artist` and `collective` are
+given, if a `status` isn't one of the statuses, if `from` or `to` is empty or isn't a day from 2000-01-01 to
+2999-12-31, or if `to` is before `from`.
 
 ## `GET /api/admin/applications/:id` (admin)
 

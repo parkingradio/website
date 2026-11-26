@@ -1708,7 +1708,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every application, or an artist's or a collective's, the most recently received first */
+        /** Every application, or an artist's or a collective's, the most recently received first: when they're given, only those with one of the statuses and with at least one of their dates in the range of days */
         get: operations["list_applications"];
         put?: never;
         /** Creates an application for an artist or a collective */
@@ -6039,6 +6039,12 @@ export interface operations {
                 artist?: string;
                 /** @description Only this collective's applications. An unknown collective has none. Not with `artist` */
                 collective?: string;
+                /** @description Only the applications with any of these statuses */
+                status?: components["schemas"]["ApplicationStatus"][];
+                /** @description The first day of a range of days, YYYY-MM-DD, in Québec, e.g. "2026-12-01": a day, not an instant. Only the applications with at least one of their dates from `from` to `to`, both included, either of which can be left out */
+                from?: string;
+                /** @description The last day of the range, YYYY-MM-DD, in Québec, included: a day, not an instant. E.g. `from` and `to` both "2026-12-12" give the applications with December 12 among their dates */
+                to?: string;
             };
             header?: never;
             path?: never;

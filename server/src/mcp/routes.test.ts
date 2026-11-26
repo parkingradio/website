@@ -6,7 +6,7 @@ import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Timestamp, changesTo, zodRoutes, useZodSchemas } from '../api/schemas.js'
+import { ApiError, ById, Timestamp, changesTo, repeatable, zodRoutes, useZodSchemas } from '../api/schemas.js'
 import { readProfileForm } from '../artists/photo-form.js'
 import { createLogger } from '../core/logger.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
@@ -45,11 +45,16 @@ async function buildApp(logs?: string[], environment = 'test') {
       '/api/admin/things/:id',
       {
         config: { admin: true, tool: { title: 'Voir une chose' } },
-        schema: { operationId: 'get_thing', summary: 'A thing', params: ById, querystring: z.object({ also: z.string().optional() }) },
+        schema: {
+          operationId: 'get_thing',
+          summary: 'A thing',
+          params: ById,
+          querystring: z.object({ also: z.string().optional(), many: repeatable(z.string()).optional() }),
+        },
       },
       async (request, reply) => {
         if (request.params.id === 'missing') return reply.status(404).send({ ok: false, error: 'No such thing' })
-        return { ok: true, id: request.params.id, also: request.query.also ?? null, by: request.user!.email, text: 'a b' }
+        return { ok: true, id: request.params.id, also: request.query.also ?? null, by: request.user!.email, text: 'a b', ...(request.query.many && { many: request.query.many }) }
       },
     )
     // Routes the router prefers to the tools' when a parameter is their segment.
@@ -418,7 +423,7 @@ describe('the MCP server', () => {
       expect(get).toMatchObject({ title: 'Voir une chose', description: `${readFirst(undefined)} A thing.`, annotations: { title: 'Voir une chose', readOnlyHint: true, openWorldHint: false } })
       expect(get.inputSchema).toEqual({
         type: 'object',
-        properties: { id: { type: 'string', description: "The thing's id" }, also: { type: 'string' } },
+        properties: { id: { type: 'string', description: "The thing's id" }, also: { type: 'string' }, many: { type: 'array', items: { type: 'string' } } },
         required: ['id'],
         additionalProperties: false,
       })
@@ -434,6 +439,16 @@ describe('the MCP server', () => {
       const { body, isError } = await call(app, 'get_thing', { id: 'x', also: 'a+b & more' })
       expect(isError).toBeUndefined()
       expect(body).toEqual({ ok: true, id: 'x', also: 'a+b & more', by: USER.email, text: 'a b' })
+    })
+
+    it('send a list as its query parameter given once per value', async () => {
+      const app = await buildApp()
+      expect((await call(app, 'get_thing', { id: 'x', many: ['a', 'b & c', 'a'] })).body).toMatchObject({ many: ['a', 'b & c', 'a'] })
+      expect((await call(app, 'get_thing', { id: 'x', many: ['a'] })).body).toMatchObject({ many: ['a'] })
+      // As if it were left out.
+      expect((await call(app, 'get_thing', { id: 'x', many: [] })).body).not.toHaveProperty('many')
+      // A list where one value is taken is that parameter given more than once, which its route refuses.
+      expect(await call(app, 'get_thing', { id: 'x', also: ['a', 'b'] })).toMatchObject({ isError: true, body: { status: 400 } })
     })
 
     it('give JSON without spaces, and escape the line and paragraph separators', async () => {

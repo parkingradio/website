@@ -111,9 +111,11 @@ title in French, which admins see when an app asks them to confirm a change, e.g
 ### Arguments
 
 A tool's arguments are its endpoint's path parameters, its query parameters, which reach it as they're given, and the
-fields of its body. For the endpoints that add an artist or a collective with a photo, or a session with a flyer, which
-are `multipart/form-data` (see [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields
-of the profile or the session. Tools can't send photos or flyers: what's added with a tool has none.
+fields of its body. A query parameter that can be given more than once, e.g. `status` for `list_applications`, is a
+list, sent as the parameter given once per value: an empty list is the same as leaving it out. For the endpoints that
+add an artist or a collective with a photo, or a session with a flyer, which are `multipart/form-data` (see
+[`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields of the profile or the session.
+Tools can't send photos or flyers: what's added with a tool has none.
 
 In the tools of `POST` endpoints, a field of the body that can be null can be left out, which sends it as null, e.g. a
 new set's `soundcloudTrack`, or a new session's `start`, which makes a session whose date isn't known yet, and so can

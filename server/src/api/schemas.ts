@@ -80,6 +80,13 @@ export function changesTo<Shape extends z.ZodRawShape>(shape: Shape) {
     .meta({ minProperties: 1 })
 }
 
+// A query parameter that can be given more than once, e.g. `?status=new&status=accepted`, as the list of its values.
+// Fastify gives a parameter that's given once as a string, and only one that's given several times as a list. It's
+// described as a list, which is how openapi.json and tools take it (see "Arguments" in docs/design/server/mcp.md).
+export function repeatable<Item extends z.ZodType>(item: Item) {
+  return z.preprocess((sent) => (typeof sent === 'string' ? [sent] : sent), z.array(item))
+}
+
 // A credential of a service the server reads, e.g. the SoundCloud app's client ID, or a YouTube API key. The client has its
 // own copy of the length, for its forms (see client/src/pages/admin/configuration/credentials-form.tsx).
 const CREDENTIAL_MAX_LENGTH = 200

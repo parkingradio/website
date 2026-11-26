@@ -128,6 +128,27 @@ export function dayWith(message: string) {
 }
 export const Day = dayWith('Invalid date')
 
+// The days that query parameters take, e.g. the calendar's `from` and `to`: those of the years 2000 to 2999, like the
+// instants that requests send (see `EARLIEST_INSTANT` and `LATEST_INSTANT`).
+const FIRST_DAY = '2000-01-01'
+const LAST_DAY = '2999-12-31'
+
+// The query parameter `name`, a day, "YYYY-MM-DD", from `FIRST_DAY` to `LAST_DAY`. Its error is a whole sentence, for
+// routes that send their schemas' messages as they are (see `firstIssue`).
+export function queryDay(name: string, description: string) {
+  const message = `\`${name}\` must be a single day, YYYY-MM-DD, without a time, from ${FIRST_DAY} to ${LAST_DAY}`
+  return dayWith(message)
+    .refine((day) => day >= FIRST_DAY && day <= LAST_DAY, message)
+    .meta({ description })
+}
+
+// Refines a query whose `from` and `to` are days, `to` included (see `queryDay`), either of which can be left out: `to`
+// can't be before `from`.
+export const toNotBeforeFrom = [
+  ({ from, to }: { from?: string; to?: string }) => from === undefined || to === undefined || to >= from,
+  "`to` can't be before `from`",
+] as const
+
 // A date and time with its offset from UTC, where the seconds can be left out, e.g. "2026-03-28T10:03-04:00" or
 // "2026-11-14T21:00:00.5-05:00". It isn't a `Timestamp`, whose seconds are required.
 const DATE_TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:[0-5]\d(\.\d+)?)?(Z|[+-](\d{2}:\d{2}))$/
