@@ -118,9 +118,11 @@ that what it shows of them can be missing or out of date: each one is a whole-da
 
 ## `GET /availability.ics`
 
-The studio's available time over the year ahead (see [Availability, in Calendar](calendar.md#availability)), one event
-per stretch. Its name and its stretches' `SUMMARY` are in French, unlike the rest of these calendars: « disponible » is
-what the admin pages call available time, so that admins recognize it.
+The studio's available time over the year ahead, as [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin)
+gives it (see [Availability, in Calendar](calendar.md#availability)): a feed whose last read failed still counts with
+what it read before. It has one event per stretch, whole, e.g. across midnight. Its name and its stretches' `SUMMARY`
+are in French, unlike the rest of these calendars: « disponible » is what the admin pages call available time, so that
+admins recognize it.
 
 Without any `holds` feed, there's no available time, and it gives an empty calendar right away. Otherwise, like
 [`GET /occupations.ics`](#get-occupationsics), it fails with 503 until every feed, of both kinds, has been read with the
@@ -130,7 +132,7 @@ Each stretch is a `VEVENT` with:
 
 | Property | Value |
 |---|---|
-| `UID` | `availability-<environment>-<start>@parking.radio`, from the server's environment, as in the calendars' names, e.g. `production`, and its start in UTC, as in `DTSTART`, e.g. `availability-production-20261125T050000Z@parking.radio`. Stretches never overlap, so no two have the same start, and environments have their own, so that an app subscribed to two environments' calendars keeps each one's. A stretch whose start changes, e.g. when a session takes its beginning, is another event |
+| `UID` | `availability-<environment>-<start>@parking.radio`, from the server's environment, e.g. `production`, and its start in UTC, as in `DTSTART`, e.g. `availability-production-20261125T050000Z@parking.radio`. Stretches never overlap, so no two have the same start, and environments have their own, so that an app subscribed to two environments' calendars keeps each one's. A stretch whose start changes is another event, e.g. the one going on at 00:00 today, which starts then, every day, or one whose beginning a session takes |
 | `DTSTART`, `DTEND` | Its `start` and `end`, as times, even from 00:00 to 00:00 |
 | `SUMMARY` | `disponible` |
 | `URL` | Calendrier on the day it starts, in Québec, `<site>/admin/calendrier?day=<YYYY-MM-DD>` |

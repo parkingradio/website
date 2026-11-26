@@ -88,33 +88,17 @@ echo "  a feed of holds doesn't count; it fails with 503 until a feed of occupat
 readonly FEED='7a2d4e6f-8b1c-4d3e-9f5a-6b7c8d9e0f12'
 readonly SECRET='private-5d1e8a3c9b7f'
 readonly HOLDS='7a2d4e6f-8b1c-4d3e-9f5a-6b7c8d9e0f13'
-add_holds() {
-    sql "insert into calendar_feeds (id, name, kind, link, created_by)
-         values ('${HOLDS}', 'Loft', 'holds', 'https://calendar.invalid/${SECRET}-loft.ics', '${ADMIN_EMAIL}')"
-}
-add_holds
+sql "insert into calendar_feeds (id, name, kind, link, created_by)
+     values ('${HOLDS}', 'Loft', 'holds', 'https://calendar.invalid/${SECRET}-loft.ics', '${ADMIN_EMAIL}')"
 request "${BASE_URL}/occupations.ics?token=${token}"
 expect_status 200
 expect_body_lacks 'BEGIN:VEVENT'
-echo "  the calendar of available time fails with 503 while a feed of holds hasn't been read"
-request "${BASE_URL}/availability.ics?token=${token}"
-expect_status 503
-expect_header cache-control 'no-store'
-expect_body_contains '{"ok":false,"error":'
-sql "delete from calendar_feeds where id = '${HOLDS}'"
 sql "insert into calendar_feeds (id, name, kind, link, created_by)
      values ('${FEED}', 'Séjours', 'occupations', 'https://calendar.invalid/${SECRET}.ics', '${ADMIN_EMAIL}')"
 request "${BASE_URL}/occupations.ics?token=${token}"
 expect_status 503
 expect_header cache-control 'no-store'
 expect_body_contains '{"ok":false,"error":'
-echo "  without a feed of holds, the calendar of available time doesn't wait for a feed of occupations"
-request "${BASE_URL}/availability.ics?token=${token}"
-expect_status 200
-expect_body_lacks 'BEGIN:VEVENT'
-add_holds
-request "${BASE_URL}/availability.ics?token=${token}"
-expect_status 503
 json POST "${BASE_URL}/api/admin/calendar/feeds/refresh"
 expect_status 200
 expect_body_contains "\"readAt\":null,\"error\":\"The link can't be read: its server can't be found\""
@@ -125,7 +109,25 @@ expect_body_contains 'SUMMARY:[REFRESH ERROR] Séjours'
 expect_body_contains "can't be found"
 expect_body_lacks "$SECRET"
 expect_body_lacks 'Loft'
-echo "  then it has the feeds whose read failed, of either kind"
+json DELETE "${BASE_URL}/api/admin/calendar/feeds/${FEED}"
+expect_status 200
+json DELETE "${BASE_URL}/api/admin/calendar/feeds/${HOLDS}"
+expect_status 200
+
+echo "  without a feed of holds, the calendar of available time doesn't wait for a feed of occupations; with one, it fails with 503 until every feed added behind the server's back has been read, then has those whose read failed"
+sql "insert into calendar_feeds (id, name, kind, link, created_by)
+     values ('${FEED}', 'Séjours', 'occupations', 'https://calendar.invalid/${SECRET}.ics', '${ADMIN_EMAIL}')"
+request "${BASE_URL}/availability.ics?token=${token}"
+expect_status 200
+expect_body_lacks 'BEGIN:VEVENT'
+sql "insert into calendar_feeds (id, name, kind, link, created_by)
+     values ('${HOLDS}', 'Loft', 'holds', 'https://calendar.invalid/${SECRET}-loft.ics', '${ADMIN_EMAIL}')"
+request "${BASE_URL}/availability.ics?token=${token}"
+expect_status 503
+expect_header cache-control 'no-store'
+expect_body_contains '{"ok":false,"error":'
+json POST "${BASE_URL}/api/admin/calendar/feeds/refresh"
+expect_status 200
 request "${BASE_URL}/availability.ics?token=${token}"
 expect_status 200
 expect_body_contains "UID:availability-feed-${FEED}@parking.radio"

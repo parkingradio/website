@@ -34,6 +34,8 @@ type Sources = { feeds: CalendarFeedsStore; reads: CalendarReads; sessions: Pick
 //   be protected or not;
 // - the sessions `forCalendar` gives: `given`, and every one the calendar counts, as it counts them (`counted`);
 // - and `available`, the available time of the year ahead, from all of these.
+// Without `range`, `forCalendar` gives the year ahead's sessions with their sets, which only `given` has and its callers
+// then don't need: loading them costs little, as /sessions.ics loads more.
 export async function calendarInputs({ feeds, reads, sessions }: Sources, { now, range }: { now: Date; range?: Period }) {
   const today = quebecDay(now)
   const window: Period = { from: dayStart(today), to: dayStart(addDays(today, YEAR_AHEAD_DAYS)) }
