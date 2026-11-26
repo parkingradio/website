@@ -86,8 +86,7 @@ for its default view, and its other parameters (see [Searching lists](#searching
 a status the list knows, the link back to the list above its title, e.g. "← candidatures", shows the list with the
 list's parameters, and « ← précédente » and « suivante → » lead to the entries before and after this one in that list,
 keeping the list's parameters in their address, with this one's place between them, e.g. « 3 / 12 » (« 3 sur 12 » for
-screen readers). The first one's « précédente » and the last one's « suivante » are greyed out and can't be used,
-without a tooltip, since this one's place already says why (see
+screen readers). The first one's « précédente » and the last one's « suivante » can't be used (see
 [Controls that can't be used](#controls-that-cant-be-used)). Without such a status, e.g. from another section's page,
 the link back shows the list as it opens, and the page has nothing else to go through it.
 
