@@ -309,9 +309,9 @@ top to bottom, the form has:
   like an artist's (see [Adding an artist](artistes.md#adding-an-artist)), and gives them the focus. Screen readers
   name it "modifier les genres". Once unfolded, the field stays so, without "modifier", until the form closes. Each time
   the performers change, an artist being added, taken out or moved, the set's genres become its performers': their
-  first genres, in the order of [a collective's genres](artistes.md#a-collectives-genres), up to 3, or none, even when
-  they were picked by hand. Genres that differ from the performers' (see [Sets](../../server/sessions.md#sets)) are
-  picked once the performers are. Opening a set's form leaves them as they are.
+  first genres, in the order of [a collective's genres](artistes.md#a-collectives-genres), up to 3, or none when they
+  have none, replacing those the set had, even genres picked by hand. Genres that differ from the performers' (see
+  [Sets](../../server/sessions.md#sets)) are picked once the performers are. Opening a set's form leaves them as they are.
 - "SoundCloud" and "YouTube": links to the set's track and video (see [Links](../../server/sessions.md#links)).
 
 When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked, and changing
@@ -391,8 +391,8 @@ An application's page leads to a session's page, or to "nouvelle session", with 
 (see [Candidatures](candidatures.md)), whose forms then start from it:
 
 - On a session's page, unless the session is cancelled, a new set's form opens, filled in from the application: its
-  artist as the only performer, and their genres as the set's (see [A set's form](#a-sets-form)), its performance types
-  and "autre", and the application itself. The page scrolls to the form, whose heading gets the focus.
+  artist as the only performer, and the genres a set takes from them (see [A set's form](#a-sets-form)), its performance
+  types and "autre", and the application itself. The page scrolls to the form, whose heading gets the focus.
 - On "nouvelle session", an artist's application lists a set, filled in the same way, whose duration isn't known yet. A
   collective's application makes the session its collective's takeover, in place of `?takeover`, with the application
   picked. Above the form, the application's days and time slots are shown as its page shows them, with a link to it,

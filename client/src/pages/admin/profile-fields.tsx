@@ -215,8 +215,8 @@ export function GenresField({
   foldable = false,
 }: GroupProps<GenreId[]> & {
   genres: GenreId[]
-  // Whether it's folded, showing only the genres and "modifier", until "modifier" unfolds it for good, giving the focus to
-  // the tags.
+  // Whether it starts folded, showing only the genres and "modifier", which unfolds it for good, giving the focus to the
+  // tags.
   foldable?: boolean
 }) {
   const [folded, setFolded] = useState(foldable)
@@ -234,7 +234,6 @@ export function GenresField({
           <button
             type="button"
             aria-label="modifier les genres"
-            aria-expanded={false}
             onClick={() => setFolded(false)}
           >
             modifier

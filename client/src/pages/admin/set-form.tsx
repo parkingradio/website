@@ -29,8 +29,8 @@ export type TakeoverCollective = Pick<Collective, 'name' | 'members'>
 type SetFormProps = {
   // What the form starts with: a set's, to change it, or what a new one starts with.
   initial: SetFormValues
-  // The artists the performers are picked from, or null when they couldn't be loaded, which leaves those of the set as
-  // they are.
+  // The artists the performers are picked from, and whose genres the set takes, or null when they couldn't be loaded,
+  // which leaves the set's performers as they are, and its genres as they are when the performers change.
   artists: Artist[] | null
   // The applications the set's is picked from, or null when they couldn't be loaded, which leaves the set's as it is.
   applications: Application[] | null
