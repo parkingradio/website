@@ -32,7 +32,7 @@ export const takesSomeOf =
     start !== null && end !== null && start < end && end > from && start < to
 
 // By start, then end.
-export const byStartThenEnd = (a: { start: Date; end: Date }, b: { start: Date; end: Date }) =>
+const byStartThenEnd = (a: { start: Date; end: Date }, b: { start: Date; end: Date }) =>
   a.start.getTime() - b.start.getTime() || a.end.getTime() - b.end.getTime()
 
 // The order of things: by start, then end, then sessions before occupations, and sessions by id. Occupations that are

@@ -56,13 +56,14 @@ export function availableTime(holds: Span[], taking: Span[], window: Period): Sp
   const stretches: Span[] = []
   for (const period of protectedTime(holds.filter(inWindow))) {
     const end = period.end < to ? period.end : to
-    let free = period.start > from ? period.start : from
+    // From when the period is available, as far as what's taken so far goes.
+    let availableFrom = period.start > from ? period.start : from
     for (const { start, end: takenUntil } of taken) {
-      if (free >= end || start >= end) break
-      if (start > free) stretches.push({ start: free, end: start })
-      if (takenUntil > free) free = takenUntil
+      if (availableFrom >= end || start >= end) break
+      if (start > availableFrom) stretches.push({ start: availableFrom, end: start })
+      if (takenUntil > availableFrom) availableFrom = takenUntil
     }
-    if (free < end) stretches.push({ start: free, end })
+    if (availableFrom < end) stretches.push({ start: availableFrom, end })
   }
   return stretches
 }

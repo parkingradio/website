@@ -77,7 +77,7 @@ export function Month({ month, grid, nameId, today, chosen, days, onChoose, onAd
               const classes = [
                 !inMonth && 'calendar-other-month',
                 day === chosen && 'calendar-chosen',
-                entries.some((entry) => isAvailable(entry) && entry.wholeDay) && 'calendar-available',
+                entries.some((entry) => isAvailable(entry) && entry.wholeDay) && 'calendar-day-available',
               ]
               // The day's button and its "+", which are both its stop, and move with the arrows.
               const stopProps = { tabIndex: day === stop ? 0 : -1, onFocus: () => setFocused(day), onKeyDown: (event: KeyboardEvent) => onKeyDown(event, day) }
@@ -143,7 +143,7 @@ function DayMarks({ entries }: { entries: CalendarDay }) {
         const classes = [`calendar-mark calendar-mark-${thing.kind}`, thing.kind === 'session' && `calendar-mark-${thing.status}`, conflicts.length > 0 && 'calendar-mark-conflict']
         return <span key={i} className={classes.filter(Boolean).join(' ')} />
       })}
-      {entries.some(isAvailable) && <span className="calendar-mark calendar-mark-free" />}
+      {entries.some(isAvailable) && <span className="calendar-mark calendar-mark-available" />}
     </span>
   )
 }
@@ -155,7 +155,7 @@ function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
     <ul id={id} className="calendar-things">
       {entries.map((entry, i) =>
         isAvailable(entry) ? (
-          <li key={i} className={entry.toDayEnd ? 'calendar-free calendar-to-day-end' : 'calendar-free'}>
+          <li key={i} className={entry.toDayEnd ? 'calendar-available calendar-to-day-end' : 'calendar-available'}>
             {entry.wholeDay ? 'disponible' : `dispo ${entry.part}`}
           </li>
         ) : (

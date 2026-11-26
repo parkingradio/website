@@ -166,24 +166,6 @@ export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.t
 // "dès 11 h" or "11 h – 15 h", whether it's the whole day, and whether it lasts until the end of the day.
 export type AvailableStretch = { part: string; wholeDay: boolean; toDayEnd: boolean }
 
-// The stretches of the available time `available`, as the server gives them (see "Availability" in
-// docs/design/server/calendar.md), cut to `day`, each with when it starts on it, or nothing when it has none.
-function availableStretches(day: string, available: Times[]): { start: number; stretch: AvailableStretch }[] {
-  const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
-  const part = (from: number, to: number) => {
-    if (from === dayFrom && to === dayTo) return WHOLE_DAY
-    if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
-    if (to === dayTo) return `dès ${timeOf(from)}`
-    return fromTo(timeOf(from), timeOf(to))
-  }
-  return available.flatMap(({ start, end }) => {
-    const [from, to] = [Math.max(Date.parse(start), dayFrom), Math.min(Date.parse(end), dayTo)]
-    if (from >= to) return []
-    const toDayEnd = to === dayTo
-    return [{ start: from, stretch: { part: part(from, to), wholeDay: from === dayFrom && toDayEnd, toDayEnd } }]
-  })
-}
-
 // What tells things apart, the way the server does: a session by its id, and an occupation by all it's given with (see
 // "The calendar" in docs/design/server/calendar.md).
 export function thingKey(thing: ConflictThing): string {
@@ -278,15 +260,27 @@ export function calendarDays(calendar: Calendar, days: string[]): Map<string, Ca
   return new Map([...byDay].map(([day, dayThings]) => [day, withAvailability(day, dayThings, calendar.availability)]))
 }
 
-// What takes some of `day`, `dayThings`, with the stretches of its available time `available` among them, if it has any
-// (see "Availability" in docs/design/client/admin/calendrier.md).
+// What takes some of `day`, `dayThings`, with the stretches of its available time among them, if it has any: those of
+// `available`, as the server gives them (see "Availability" in docs/design/server/calendar.md), cut to the day (see
+// "Availability" in docs/design/client/admin/calendrier.md).
 function withAvailability(day: string, dayThings: DayThing[], available: Times[]): CalendarDay {
-  const dayFrom = dayStart(day)
+  const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
+  const part = (from: number, to: number) => {
+    if (from === dayFrom && to === dayTo) return WHOLE_DAY
+    if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
+    if (to === dayTo) return `dès ${timeOf(from)}`
+    return fromTo(timeOf(from), timeOf(to))
+  }
   // By when each entry starts on the day, the things that started earlier at 00:00, and a thing before a stretch that
   // starts when it does, e.g. a cancelled session.
   const entries: [number, DayEntry][] = [
     ...dayThings.map((entry): [number, DayEntry] => [Math.max(Date.parse(entry.thing.start), dayFrom), entry]),
-    ...availableStretches(day, available).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
+    ...available.flatMap(({ start, end }): [number, DayEntry][] => {
+      const [from, to] = [Math.max(Date.parse(start), dayFrom), Math.min(Date.parse(end), dayTo)]
+      if (from >= to) return []
+      const toDayEnd = to === dayTo
+      return [[from, { part: part(from, to), wholeDay: from === dayFrom && toDayEnd, toDayEnd }]]
+    }),
   ]
   return entries.sort(([a], [b]) => a - b).map(([, entry]) => entry)
 }

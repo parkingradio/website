@@ -364,8 +364,6 @@ describe('the days of the month', () => {
     expect(available('2026-11-25')).toEqual([])
     expect(available('2026-11-26')).toEqual([])
     expect(available('2026-11-28')).toEqual(['toute la journée'])
-    // None when the server gives none, e.g. without holds.
-    expect([...calendarDays(calendar({ sessions: [late], occupations: [stay, repair] }), gridDays('2026-11')).values()].flat().filter(isAvailable)).toEqual([])
   })
 
   it('have available time among what takes them, in order of time', () => {

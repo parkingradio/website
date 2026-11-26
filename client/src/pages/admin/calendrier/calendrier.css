@@ -17,8 +17,8 @@
   color: #4b2a85;
 }
 
-.calendar-free,
-.calendar-mark-free {
+.calendar-available,
+.calendar-mark-available {
   background: #dcf1e0;
   color: #1b5e2a;
 }
@@ -292,7 +292,7 @@
   cursor: pointer;
 }
 
-.calendar-month td.calendar-available {
+.calendar-month td.calendar-day-available {
   background: #eef8f0;
 }
 
@@ -611,8 +611,8 @@
     background: none;
   }
 
-  .calendar-mark-free,
-  .calendar-legend .calendar-free {
+  .calendar-mark-available,
+  .calendar-legend .calendar-available {
     border: 1px solid #1b5e2a;
     border-radius: 50%;
   }

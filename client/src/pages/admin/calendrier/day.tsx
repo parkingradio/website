@@ -46,7 +46,7 @@ export function ChosenDay({ day, today, entries, onClose, children }: ChosenDayP
             {entries.map((entry, i) =>
               isAvailable(entry) ? (
                 <li key={i} className="calendar-row">
-                  <span className="calendar-kind calendar-free">disponible</span>
+                  <span className="calendar-kind calendar-available">disponible</span>
                   <span>{entry.part}</span>
                 </li>
               ) : (

@@ -302,7 +302,7 @@ export function Calendrier() {
 const LEGEND = [
   { kind: 'session', name: 'session', tip: 'Toutes les sessions qui ont une date.', calendar: 'sessions' },
   { kind: 'occupation', name: 'occupation', tip: "Période où le studio n'est pas disponible pour des sessions.", calendar: 'occupations' },
-  { kind: 'free', name: 'disponible', tip: 'Plage disponible au studio, protégée des occupations.', calendar: null },
+  { kind: 'available', name: 'disponible', tip: 'Plage disponible au studio, protégée des occupations.', calendar: null },
   { kind: 'conflict', name: 'conflit', tip: 'Une session ou une occupation qui chevauche une plage indisponible.', calendar: null },
 ] as const
 

@@ -126,7 +126,7 @@ expect_status 404
 request --header "Cookie: ${cookie}" "$URL"
 expect_body_contains '"total":0'
 
-echo "  the calendar gives the sessions of its days, those without a date, and the feeds, and refuses more than 400 days"
+echo "  the calendar gives the sessions of its days, those without a date, the feeds, availability but never holds, and refuses more than 400 days"
 readonly CALENDAR="${BASE_URL}/api/admin/calendar"
 request "${CALENDAR}?from=2031-03-10&to=2031-03-10"
 expect_status 401

@@ -43,8 +43,7 @@ const TEAM = {
 }
 // A feed of the guests' stays, whose last read failed.
 const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', link: 'https://example.com/stays.ics', error: "The link can't be read: its server fails (503)" }
-// A feed of the time protected for sessions, which protects the 365 days from today: they're available time where
-// nothing takes them.
+// A feed of the time protected for sessions, with which the server gives available time.
 const LOFT = { ...TEAM, id: 'loft', name: 'Loft', kind: 'holds' as const, link: 'https://example.com/loft.ics' }
 const [TODAY, LAST] = ['2026-11-19T00:00:00-05:00', '2027-11-19T00:00:00-05:00']
 
@@ -299,17 +298,17 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      const free = (day: string) => [...cell(day).querySelectorAll('.calendar-free')].map(visibleText)
-      expect(free('2026-11-19')).toEqual(['disponible'])
-      expect(cell('2026-11-19')).toHaveClass('calendar-available')
-      expect(free('2026-11-26')).toEqual(["dispo jusqu'à 10 h", 'dispo dès 16 h'])
-      expect(cell('2026-11-26')).not.toHaveClass('calendar-available')
+      const available = (day: string) => [...cell(day).querySelectorAll('.calendar-available')].map(visibleText)
+      expect(available('2026-11-19')).toEqual(['disponible'])
+      expect(cell('2026-11-19')).toHaveClass('calendar-day-available')
+      expect(available('2026-11-26')).toEqual(["dispo jusqu'à 10 h", 'dispo dès 16 h'])
+      expect(cell('2026-11-26')).not.toHaveClass('calendar-day-available')
       // Not that of the month after, which the model has (see model.test.ts).
-      expect(free('2026-12-05')).toEqual([])
-      expect(cell('2026-12-05')).not.toHaveClass('calendar-available')
+      expect(available('2026-12-05')).toEqual([])
+      expect(cell('2026-12-05')).not.toHaveClass('calendar-day-available')
     })
 
-    it('shows the available time the server gives, around a session too, and none when it gives none', async () => {
+    it('shows the available time the server gives, around a session too, and nothing where it gives none', async () => {
       // Protected from 11 h to 18 h on the 23rd, around a session, and nowhere else.
       const tea = session('session-7', 'APÉRO', '2026-11-23T13:00:00-05:00', '2026-11-23T15:00:00-05:00')
       const availability = [
@@ -317,22 +316,15 @@ describe('Calendrier', () => {
         { start: tea.end!, end: '2026-11-23T18:00:00-05:00' },
       ]
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [tea], availability } })
-      const first = renderAt('/admin/calendrier')
+      renderAt('/admin/calendrier')
       await loaded()
 
       expect(cellText('2026-11-23')).toBe('23+dispo 11 h – 13 h13 h – 15 hsession : APÉROdispo 15 h – 18 h')
-      expect(cell('2026-11-23').querySelectorAll('.calendar-mark-free')).toHaveLength(1)
+      expect(cell('2026-11-23').querySelectorAll('.calendar-mark-available')).toHaveLength(1)
       // Nothing takes it, but it isn't protected: no color, no mention, no mark.
       expect(cellText('2026-11-24')).toBe('24+')
-      expect(cell('2026-11-24')).not.toHaveClass('calendar-available')
+      expect(cell('2026-11-24')).not.toHaveClass('calendar-day-available')
       expect(cell('2026-11-24').querySelector('.calendar-marks')).toBeNull()
-      first.unmount()
-
-      // Nothing's protected without a holds feed.
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [TEAM, STAYS], availability: [] } })
-      renderAt('/admin/calendrier')
-      await loaded()
-      expect(document.querySelectorAll('.calendar-month .calendar-free, .calendar-month .calendar-mark-free, .calendar-available')).toHaveLength(0)
     })
 
     it('says what each kind is in the legend, in a tooltip, which does nothing else', async () => {
@@ -536,8 +528,8 @@ describe('Calendrier', () => {
       await loaded()
 
       expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(['disponibletoute la journée'])
-      expect(cell('2026-12-01').querySelector('.calendar-free')).toBeNull()
-      expect(cell('2026-12-01')).not.toHaveClass('calendar-available')
+      expect(cell('2026-12-01').querySelector('.calendar-available')).toBeNull()
+      expect(cell('2026-12-01')).not.toHaveClass('calendar-day-available')
     })
   })
 
@@ -998,7 +990,7 @@ describe('Calendrier', () => {
       await loaded()
 
       const marks = (day: string) => cell(day).querySelector('.calendar-marks')
-      const kinds = (day: string) => [...marks(day)!.children].map((mark) => mark.className.match(/calendar-mark-(session|occupation|free)/)![1])
+      const kinds = (day: string) => [...marks(day)!.children].map((mark) => mark.className.match(/calendar-mark-(session|occupation|available)/)![1])
       const conflicting = (day: string) => [...marks(day)!.children].map((mark) => mark.classList.contains('calendar-mark-conflict'))
       expect(marks('2026-11-21')).toHaveAttribute('aria-hidden', 'true')
       expect(marks('2026-11-21')).toHaveTextContent(/^$/)
@@ -1006,11 +998,11 @@ describe('Calendrier', () => {
       expect(kinds('2026-11-21')).toEqual(['occupation', 'session'])
       expect(conflicting('2026-11-21')).toEqual([true, true])
       // Available time once, after the things, whatever its stretches.
-      expect(kinds('2026-11-22')).toEqual(['occupation', 'session', 'free'])
-      expect(kinds('2026-11-26')).toEqual(['occupation', 'free'])
+      expect(kinds('2026-11-22')).toEqual(['occupation', 'session', 'available'])
+      expect(kinds('2026-11-26')).toEqual(['occupation', 'available'])
       expect(conflicting('2026-11-26')).toEqual([false, false])
-      // A day free all day.
-      expect(kinds('2026-11-19')).toEqual(['free'])
+      // A day that's all available time.
+      expect(kinds('2026-11-19')).toEqual(['available'])
       // Done and cancelled sessions.
       expect(marks('2026-11-07')!.firstElementChild).toHaveClass('calendar-mark-done')
       expect(marks('2026-11-24')!.firstElementChild).toHaveClass('calendar-mark-cancelled')
@@ -1160,7 +1152,7 @@ describe('Calendrier', () => {
 
     it('says when there is nothing to settle, and warns of the feeds that were not read, about conflicts alone without a holds feed', async () => {
       const notRead = { ...TEAM, id: 'new', name: 'Nouveau', readAt: null }
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds: [TEAM, STAYS, notRead], conflicts: [], undatedSessions: [] } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds: [TEAM, STAYS, notRead], availability: [], conflicts: [], undatedSessions: [] } })
       renderAt('/admin/calendrier')
       await loaded()
 
@@ -1193,7 +1185,7 @@ describe('Calendrier', () => {
 
     it('has no notice when there are no feeds: with nothing to settle, it only has its row', async () => {
       // Without feeds, there are no occupations, and no conflicts.
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], conflicts: [], undatedSessions: [] } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], availability: [], conflicts: [], undatedSessions: [] } })
       renderAt('/admin/calendrier')
       await loaded()
 

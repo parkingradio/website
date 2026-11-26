@@ -166,7 +166,7 @@ by start.
 **Available time** is the protected time of [the year ahead](#the-calendar) that nothing takes: no session that isn't
 cancelled, done ones included, and no occupation. The part of today that's over is in it too, so apps shouldn't suggest
 it. It's in stretches, cut only at the ends of the year ahead, not e.g. at midnight: two stretches never overlap or
-follow each other. While there's no `holds` feed, there's none.
+follow each other.
 
 Available time is where sessions can go: a session placed within a stretch is within protected time, and overlaps
 nothing. It doesn't include the time a session takes itself: a session that's moved can go within its own time and the

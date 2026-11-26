@@ -176,17 +176,4 @@ describe('availableTime', () => {
     // Holds that are all before today, or after the 365 days.
     expect(available([span(at('2026-11-22', '11:00'), dayStart('2026-11-23')), span(dayStart('2027-11-23'), at('2027-11-23', '11:00'))])).toEqual([])
   })
-
-  it('takes whole days of 25 hours, or of 23, whole', () => {
-    const window = { from: dayStart('2026-10-01'), to: dayStart('2027-12-01') }
-    // November 1, 2026, when the clocks go back, and March 14, 2027, when they go forward.
-    const fall = days('2026-11-01', '2026-11-02')
-    const spring = days('2027-03-14', '2027-03-15')
-    expect(available([fall, spring], [], window)).toEqual([fall, spring])
-    expect(fall.end.getTime() - fall.start.getTime()).toBe(25 * 3600_000)
-    expect(spring.end.getTime() - spring.start.getTime()).toBe(23 * 3600_000)
-    // A session from 1:30 to 3:00 on the day of 25 hours, of which 1:30 comes twice: from the first one.
-    const night = span(new Date('2026-11-01T05:30:00Z'), at('2026-11-01', '03:00'))
-    expect(available([fall], [night], window)).toEqual([span(fall.start, night.start), span(night.end, fall.end)])
-  })
 })

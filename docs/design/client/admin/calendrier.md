@@ -162,10 +162,8 @@ sessions there.
 
 ### Availability
 
-Available time is the studio's protected time that nothing takes, as the calendar gives it (see
-[Availability](../../server/calendar.md#availability)), so that a day with a session can have some too, around it. The
-page cuts its stretches at each midnight: each day has its own, from 00:00 to 00:00. The page says nothing of the time
-that nothing takes but that isn't protected.
+Available time is the calendar's (see [Availability](../../server/calendar.md#availability)): the page cuts its
+stretches at each midnight, so that each day has its own, from 00:00 to 00:00.
 
 The month shows the available time of its own days, not that of the months before and after. A day that's all available
 time is green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or
