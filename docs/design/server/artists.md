@@ -67,9 +67,9 @@ gone for good after that.
 
 The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
 its EXIF orientation says, never larger than the photo, nor taller than WebP allows. They keep none of its metadata,
-e.g. where it was taken, nor its colour profile, but they keep its colours: those of a photo with a colour profile are
-in Display P3, with a Display P3 profile of the server's own, never the photo's, and those of a photo without one are
-as they are, without a profile. They're deleted with it.
+e.g. where it was taken, but keep its colours, as far as Display P3 has them: those of a photo with a colour profile are
+in Display P3, with a Display P3 profile of the server's own, and those of a photo without one are as they are, without
+a profile. They're deleted with it.
 When it starts, the server makes, in the background, the sizes that the photos it keeps don't have: until then, and for
 good for a photo it can't read, the endpoints fail with 404 for a size that isn't there.
 

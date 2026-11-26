@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
 import { PHOTO_WIDTHS, UnreadablePhoto, makeSizes, resize, sizeKey, sizeName, widthNamed } from './sizes.js'
-import { TEST_COLOUR, colourTestImages, expectColour, testImage, wideGamutTestImages } from './test-photos.js'
+import { colourTestImages, expectColour, testImage, wideGamutTestImages } from './test-photos.js'
 
 // What photos and flyers are served as, made from real images (see "Photos" in docs/design/server/artists.md).
 
@@ -52,9 +52,9 @@ describe('resize', () => {
   })
 
   it('keeps its colours: in Display P3, with a profile of its own, when the photo has a profile, and as they are otherwise', async () => {
-    for (const [name, photo] of Object.entries(await colourTestImages())) {
+    for (const [name, { image: photo, colour }] of Object.entries(await colourTestImages())) {
       const size = await resize(photo, 320)
-      await expectColour(size, TEST_COLOUR, 4, name)
+      await expectColour(size, colour, 4, name)
       // Never the photo's, e.g. sRGB's.
       const profiled = (await sharp(photo).metadata()).icc !== undefined
       expect((await sharp(size).metadata()).icc, name).toEqual(profiled ? P3_PROFILE : undefined)

@@ -78,20 +78,61 @@ export async function testImage(
   return (rotated ? image.withMetadata({ orientation: 6 }) : image)[format]().toBuffer()
 }
 
-// Images of `testImage`'s colour with and without a profile, 8-bit and 16-bit, by name, to check that what's made from
-// them keeps its colours (see `readPhoto` in sizes.ts). `testImage` makes it in Display P3, where it's about
-// (212, 96, 59).
-export async function colourTestImages(): Promise<Record<string, Buffer>> {
+// Images with and without a profile, 8-bit and 16-bit, by name, with the colour each one is, in sRGB, to check that
+// what's made from them keeps it (see `readPhoto` in sizes.ts): `testImage`'s colour, which `testImage` makes in
+// Display P3, where it's about (212, 96, 59), and a grey whose profile has a gamma of 1.8, far enough from sRGB's that
+// it's another grey when the profile is ignored.
+export async function colourTestImages(): Promise<Record<string, { image: Buffer; colour: number[] }>> {
   const p3 = await testImage('png', 64, 64)
   const [r, g, b] = TEST_COLOUR
   const srgb = () => sharp({ create: { width: 64, height: 64, channels: 3, background: { r, g, b } } })
+  const grey = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#787878' } }).toColourspace('b-w').jpeg().toBuffer()
+  const colour = TEST_COLOUR
   return {
-    p3,
-    'p3 16-bit': await sharp(p3).keepIccProfile().toColourspace('rgb16').png().toBuffer(),
-    'sRGB, with its profile': await srgb().withIccProfile('srgb').jpeg().toBuffer(),
-    'sRGB 16-bit, with its profile': await srgb().toColourspace('rgb16').withIccProfile('srgb').png().toBuffer(),
-    'sRGB 16-bit, without a profile': await srgb().toColourspace('rgb16').png().toBuffer(),
+    p3: { image: p3, colour },
+    'p3 16-bit': { image: await sharp(p3).keepIccProfile().toColourspace('rgb16').png().toBuffer(), colour },
+    'sRGB, with its profile': { image: await srgb().withIccProfile('srgb').jpeg().toBuffer(), colour },
+    'sRGB 16-bit, with its profile': { image: await srgb().toColourspace('rgb16').withIccProfile('srgb').png().toBuffer(), colour },
+    'sRGB 16-bit, without a profile': { image: await srgb().toColourspace('rgb16').png().toBuffer(), colour },
+    // 120 at gamma 1.8 is 139 in sRGB.
+    'grey, with a profile of gamma 1.8': { image: withJpegProfile(grey, greyProfile(1.8)), colour: [139, 139, 139] },
   }
+}
+
+// An ICC profile for greyscale of gamma `gamma`, built by hand, since neither sharp nor CI has one: a header, and a
+// description, a white point and the grey's curve.
+function greyProfile(gamma: number): Buffer {
+  const uint32 = (value: number) => {
+    const bytes = Buffer.alloc(4)
+    bytes.writeUInt32BE(value)
+    return bytes
+  }
+  const d50 = Buffer.concat([0.9642, 1, 0.8249].map((value) => uint32(Math.round(value * 65536))))
+  const tags = Object.entries({
+    desc: Buffer.concat([Buffer.from('desc\0\0\0\0', 'latin1'), uint32(2), Buffer.from('g', 'latin1'), Buffer.alloc(79)]),
+    wtpt: Buffer.concat([Buffer.from('XYZ \0\0\0\0', 'latin1'), d50]),
+    kTRC: Buffer.concat([Buffer.from('curv\0\0\0\0', 'latin1'), uint32(1), uint32(Math.round(gamma * 256) << 16)]),
+  })
+  const table = [uint32(tags.length)]
+  let offset = 128 + 4 + 12 * tags.length
+  for (const [signature, tag] of tags) {
+    table.push(Buffer.from(signature, 'latin1'), uint32(offset), uint32(tag.length))
+    offset += tag.length
+  }
+  const header = Buffer.alloc(128)
+  header.writeUInt32BE(offset, 0)
+  header.writeUInt32BE(0x02100000, 8)
+  header.write('mntrGRAYXYZ ', 12, 'latin1')
+  header.write('acsp', 36, 'latin1')
+  d50.copy(header, 68)
+  return Buffer.concat([header, ...table, ...tags.map(([, tag]) => tag)])
+}
+
+// `jpeg` with `profile` embedded, in an APP2 segment right after its start.
+function withJpegProfile(jpeg: Buffer, profile: Buffer): Buffer {
+  const segment = Buffer.concat([Buffer.from([0xff, 0xe2, 0, 0]), Buffer.from('ICC_PROFILE\0\x01\x01', 'latin1'), profile])
+  segment.writeUInt16BE(segment.length - 2, 2)
+  return Buffer.concat([jpeg.subarray(0, 2), segment, jpeg.subarray(2)])
 }
 
 // Images of Display P3's pure green, a colour outside sRGB, 8-bit and 16-bit, in Display P3, by name. sharp takes the

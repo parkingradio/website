@@ -30,9 +30,9 @@ describe('raFlyer', () => {
   })
 
   it('is in sRGB, converted from the profile of the flyer, 16-bit ones included', async () => {
-    for (const [name, flyer] of Object.entries(await colourTestImages())) {
+    for (const [name, { image: flyer, colour }] of Object.entries(await colourTestImages())) {
       expect((await sharp(flyer).metadata()).icc === undefined, name).toBe(name.endsWith('without a profile'))
-      await expectColour(await raFlyer(flyer), TEST_COLOUR, 3, name)
+      await expectColour(await raFlyer(flyer), colour, 3, name)
     }
   })
 

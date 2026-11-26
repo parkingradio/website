@@ -23,8 +23,8 @@ export const SIZE_TYPE = 'image/webp'
 // when they're missing, so the server would otherwise keep serving those already made, and their public URLs, which
 // browsers and Cloudflare keep for good, have to change with what they serve. The server then makes every size again,
 // under the new name, when it starts (see artists/backfill.ts), and the sizes under the old name, which it never serves
-// again, are left behind in the bucket: they have to be deleted by hand once it has made the new ones, which the new
-// name mustn't match. Until then, deleting a photo leaves them behind.
+// again, are left behind in the bucket: they have to be deleted by hand, by the end of their keys, once it has made the
+// new ones, so the new name mustn't end like the old one. Until then, deleting a photo leaves them behind.
 export function sizeName(width: PhotoWidth): string {
   return `w${width}.v2.webp`
 }
@@ -59,7 +59,7 @@ export class UnreadablePhoto extends Error {
 // Display P3 for 16-bit RGB, before converting it to `profile`: 8-bit RGB, e.g. a phone's photo in Display P3, would
 // lose its colours outside sRGB, so its profile is ignored as it's read, and it's converted straight from it to
 // `profile` instead. Not greyscale or CMYK, whose profile sharp then wouldn't use at all. A photo without a profile is
-// left as it is: sharp would take a 16-bit one to be in Display P3, and convert it.
+// left as it is: sharp would take it to be in sRGB, or Display P3 when it's 16-bit, and convert or tag it.
 export async function readPhoto(photo: Buffer, profile: 'p3' | 'srgb'): Promise<Sharp> {
   const options = { limitInputPixels: PHOTO_MAX_PIXELS, failOn: 'truncated' } as const
   const { icc, space } = await sharp(photo, options).metadata()
