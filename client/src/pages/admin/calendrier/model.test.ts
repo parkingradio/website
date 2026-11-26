@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
 import { spaced } from '../../../test-utils'
-import { addMonths, briefTimes, calendarDays, daysOf, isFree, fullTimes, gridDays, gridRange, inSentence, listRange, listedMonths, nameOf, namedThing, partOfDay, readDay, readMonth, startDay, thingKey, thingsWithConflicts } from './model'
+import { addMonths, briefTimes, calendarDays, daysOf, isAvailable, fullTimes, gridDays, gridRange, inSentence, listRange, listedMonths, nameOf, namedThing, partOfDay, readDay, readMonth, startDay, thingKey, thingsWithConflicts } from './model'
 import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
 
 const times = (start: string, end: string) => ({ start, end })
-// What takes a day, and the parts of the day of its free time.
-const thingsOn = (entries: CalendarDay) => entries.filter((entry): entry is DayThing => !isFree(entry))
-const freeOf = (entries: CalendarDay) => entries.filter(isFree).map(({ part }) => spaced(part))
-// The parts of the day of `day`'s free time, from the server's stretches `free`.
-const parts = (day: string, freeTime: { start: string; end: string }[]) => freeOf(calendarDays(calendar({ freeTime }), [day]).get(day)!)
+// What takes a day, and the parts of the day of its available time.
+const thingsOn = (entries: CalendarDay) => entries.filter((entry): entry is DayThing => !isAvailable(entry))
+const availableOf = (entries: CalendarDay) => entries.filter(isAvailable).map(({ part }) => spaced(part))
+// The parts of the day of `day`'s available time, from the server's stretches `availability`.
+const parts = (day: string, availability: { start: string; end: string }[]) => availableOf(calendarDays(calendar({ availability }), [day]).get(day)!)
 
 describe('the grid', () => {
   it('runs from the Sunday of the first week to the Saturday of the last', () => {
@@ -184,7 +184,7 @@ describe("a thing's times in brief", () => {
   })
 })
 
-describe('free time', () => {
+describe('available time', () => {
   it("is the server's stretches, cut at each midnight", () => {
     // From 15 h on the 20th to 11 h on the 23rd.
     const stretch = [times('2026-11-20T15:00:00-05:00', '2026-11-23T11:00:00-05:00')]
@@ -245,13 +245,13 @@ function session(id: string, start: string, end: string, status: Session['status
   return { id, title: id.toUpperCase(), start, end, status, sets: [] } as unknown as Session
 }
 
-// Free time over the 365 days from the calendars' today, as the server gives it when they're all protected and nothing
-// takes them.
+// Available time over the 365 days from the calendars' today, as the server gives it when they're all protected and
+// nothing takes them.
 const ALWAYS = times('2026-11-19T00:00:00-05:00', '2027-11-19T00:00:00-05:00')
 
 function calendar(fields: Partial<Calendar>): Calendar {
   const feeds = [feed('q', 'Séjours'), feed('o', 'Équipe'), feed('h', 'Loft', 'holds')]
-  return { ok: true, today: '2026-11-19', feeds, sessions: [], occupations: [], freeTime: [], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
+  return { ok: true, today: '2026-11-19', feeds, sessions: [], occupations: [], availability: [], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
 }
 
 const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
@@ -259,14 +259,14 @@ const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing
 const unprotected = ({ id, title, start, end }: Session) => ({ id, title, start: start!, end: end! })
 
 describe('the days of the month', () => {
-  // A stay, without a title, a session during it, and a repair over three whole days, and the free time around them, from
-  // today.
+  // A stay, without a title, a session during it, and a repair over three whole days, and the available time around
+  // them, from today.
   const stay = { feedId: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: '' }
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const repair = { feedId: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
   const conflict: Conflict = { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, sessionThing(late)] }
-  const freeTime = [times(ALWAYS.start, stay.start), times(stay.end, repair.start), times(repair.end, ALWAYS.end)]
-  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict], freeTime }), gridDays('2026-11'))
+  const availability = [times(ALWAYS.start, stay.start), times(stay.end, repair.start), times(repair.end, ALWAYS.end)]
+  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict], availability }), gridDays('2026-11'))
 
   it('have what takes them, by start, then end, with their names', () => {
     expect(thingsOn(days.get('2026-11-21')!).map(({ thing, part }) => [thing.kind, thing.title, spaced(part)])).toEqual([
@@ -285,9 +285,9 @@ describe('the days of the month', () => {
     expect(conflicts('2026-11-22')).toEqual([['session'], ['occupation']])
   })
 
-  it('say what lasts until the end of the day, 00:00 or later, things and free time', () => {
+  it('say what lasts until the end of the day, 00:00 or later, things and available time', () => {
     const toDayEnd = (shown: Map<string, CalendarDay>, day: string) => shown.get(day)!.map((entry) => [spaced(entry.part), entry.toDayEnd])
-    // The stay, all day, and the session, until 1 h the next day, then their ends, and the free time after them.
+    // The stay, all day, and the session, until 1 h the next day, then their ends, and the available time after them.
     expect(toDayEnd(days, '2026-11-21')).toEqual([
       ['toute la journée', true],
       ['21 h – 1 h', true],
@@ -317,11 +317,11 @@ describe('the days of the month', () => {
     expect(toDayEnd(calendarDays(calendar({ occupations: [fall] }), gridDays('2026-11')), '2026-11-01')).toEqual([['toute la journée', true]])
   })
 
-  it('list what started on an earlier day first, by start, then end, then the free time', () => {
+  it('list what started on an earlier day first, by start, then end, then the available time', () => {
     expect(days.get('2026-11-22')!.map(({ part }) => spaced(part))).toEqual(["jusqu'à 11 h", "jusqu'à 1 h", 'dès 11 h'])
     // A thing before a stretch that starts when it does: a cancelled session, which doesn't take the studio.
     const cancelled = session('off', '2026-11-23T22:00:00-05:00', '2026-11-24T02:00:00-05:00', 'cancelled')
-    const shown = calendarDays(calendar({ sessions: [cancelled], freeTime: [ALWAYS] }), gridDays('2026-11'))
+    const shown = calendarDays(calendar({ sessions: [cancelled], availability: [ALWAYS] }), gridDays('2026-11'))
     expect(shown.get('2026-11-24')!.map(({ part }) => spaced(part))).toEqual(["jusqu'à 2 h", 'toute la journée'])
   })
 
@@ -346,35 +346,35 @@ describe('the days of the month', () => {
     expect(lines).toEqual([["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours"]])
   })
 
-  it('have the free time the server gives, cut to each of them', () => {
-    const free = (day: string) => freeOf(days.get(day)!)
+  it('have the available time the server gives, cut to each of them', () => {
+    const available = (day: string) => availableOf(days.get(day)!)
     // Before today.
-    expect(free('2026-11-18')).toEqual([])
-    expect(free('2026-11-19')).toEqual(['toute la journée'])
+    expect(available('2026-11-18')).toEqual([])
+    expect(available('2026-11-19')).toEqual(['toute la journée'])
     // In the month after too, as in its own month's grid.
-    expect(free('2026-12-01')).toEqual(['toute la journée'])
-    expect(freeOf(calendarDays(calendar({ freeTime: [ALWAYS] }), gridDays('2026-12')).get('2026-12-01')!)).toEqual(['toute la journée'])
+    expect(available('2026-12-01')).toEqual(['toute la journée'])
+    expect(availableOf(calendarDays(calendar({ availability: [ALWAYS] }), gridDays('2026-12')).get('2026-12-01')!)).toEqual(['toute la journée'])
     // The stay starts at 15 h.
-    expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
+    expect(available('2026-11-20')).toEqual(["jusqu'à 15 h"])
     // The stay takes all of it.
-    expect(free('2026-11-21')).toEqual([])
+    expect(available('2026-11-21')).toEqual([])
     // The session's tail, and the stay, end.
-    expect(free('2026-11-22')).toEqual(['dès 11 h'])
+    expect(available('2026-11-22')).toEqual(['dès 11 h'])
     // A whole-day occupation, which takes the 25th to the 27th whole.
-    expect(free('2026-11-25')).toEqual([])
-    expect(free('2026-11-26')).toEqual([])
-    expect(free('2026-11-28')).toEqual(['toute la journée'])
+    expect(available('2026-11-25')).toEqual([])
+    expect(available('2026-11-26')).toEqual([])
+    expect(available('2026-11-28')).toEqual(['toute la journée'])
     // None when the server gives none, e.g. without holds.
-    expect([...calendarDays(calendar({ sessions: [late], occupations: [stay, repair] }), gridDays('2026-11')).values()].flat().filter(isFree)).toEqual([])
+    expect([...calendarDays(calendar({ sessions: [late], occupations: [stay, repair] }), gridDays('2026-11')).values()].flat().filter(isAvailable)).toEqual([])
   })
 
-  it('have free time among what takes them, in order of time', () => {
+  it('have available time among what takes them, in order of time', () => {
     const repairs = [{ feedId: 'o', start: '2026-11-24T10:00:00-05:00', end: '2026-11-24T16:00:00-05:00', wholeDay: false, title: '' }]
     const evening = session('evening', '2026-11-24T20:00:00-05:00', '2026-11-24T22:00:00-05:00')
-    const freeTime = [times(ALWAYS.start, repairs[0].start), times(repairs[0].end, evening.start!), times(evening.end!, ALWAYS.end)]
-    const shown = calendarDays(calendar({ sessions: [evening], occupations: repairs, freeTime }), gridDays('2026-11'))
+    const availability = [times(ALWAYS.start, repairs[0].start), times(repairs[0].end, evening.start!), times(evening.end!, ALWAYS.end)]
+    const shown = calendarDays(calendar({ sessions: [evening], occupations: repairs, availability }), gridDays('2026-11'))
     expect(shown.get('2026-11-24')!.map(({ part }) => spaced(part))).toEqual(["jusqu'à 10 h", '10 h – 16 h', '16 h – 20 h', '20 h – 22 h', 'dès 22 h'])
-    expect(freeOf(shown.get('2026-11-24')!)).toEqual(["jusqu'à 10 h", '16 h – 20 h', 'dès 22 h'])
+    expect(availableOf(shown.get('2026-11-24')!)).toEqual(["jusqu'à 10 h", '16 h – 20 h', 'dès 22 h'])
   })
 
   it('say which sessions are outside protected time, on every day they take', () => {

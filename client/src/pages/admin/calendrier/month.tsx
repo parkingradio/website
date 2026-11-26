@@ -2,11 +2,11 @@ import { useId, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import { addDays } from '../../../quebec-time'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { LAST_DAY, isFree, monthOf } from './model'
+import { LAST_DAY, isAvailable, monthOf } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationCalendar, OccupationTitle, SessionTitle } from './things'
 
-// The month's grid, from Sunday to Saturday, with what takes each day, and its free time (see "The month" in
+// The month's grid, from Sunday to Saturday, with what takes each day, and its available time (see "The month" in
 // docs/design/client/admin/calendrier.md).
 
 const WEEKDAYS = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
@@ -70,14 +70,14 @@ export function Month({ month, grid, nameId, today, chosen, days, onChoose, onAd
           <tr key={grid[week * 7]}>
             {grid.slice(week * 7, week * 7 + 7).map((day) => {
               const inMonth = monthOf(day) === month
-              // Only the month's own days show their free time.
-              const entries = (days?.get(day) ?? []).filter((entry) => inMonth || !isFree(entry))
+              // Only the month's own days show their available time.
+              const entries = (days?.get(day) ?? []).filter((entry) => inMonth || !isAvailable(entry))
               // What's on the day, which describes its button.
               const entriesId = entries.length > 0 ? `${id}${day}` : undefined
               const classes = [
                 !inMonth && 'calendar-other-month',
                 day === chosen && 'calendar-chosen',
-                entries.some((entry) => isFree(entry) && entry.wholeDay) && 'calendar-available',
+                entries.some((entry) => isAvailable(entry) && entry.wholeDay) && 'calendar-available',
               ]
               // The day's button and its "+", which are both its stop, and move with the arrows.
               const stopProps = { tabIndex: day === stop ? 0 : -1, onFocus: () => setFocused(day), onKeyDown: (event: KeyboardEvent) => onKeyDown(event, day) }
@@ -133,28 +133,28 @@ export function Month({ month, grid, nameId, today, chosen, days, onChoose, onAd
 }
 
 // What's on a day, as marks, which narrow screens show in place of its words: a mark for each thing, in order, framed
-// when the thing is in a conflict, then a circle when it has free time. Screen readers leave them out, since the words
-// describe the day.
+// when the thing is in a conflict, then a circle when it has available time. Screen readers leave them out, since the
+// words describe the day.
 function DayMarks({ entries }: { entries: CalendarDay }) {
-  const things = entries.filter((entry): entry is DayThing => !isFree(entry))
+  const things = entries.filter((entry): entry is DayThing => !isAvailable(entry))
   return (
     <span className="calendar-marks" aria-hidden="true">
       {things.map(({ thing, conflicts }, i) => {
         const classes = [`calendar-mark calendar-mark-${thing.kind}`, thing.kind === 'session' && `calendar-mark-${thing.status}`, conflicts.length > 0 && 'calendar-mark-conflict']
         return <span key={i} className={classes.filter(Boolean).join(' ')} />
       })}
-      {entries.some(isFree) && <span className="calendar-mark calendar-mark-free" />}
+      {entries.some(isAvailable) && <span className="calendar-mark calendar-mark-free" />}
     </span>
   )
 }
 
-// What's on a day: its things and the stretches of its free time, in order of time, what lasts until the end of the day
-// stretching down to fill the room left in it.
+// What's on a day: its things and the stretches of its available time, in order of time, what lasts until the end of
+// the day stretching down to fill the room left in it.
 function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
   return (
     <ul id={id} className="calendar-things">
       {entries.map((entry, i) =>
-        isFree(entry) ? (
+        isAvailable(entry) ? (
           <li key={i} className={entry.toDayEnd ? 'calendar-free calendar-to-day-end' : 'calendar-free'}>
             {entry.wholeDay ? 'disponible' : `dispo ${entry.part}`}
           </li>

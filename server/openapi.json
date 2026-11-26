@@ -1160,6 +1160,24 @@
         ],
         "additionalProperties": false
       },
+      "CalendarAvailableStretch": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      },
       "CalendarConflict": {
         "type": "object",
         "properties": {
@@ -1280,24 +1298,6 @@
           "holds"
         ],
         "description": "What its events are: occupations, which take the studio, or holds, which protect time for sessions"
-      },
-      "CalendarFreeStretch": {
-        "type": "object",
-        "properties": {
-          "start": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "end": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "start",
-          "end"
-        ],
-        "additionalProperties": false
       },
       "CalendarOccupation": {
         "type": "object",
@@ -11417,7 +11417,7 @@
     "/api/admin/calendar": {
       "get": {
         "operationId": "get_calendar",
-        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, its free time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date",
+        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, its available time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date",
         "tags": [
           "Calendar"
         ],
@@ -11460,7 +11460,7 @@
                     "today": {
                       "type": "string",
                       "format": "date",
-                      "description": "The day the conflicts, the sessions outside protected time and the free time are counted from: today, in Québec"
+                      "description": "The day the conflicts, the sessions outside protected time and the available time are counted from: today, in Québec"
                     },
                     "feeds": {
                       "type": "array",
@@ -11483,12 +11483,12 @@
                       },
                       "description": "The occupations that take some of the days, by start, then end"
                     },
-                    "freeTime": {
+                    "availability": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/CalendarFreeStretch"
+                        "$ref": "#/components/schemas/CalendarAvailableStretch"
                       },
-                      "description": "The free time that takes some of the days, stretch by stretch, by start: the protected time of the next 365 days, from 00:00 today, that no session that isn't cancelled, nor occupation, takes"
+                      "description": "The available time that takes some of the days, stretch by stretch, by start: the protected time of the next 365 days, from 00:00 today, that no session that isn't cancelled, nor occupation, takes"
                     },
                     "conflicts": {
                       "type": "array",
@@ -11518,7 +11518,7 @@
                     "feeds",
                     "sessions",
                     "occupations",
-                    "freeTime",
+                    "availability",
                     "conflicts",
                     "unprotectedSessions",
                     "undatedSessions"

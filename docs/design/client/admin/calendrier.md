@@ -1,16 +1,16 @@
 # Calendrier
 
-At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, its free time, and what needs settling
-(see [Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)). From top to
-bottom, the page has "À régler", the toolbar, then a legend, with the links to the admin's calendars (see
+At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, its available time, and what needs
+settling (see [Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)). From
+top to bottom, the page has "À régler", the toolbar, then a legend, with the links to the admin's calendars (see
 [Subscribing](#subscribing)), the month and the chosen day, or the list (see [The list](#the-list)).
 
 "Today" is the day it is in Québec, by the browser's clock.
 
 ## What's shown
 
-Sessions, occupations, free time and conflicts each have their own color, which the legend gives, and besides the color,
-something else that tells them apart:
+Sessions, occupations, available time and conflicts each have their own color, which the legend gives, and besides the
+color, something else that tells them apart:
 
 - Sessions have a bar on their left, and their title. Sessions that are done or cancelled take the
   [status colors](layout.md#status-colors), with "jouée" or "annulée" written. Past planned sessions keep their color, so
@@ -18,7 +18,7 @@ something else that tells them apart:
 - Occupations have a dashed border. An occupation is named by its title, then the name of its feed, its calendar, e.g.
   « Airbnb », « Séjours », or by its calendar's name alone, as it's written, when it has no title, e.g. « Calendrier de
   l'équipe ». Its title is cut short in the month, after two lines.
-- Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
+- Available time says "disponible" or "dispo …" (see [Availability](#availability)).
 - Conflicts have a red frame, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
 
 In the legend, "session", "occupation", "disponible" and "conflit" each have a tooltip that says what it is (see
@@ -80,9 +80,9 @@ announce it as unavailable. It's closed by default.
 Under that row, the box warns (see [Warnings](layout.md#warnings)) about each feed whose last read failed, naming it,
 saying why, and that what it affects can be missing or out of date, and linking to Configuration, and about each feed
 that hasn't been read yet, naming it, and saying what can be missing, or there wrongly. An `occupations` feed affects
-conflicts, and free time while there's a `holds` feed. A `holds` feed affects free time and the sessions outside
-protected time, e.g. « ⚠ Le calendrier « Loft » n'a pas encore été lu : des plages disponibles peuvent manquer, et des
-sessions être signalées à tort hors plage protégée. »
+conflicts, and available time while there's a `holds` feed. A `holds` feed affects available time and the sessions
+outside protected time, e.g. « ⚠ Le calendrier « Loft » n'a pas encore été lu : des plages disponibles peuvent manquer,
+et des sessions être signalées à tort hors plage protégée. »
 
 Opened, it has a group for each kind of thing to settle, each under a divider, with its tag and a heading, then a row
 for each one, on one line: when it is, then what it is. The whole row is what's done about it, by clicking it, or with
@@ -123,17 +123,17 @@ A table with the days of the week, "dim" to "sam", then the weeks that have the 
 before and after are faded out, with what's on them. Today stands out.
 
 Each day lists what takes some of it, each with its part of the day and its name (see [What's shown](#whats-shown)), and
-the stretches of its free time (see [Free time](#free-time)), in order of when each starts on the day, what started on
-an earlier day first: things by start, then end, and before a stretch that starts when they do. A session also has its
-sets' performers, cut short when they don't fit. A thing that's in a conflict has "conflit" on the days the time it
-overlaps the other thing takes some of. Screen readers read each thing's kind before it, and « , calendrier » or
+the stretches of its available time (see [Availability](#availability)), in order of when each starts on the day, what
+started on an earlier day first: things by start, then end, and before a stretch that starts when they do. A session
+also has its sets' performers, cut short when they don't fit. A thing that's in a conflict has "conflit" on the days the
+time it overlaps the other thing takes some of. Screen readers read each thing's kind before it, and « , calendrier » or
 « , avec » between its title and its calendar or performers, e.g. « occupation : RÉPARATION, calendrier Calendrier de
 l'équipe », « session : HAUTE RIVE TAKEOVER, avec Aurore, Brume ».
 
 What lasts until the end of the day, 00:00, or later stretches down to fill the room left in the day: things, e.g.
-"toute la journée", "dès 15 h" or "21 h – 1 h", and free time, "disponible" or "dispo dès 11 h". When several do, they
-share that room equally, and what follows them goes below them, at the bottom of the day. The rest is as tall as its
-words.
+"toute la journée", "dès 15 h" or "21 h – 1 h", and available time, "disponible" or "dispo dès 11 h". When several do,
+they share that room equally, and what follows them goes below them, at the bottom of the day. The rest is as tall as
+its words.
 
 Clicking a day chooses it, and clicking it again unchooses it. Clicking a session opens its page, without choosing its
 day.
@@ -155,21 +155,21 @@ On narrow screens like phones, each day of the month shows its number, its "+", 
 what's on it: a small square for each thing, in the month's order, which looks like the thing does on wider screens, as
 the legend shows (a session's bar, an occupation's dashed border), with a red frame when the thing has "conflit" on the
 day; a session that's done is filled grey, and one that's cancelled hollow, which the legend shows too, as "jouée" and
-"annulée". Then a green circle when the day has free time. Screen readers still read the day's words, as its
+"annulée". Then a green circle when the day has available time. Screen readers still read the day's words, as its
 description, and the chosen day writes them. Tapping a day chooses it, or unchooses it, the month having no links to
 sessions there.
 
 
-### Free time
+### Availability
 
-Free time is the studio's protected time that nothing takes, as the calendar gives it (see
-[Free time](../../server/calendar.md#free-time)), so that a day with a session can have some too, around it. The page
-cuts its stretches at each midnight: each day has its own, from 00:00 to 00:00. The page says nothing of the time that
-nothing takes but that isn't protected.
+Available time is the studio's protected time that nothing takes, as the calendar gives it (see
+[Availability](../../server/calendar.md#availability)), so that a day with a session can have some too, around it. The
+page cuts its stretches at each midnight: each day has its own, from 00:00 to 00:00. The page says nothing of the time
+that nothing takes but that isn't protected.
 
-The month shows the free time of its own days, not that of the months before and after. A day that's all free time is
-green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or "dispo
-11 h – 15 h".
+The month shows the available time of its own days, not that of the months before and after. A day that's all available
+time is green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or
+"dispo 11 h – 15 h".
 
 ## The chosen day
 
@@ -177,8 +177,8 @@ Under the month, the chosen day, with the day as its heading, e.g. "jeudi 19 nov
 today, and a "×" ("fermer le jour" for screen readers) that unchooses it, which puts the focus back on the day in the
 month. Choosing a day, in the month or from a row of "À régler" or of the list, brings the chosen day's heading into
 view, when it isn't already, as far as the day in the month stays in view too. It has a row for each thing that takes
-some of the day, and each stretch of its free time (see [Free time](#free-time)), even on a day of the month before or
-after, in the month's order.
+some of the day, and each stretch of its available time (see [Availability](#availability)), even on a day of the month
+before or after, in the month's order.
 
 A thing's row has:
 
@@ -222,7 +222,7 @@ showing the list, closes it too, and what was typed in it is lost.
 What takes the studio over the 365 days that conflicts are found in (see
 [Conflicts](../../server/calendar.md#conflicts)), from today, month by month: each month that has some of these days, by
 its name, e.g. "novembre 2026", then a row for each thing, or « Rien. » when it has none. It ends with the day it stops
-at, « La liste s'arrête au jeudi 18 novembre 2027. ». Free time isn't listed: the month shows it.
+at, « La liste s'arrête au jeudi 18 novembre 2027. ». Available time isn't listed: the month shows it.
 
 Each thing is listed once, on the first of these days it takes some of: the day it starts, or today for something that
 started before. Things are in order of their start, then of their end. A thing's row is in columns, which start at the

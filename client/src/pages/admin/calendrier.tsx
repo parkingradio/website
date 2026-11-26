@@ -306,9 +306,9 @@ const LEGEND = [
   { kind: 'conflict', name: 'conflit', tip: 'Une session ou une occupation qui chevauche une plage indisponible.', calendar: null },
 ] as const
 
-// What sessions, occupations, free time and conflicts are, in tooltips, with their colors, and on narrow screens their
-// marks (see calendrier.css), and the links to the admin's calendars of the sessions and of the occupations once their
-// token is known.
+// What sessions, occupations, available time and conflicts are, in tooltips, with their colors, and on narrow screens
+// their marks (see calendrier.css), and the links to the admin's calendars of the sessions and of the occupations once
+// their token is known.
 function Legend({ token }: { token: string | null }) {
   return (
     <ul className="calendar-legend" aria-label="Légende">

@@ -13,8 +13,8 @@ read from calendars too, as **holds**, which don't take the studio (see [Protect
 Occupations and holds can't be changed on the site, or with the tools: only in their own calendars. The feeds they're
 read from are added, changed and removed on the admin pages, not with the tools, since their links are secrets.
 
-The server gives the studio's calendar: what takes it over a range of days, its [free time](#free-time), and what needs
-settling: its conflicts, the sessions outside protected time, and the sessions without a date (see
+The server gives the studio's calendar: what takes it over a range of days, its [available time](#availability), and
+what needs settling: its conflicts, the sessions outside protected time, and the sessions without a date (see
 [The calendar](#the-calendar)). It doesn't give holds themselves.
 
 ## Feeds
@@ -99,7 +99,7 @@ day after its last, e.g. a month:
 
 - the sessions with a start that take some of that time, by start, whatever their status (cancelled ones included),
 - the occupations that take some of it, by start, then end,
-- the stretches of [free time](#free-time) that take some of it, by start,
+- the stretches of [available time](#availability) that take some of it, by start,
 - every feed, with its kind, when it was last read (`readAt`) and why that failed (`error`),
 - and, whatever the range, what needs settling: the [conflicts](#conflicts) and the
   [sessions outside protected time](#protected-time) of the year ahead, and the
@@ -110,7 +110,7 @@ days later.
 
 Occupations and holds are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)): a feed whose
 last read failed still gives what it read before, and one that hasn't been read yet, e.g. right after the server
-restarts, gives nothing. What the calendar works out from such a feed, its occupations, conflicts, free time and
+restarts, gives nothing. What the calendar works out from such a feed, its occupations, conflicts, available time and
 sessions outside protected time, can then be wrong or out of date, so apps should tell the admin. They can have every
 feed read again first when they need the calendar to be up to date, e.g. right after the admin changed an event, but not
 before every calendar they ask for, since that waits for every read. Reads also only keep events from a year before
@@ -147,7 +147,7 @@ follow each other count as one, e.g. one until 15:00 and one from 15:00. A sessi
 moment of it, from its start, included, to its end, excluded, is protected.
 
 Sessions are meant to be within protected time (see [Rules, in Sessions](sessions.md#rules)): the calendar gives the
-[free time](#free-time), where they can go, and the sessions that aren't, which need settling.
+[available time](#availability), where they can go, and the sessions that aren't, which need settling.
 
 **The sessions outside protected time** need settling, like conflicts. They're the sessions that take some of
 [the year ahead](#the-calendar), and that:
@@ -161,18 +161,18 @@ Sessions are meant to be within protected time (see [Rules, in Sessions](session
 While there's no `holds` feed, there are none. Each one has the session's `id`, `title`, `start` and `end`, and they're
 by start.
 
-## Free time
+## Availability
 
-**Free time** is the protected time of [the year ahead](#the-calendar) that nothing takes: no session that isn't
+**Available time** is the protected time of [the year ahead](#the-calendar) that nothing takes: no session that isn't
 cancelled, done ones included, and no occupation. The part of today that's over is in it too, so apps shouldn't suggest
 it. It's in stretches, cut only at the ends of the year ahead, not e.g. at midnight: two stretches never overlap or
 follow each other. While there's no `holds` feed, there's none.
 
-Free time is where sessions can go: a session placed within a stretch is within protected time, and overlaps nothing.
-It doesn't include the time a session takes itself: a session that's moved can go within its own time and the free time
-around it. The calendar gives the stretches that take some of the days asked for, each with its `start` and `end`,
-whole, e.g. one that goes on after the last day: to see where a session can go, apps ask for the calendar of the days it
-would take.
+Available time is where sessions can go: a session placed within a stretch is within protected time, and overlaps
+nothing. It doesn't include the time a session takes itself: a session that's moved can go within its own time and the
+available time around it. The calendar gives the stretches that take some of the days asked for, each with its `start`
+and `end`, whole, e.g. one that goes on after the last day: to see where a session can go, apps ask for the calendar of
+the days it would take.
 
 ## Sessions without a date
 
@@ -197,7 +197,7 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | `feeds` | list of feeds | Every feed, as [`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them |
 | `sessions` | list of sessions | The sessions with a start that take some of the days, whatever their status, as [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) gives them, by start |
 | `occupations` | list of occupations | The occupations that take some of the days, by start, then end |
-| `freeTime` | list | The stretches of [free time](#free-time) that take some of the days, by start, each with its `start` and `end` |
+| `availability` | list | The stretches of [available time](#availability) that take some of the days, by start, each with its `start` and `end` |
 | `conflicts` | list of conflicts | The conflicts of [the year ahead](#the-calendar), whatever the days asked for |
 | `unprotectedSessions` | list | The [sessions outside protected time](#protected-time), by start, whatever the days asked for, each with its `id`, `title`, `start` and `end` |
 | `undatedSessions` | list of sessions | The sessions without a date, as `GET /api/admin/sessions` gives them, the most recently added first, whatever the days asked for |

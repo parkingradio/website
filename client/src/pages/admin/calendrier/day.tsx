@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { formatDay, sessionPerformers } from '../describe'
-import { fullTimes, inSentence, isFree } from './model'
+import { fullTimes, inSentence, isAvailable } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationLabel, SessionTitle, ThingKind } from './things'
 
@@ -44,7 +44,7 @@ export function ChosenDay({ day, today, entries, onClose, children }: ChosenDayP
         ) : (
           <ul className="calendar-rows">
             {entries.map((entry, i) =>
-              isFree(entry) ? (
+              isAvailable(entry) ? (
                 <li key={i} className="calendar-row">
                   <span className="calendar-kind calendar-free">disponible</span>
                   <span>{entry.part}</span>

@@ -32,7 +32,7 @@ export const LAST_DAY = '2999-12-31'
 export const FIRST_MONTH = FIRST_DAY.slice(0, 7)
 export const LAST_MONTH = LAST_DAY.slice(0, 7)
 
-// How many days from today the list shows: the 365 days that conflicts and free time are found in.
+// How many days from today the list shows: the 365 days that conflicts and available time are found in.
 const HORIZON_DAYS = 365
 
 // `value` if it's a month the page shows, from 2000-01 to 2999-12, or else null.
@@ -102,7 +102,7 @@ function takesSomeOf({ start, end }: Times, day: string): boolean {
 // Whether something lasts until the end of `day`, 00:00 the next day, or later.
 const lastsToEndOf = ({ end }: Times, day: string) => Date.parse(end) >= dayStart(addDays(day, 1))
 
-// What a thing takes of a day when that's all of it, and the free time of a day that's all free time.
+// What a thing takes of a day when that's all of it, and the available time of a day that's all available time.
 const WHOLE_DAY = 'toute la journée'
 
 // The part of `day` something takes, as the month writes it, e.g. "21 h – 23 h", "dès 18 h", "jusqu'à 1 h" or "toute la
@@ -162,13 +162,13 @@ export function startDay({ start }: Times, near: string): string {
 // has none.
 export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar))
 
-// A stretch of free time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h", "dès 11 h" or
-// "11 h – 15 h", whether it's the whole day, and whether it lasts until the end of the day.
-export type FreeStretch = { part: string; wholeDay: boolean; toDayEnd: boolean }
+// A stretch of available time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h",
+// "dès 11 h" or "11 h – 15 h", whether it's the whole day, and whether it lasts until the end of the day.
+export type AvailableStretch = { part: string; wholeDay: boolean; toDayEnd: boolean }
 
-// The stretches of the free time `free`, as the server gives them (see "Free time" in docs/design/server/calendar.md), cut
-// to `day`, each with when it starts on it, or nothing when it has none.
-function freeStretches(day: string, free: Times[]): { start: number; stretch: FreeStretch }[] {
+// The stretches of the available time `available`, as the server gives them (see "Availability" in
+// docs/design/server/calendar.md), cut to `day`, each with when it starts on it, or nothing when it has none.
+function availableStretches(day: string, available: Times[]): { start: number; stretch: AvailableStretch }[] {
   const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
   const part = (from: number, to: number) => {
     if (from === dayFrom && to === dayTo) return WHOLE_DAY
@@ -176,7 +176,7 @@ function freeStretches(day: string, free: Times[]): { start: number; stretch: Fr
     if (to === dayTo) return `dès ${timeOf(from)}`
     return fromTo(timeOf(from), timeOf(to))
   }
-  return free.flatMap(({ start, end }) => {
+  return available.flatMap(({ start, end }) => {
     const [from, to] = [Math.max(Date.parse(start), dayFrom), Math.min(Date.parse(end), dayTo)]
     if (from >= to) return []
     const toDayEnd = to === dayTo
@@ -260,12 +260,12 @@ export function thingsWithConflicts(calendar: Calendar): ThingWithConflicts[] {
 // end of the day, 00:00 or later.
 export type DayThing = { thing: Thing; part: string; conflicts: ThingConflict[]; toDayEnd: boolean }
 
-// What's on a day of the grid, in order of time: what takes some of it, by start, then end, and the stretches of its free
-// time, if it has any (see "Free time" in docs/design/client/admin/calendrier.md), among them.
-export type DayEntry = DayThing | FreeStretch
+// What's on a day of the grid, in order of time: what takes some of it, by start, then end, and the stretches of its
+// available time, if it has any (see "Availability" in docs/design/client/admin/calendrier.md), among them.
+export type DayEntry = DayThing | AvailableStretch
 export type CalendarDay = DayEntry[]
 
-export const isFree = (entry: DayEntry): entry is FreeStretch => !('thing' in entry)
+export const isAvailable = (entry: DayEntry): entry is AvailableStretch => !('thing' in entry)
 
 // The days of a grid, `days`, as they're shown with `calendar`, read for them.
 export function calendarDays(calendar: Calendar, days: string[]): Map<string, CalendarDay> {
@@ -275,18 +275,18 @@ export function calendarDays(calendar: Calendar, days: string[]): Map<string, Ca
       byDay.get(day)!.push({ thing, part: partOfDay(thing, day), conflicts: conflicts.filter(({ conflict }) => takesSomeOf(conflict, day)), toDayEnd: lastsToEndOf(thing, day) })
     }
   }
-  return new Map([...byDay].map(([day, dayThings]) => [day, withFreeTime(day, dayThings, calendar.freeTime)]))
+  return new Map([...byDay].map(([day, dayThings]) => [day, withAvailability(day, dayThings, calendar.availability)]))
 }
 
-// What takes some of `day`, `dayThings`, with the stretches of its free time `free` among them, if it has any (see "Free
-// time" in docs/design/client/admin/calendrier.md).
-function withFreeTime(day: string, dayThings: DayThing[], free: Times[]): CalendarDay {
+// What takes some of `day`, `dayThings`, with the stretches of its available time `available` among them, if it has any
+// (see "Availability" in docs/design/client/admin/calendrier.md).
+function withAvailability(day: string, dayThings: DayThing[], available: Times[]): CalendarDay {
   const dayFrom = dayStart(day)
   // By when each entry starts on the day, the things that started earlier at 00:00, and a thing before a stretch that
   // starts when it does, e.g. a cancelled session.
   const entries: [number, DayEntry][] = [
     ...dayThings.map((entry): [number, DayEntry] => [Math.max(Date.parse(entry.thing.start), dayFrom), entry]),
-    ...freeStretches(day, free).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
+    ...availableStretches(day, available).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
   ]
   return entries.sort(([a], [b]) => a - b).map(([, entry]) => entry)
 }

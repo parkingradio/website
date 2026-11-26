@@ -205,8 +205,8 @@ describe('GET /api/admin/calendar', () => {
       },
     ])
     expect(body.undatedSessions.map(({ id }: { id: string }) => id)).toEqual(['undated-new', 'undated-old'])
-    // Without a `holds` feed, there's no free time, and nothing is known to be outside protected time.
-    expect(body.freeTime).toEqual([])
+    // Without a `holds` feed, there's no available time, and nothing is known to be outside protected time.
+    expect(body.availability).toEqual([])
     expect(body.unprotectedSessions).toEqual([])
 
     // Whatever the days asked for, the conflicts and the sessions without a date are the same.
@@ -246,7 +246,7 @@ describe('GET /api/admin/calendar', () => {
     ])
     expect(body).not.toHaveProperty('holds')
     // The time they protect, of both feeds, around the repair and the sessions.
-    expect(body.freeTime).toEqual([
+    expect(body.availability).toEqual([
       { start: '2026-11-27T15:00:00-05:00', end: '2026-11-27T19:00:00-05:00' },
       { start: '2026-11-27T22:00:00-05:00', end: '2026-11-28T14:00:00-05:00' },
       { start: '2026-11-28T15:00:00-05:00', end: '2026-11-30T00:00:00-05:00' },
@@ -260,7 +260,7 @@ describe('GET /api/admin/calendar', () => {
     expect(JSON.stringify(body)).not.toContain('Jean Tremblay')
   })
 
-  it("gives the free time that takes some of the days, whole, around the sessions that aren't cancelled and the occupations", async () => {
+  it("gives the available time that takes some of the days, whole, around the sessions that aren't cancelled and the occupations", async () => {
     listed = [...FEEDS, ...HOLDS_FEEDS]
     kept.set(LOFT, {
       events: [
@@ -285,21 +285,21 @@ describe('GET /api/admin/calendar', () => {
     ]
     const body = (await calendar(await buildApp(), 'from=2026-11-28&to=2026-11-29')).json()
     // Not the stretch that ends when the first day starts, nor the one after the days, and the last one whole.
-    expect(body.freeTime).toEqual([
+    expect(body.availability).toEqual([
       { start: '2026-11-27T01:00:00-05:00', end: '2026-11-28T10:00:00-05:00' },
       { start: '2026-11-28T12:00:00-05:00', end: '2026-11-30T11:00:00-05:00' },
     ])
     // Before the done session, but not after it, the next day.
-    expect((await calendar(await buildApp(), 'from=2026-11-26&to=2026-11-26')).json().freeTime).toEqual([{ start: '2026-11-26T15:00:00-05:00', end: '2026-11-26T21:00:00-05:00' }])
+    expect((await calendar(await buildApp(), 'from=2026-11-26&to=2026-11-26')).json().availability).toEqual([{ start: '2026-11-26T15:00:00-05:00', end: '2026-11-26T21:00:00-05:00' }])
   })
 
-  it('gives the free time of the next 365 days only, from 00:00 today, what is over today included', async () => {
+  it('gives the available time of the next 365 days only, from 00:00 today, what is over today included', async () => {
     listed = HOLDS_FEEDS
     // From a week before today to a week after the 365 days.
     kept.set(LOFT, { events: [event('2026-11-16T05:00:00Z', '2027-11-30T05:00:00Z', '', true)], readAt: NOW, error: null })
     const body = (await calendar(await buildApp(), 'from=2026-11-20&to=2027-11-26')).json()
-    expect(body.freeTime).toEqual([{ start: '2026-11-23T00:00:00-05:00', end: '2027-11-23T00:00:00-05:00' }])
-    expect((await calendar(await buildApp(), 'from=2026-11-20&to=2026-11-22')).json().freeTime).toEqual([])
+    expect(body.availability).toEqual([{ start: '2026-11-23T00:00:00-05:00', end: '2027-11-23T00:00:00-05:00' }])
+    expect((await calendar(await buildApp(), 'from=2026-11-20&to=2026-11-22')).json().availability).toEqual([])
   })
 
   it('gives the planned sessions of the next 365 days that are outside protected time, by start, whatever the days asked for', async () => {
@@ -379,13 +379,13 @@ describe('GET /api/admin/calendar', () => {
     listed = [HOLDS_FEEDS[0]]
     const asHolds = (await calendar(await buildApp(), 'from=2026-12-09&to=2026-12-09')).json()
     expect(asHolds).toMatchObject({ occupations: [], conflicts: [], unprotectedSessions: [] })
-    expect(asHolds.freeTime).toEqual([
+    expect(asHolds.availability).toEqual([
       { start: '2026-12-09T00:00:00-05:00', end: '2026-12-09T19:00:00-05:00' },
       { start: '2026-12-09T21:00:00-05:00', end: '2026-12-10T00:00:00-05:00' },
     ])
     listed = [{ ...HOLDS_FEEDS[0], kind: 'occupations' }]
     const asOccupations = (await calendar(await buildApp(), 'from=2026-12-09&to=2026-12-09')).json()
-    expect(asOccupations).toMatchObject({ freeTime: [], unprotectedSessions: [] })
+    expect(asOccupations).toMatchObject({ availability: [], unprotectedSessions: [] })
     expect(asOccupations.occupations).toEqual([{ feedId: LOFT, start: '2026-12-09T00:00:00-05:00', end: '2026-12-10T00:00:00-05:00', wholeDay: true, title: 'Gardé' }])
     expect(asOccupations.conflicts).toHaveLength(1)
   })

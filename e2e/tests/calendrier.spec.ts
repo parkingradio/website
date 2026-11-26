@@ -168,7 +168,7 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await logIn(page, { at: `/admin/calendrier?day=${day}` })
 
   // In the month, each "conflit" on the day they overlap, the stay from its start, as it lasts more than 12 hours, and its
-  // end the next day, without it, and no free time, without a holds feed.
+  // end the next day, without it, and no available time, without a holds feed.
   const cell = dayCell(page, day)
   await expect(cell).toContainText(`10 h – 16 hoccupation : RÉPARATION ${unique}, calendrier ${team}conflit`)
   await expect(cell).toContainText(`dès 12 hoccupation : ${stays}conflit`)
@@ -245,7 +245,7 @@ function ownSession(id: string, title: string, start: string, end: string): NonN
   }
 }
 
-test('free time shows where nothing takes the protected time, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
+test('available time shows where nothing takes the protected time, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
   const { unique } = own(testInfo)
   if (isMobile) await page.setViewportSize(NARROW)
   // Two days in the same month, a week or more before the nearest seeded session (see seed-data.ts), so that only the
@@ -261,7 +261,7 @@ test('free time shows where nothing takes the protected time, and the sessions o
     feeds: [ownFeed(`loft-${unique}`, loft, day, { kind: 'holds', error: FAILED }), ownFeed(`blocks-${unique}`, blocks, day, { kind: 'holds', read: false }), ownFeed(`team-${unique}`, team, day)],
     occupations: [{ feedId: `team-${unique}`, start: at(day, '12:00'), end: at(day, '13:00'), wholeDay: false, title: `RÉUNION ${unique}` }],
     sessions: [inside, outside],
-    freeTime: [
+    availability: [
       { start: at(day, '11:00'), end: at(day, '12:00') },
       { start: at(day, '13:00'), end: at(day, '15:00') },
       { start: at(day, '17:00'), end: at(day, '18:00') },
