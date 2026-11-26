@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { UNAUTHORIZED } from '../admins/auth.js'
+import { addDays, dayStart, quebecDay } from '../api/formats.js'
 import { ApiError, zodRoutes } from '../api/schemas.js'
 import type { CalendarFeedsStore } from '../calendar/feeds.js'
-import { calendarInputs } from '../calendar/inputs.js'
+import { YEAR_DAYS, calendarInputs } from '../calendar/inputs.js'
 import type { CalendarReads, FeedRead } from '../calendar/reads.js'
 import type { SessionsStore } from '../sessions/store.js'
 import { availabilityCalendar, occupationsCalendar, sessionsCalendar } from './calendars.js'
@@ -23,6 +24,9 @@ const noStore = async (_request: FastifyRequest, reply: FastifyReply) => {
 const NOT_AN_ADMINS_TOKEN: ApiError = { ok: false, error: "The link's token isn't an admin's" }
 const NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds of occupations haven't all been read yet, with their links, since the server started" }
 const FEEDS_NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds haven't all been read yet, with their links, since the server started" }
+// A year back at `now`, which each calendar keeps what ends after: 00:00 on the day 365 days before today, in Québec.
+const yearBack = (now: Date) => dayStart(addDays(quebecDay(now), -YEAR_DAYS))
+
 // Whether something was read from the feed since the server started, with the link it has (see `CalendarReads.of`).
 const isRead = <Feed>(withRead: { feed: Feed; read: FeedRead | undefined }): withRead is { feed: Feed; read: FeedRead } => withRead.read !== undefined
 
@@ -59,7 +63,7 @@ export async function adminCalendarsRoutes(app: FastifyInstance, { store, feeds,
   app.get('/sessions.ics', { onSend: noStore }, async (request, reply) => {
     if (!(await authorized(request, reply))) return reply
     const now = new Date()
-    const rows = await store.sessions(now)
+    const rows = await store.sessions(yearBack(now))
     return sendCalendar(reply, sessionsCalendar(rows, { siteOrigin, environment, now }))
   })
 
@@ -71,16 +75,21 @@ export async function adminCalendarsRoutes(app: FastifyInstance, { store, feeds,
     // lose the occupations of the feeds that haven't been read yet. `holds` feeds don't count.
     const withReads = (await feeds.list()).filter(({ kind }) => kind === 'occupations').map((feed) => ({ feed, read: reads.of(feed) }))
     if (!withReads.every(isRead)) return reply.code(503).send(NOT_READ_YET)
-    return sendCalendar(reply, occupationsCalendar(withReads, { siteOrigin, environment, now: new Date() }))
+    // Only the occupations that end after a year back.
+    const now = new Date()
+    const since = yearBack(now)
+    const kept = withReads.map(({ feed, read }) => ({ feed, read: { ...read, events: read.events.filter(({ end }) => end > since) } }))
+    return sendCalendar(reply, occupationsCalendar(kept, { siteOrigin, environment, now }))
   })
 
   app.get('/availability.ics', { onSend: noStore }, async (request, reply) => {
     if (!(await authorized(request, reply))) return reply
-    // The available time, and every feed with what was read from it, as GET /api/admin/calendar has them for the days of
-    // the year ahead. Without a `holds` feed, there's none, whatever was read. Otherwise, until a read of every feed, of
-    // either kind, with the link it has, has ended since the server started, the calendar fails, like /occupations.ics.
+    // The available time from a year back to the end of the year ahead, and every feed with what was read from it, as
+    // GET /api/admin/calendar works them out. Without a `holds` feed, there's none, whatever was read. Otherwise, until a
+    // read of every feed, of either kind, with the link it has, has ended since the server started, the calendar fails,
+    // like /occupations.ics.
     const now = new Date()
-    const { withReads, holds, available } = await calendarInputs({ feeds, reads, sessions }, { now })
+    const { withReads, holds, available } = await calendarInputs({ feeds, reads, sessions }, { now, since: yearBack(now) })
     if (holds === null) return sendCalendar(reply, availabilityCalendar([], [], { siteOrigin, environment, now }))
     if (!withReads.every(isRead)) return reply.code(503).send(FEEDS_NOT_READ_YET)
     return sendCalendar(reply, availabilityCalendar(available, withReads, { siteOrigin, environment, now }))

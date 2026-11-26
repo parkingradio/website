@@ -112,8 +112,8 @@ export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environ
 export function availabilityCalendar(stretches: { start: Date; end: Date }[], feeds: FeedWithRead[], { siteOrigin, environment, now }: CalendarOptions): string {
   const available = stretches.map(({ start, end }) => [
     'BEGIN:VEVENT',
-    // Stretches never overlap, so their starts tell them apart. One whose start changes is another event, e.g. the one that
-    // goes on at 00:00 today, which the year ahead cuts there, every day: calendar apps then replace it, which is harmless.
+    // Stretches never overlap, so their starts tell them apart. One whose start changes is another event, which calendar apps
+    // then replace, while one whose end changes, e.g. the one the end of the year ahead cuts, is the same event.
     `UID:availability-${environment}-${dateTime(start)}@parking.radio`,
     `DTSTAMP:${dateTime(now)}`,
     // Always times, even from 00:00 to 00:00, unlike what takes whole days.

@@ -66,11 +66,13 @@ occupations and the events about feeds whose last read failed, has dates (`VALUE
 with the day after the last one as `DTEND`. Text values are escaped and folded as in
 [`GET /calendar.ics`](events.md#get-calendarics).
 
+**A year back** is 00:00 on the day 365 days before today, in Québec. Each calendar keeps what ends after then, whole,
+even when it started before, so that calendar apps keep the past: how far ahead each one goes is in its section.
+
 ## `GET /sessions.ics`
 
-The sessions with a start, whatever their status, announced or not: every one that starts at most a year before the
-request, and every one whose end hasn't passed, like the events of [`GET /calendar.ics`](events.md#get-calendarics).
-Sessions without a start aren't in it. Each one is a `VEVENT` with:
+The sessions with a start, whatever their status, announced or not, that end after a year back (see
+[The calendars](#the-calendars)), however far ahead. Sessions without a start aren't in it. Each one is a `VEVENT` with:
 
 | Property | Value |
 |---|---|
@@ -87,8 +89,8 @@ Sessions without a start aren't in it. Each one is a `VEVENT` with:
 The occupations, as the server has them from the last reads of the `occupations` calendar feeds (see
 [Reading the feeds, in Calendar](calendar.md#reading-the-feeds)): a feed whose last read failed still gives what it read
 before, as [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) does, and nothing when no read of it
-succeeded. They cover what reads keep, from a year before them to two years after them (see
-[Events, in Calendar](calendar.md#events)).
+succeeded. It has those that end after a year back (see [The calendars](#the-calendars)), among what reads keep, from a
+year before them to two years after them (see [Events, in Calendar](calendar.md#events)).
 
 Until every `occupations` feed has been read with the link it has, since the server started, whether that read
 succeeded or failed, it fails with 503, rather than give a calendar without the occupations of the feeds that haven't
@@ -118,11 +120,13 @@ that what it shows of them can be missing or out of date: each one is a whole-da
 
 ## `GET /availability.ics`
 
-The studio's available time over the year ahead, as [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin)
-gives it (see [Availability, in Calendar](calendar.md#availability)): a feed whose last read failed still counts with
-what it read before. It has one event per stretch, whole, e.g. across midnight. Its name and its stretches' `SUMMARY`
-are in French, unlike the rest of these calendars: « disponible » is what the admin pages call available time, so that
-admins recognize it.
+The studio's available time (see [Availability, in Calendar](calendar.md#availability)) from a year back (see
+[The calendars](#the-calendars)) to the end of the year ahead (see
+[The calendar, in Calendar](calendar.md#the-calendar)), worked out as
+[`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) does: a feed whose last read failed still counts
+with what it read before. It has one event per stretch, whole, e.g. across midnight or a year back, except the one going
+on at the end of the year ahead, which ends there. Its name and its stretches' `SUMMARY` are in French, unlike the rest
+of these calendars: « disponible » is what the admin pages call available time, so that admins recognize it.
 
 Without any `holds` feed, there's no available time, and it gives an empty calendar right away. Otherwise, like
 [`GET /occupations.ics`](#get-occupationsics), it fails with 503 until every feed, of both kinds, has been read with the
@@ -132,7 +136,7 @@ Each stretch is a `VEVENT` with:
 
 | Property | Value |
 |---|---|
-| `UID` | `availability-<environment>-<start>@parking.radio`, from the server's environment, e.g. `production`, and its start in UTC, as in `DTSTART`, e.g. `availability-production-20261125T050000Z@parking.radio`. Stretches never overlap, so no two have the same start, and environments have their own, so that an app subscribed to two environments' calendars keeps each one's. A stretch whose start changes is another event, e.g. the one going on at 00:00 today, which starts then, every day, or one whose beginning a session takes |
+| `UID` | `availability-<environment>-<start>@parking.radio`, from the server's environment, e.g. `production`, and its start in UTC, as in `DTSTART`, e.g. `availability-production-20261125T050000Z@parking.radio`. Stretches never overlap, so no two have the same start, and environments have their own, so that an app subscribed to two environments' calendars keeps each one's. A stretch whose start changes is another event, e.g. one whose beginning a session takes, while one whose end changes is the same event, e.g. the one the end of the year ahead cuts |
 | `DTSTART`, `DTEND` | Its `start` and `end`, as times, even from 00:00 to 00:00 |
 | `SUMMARY` | `disponible` |
 | `URL` | Calendrier on the day it starts, in Québec, `<site>/admin/calendrier?day=<YYYY-MM-DD>` |
