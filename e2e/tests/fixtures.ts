@@ -115,13 +115,12 @@ export function adminMenu(page: Page) {
 
 export type Schemas = components['schemas']
 
-// What `withCalendar` adds to the studio's calendar: occupations, holds and conflicts, as if they were read from feeds,
-// sessions, with those of them that are outside protected time, and the free time they leave.
+// What `withCalendar` adds to the studio's calendar: occupations and conflicts, as if they were read from feeds, sessions,
+// with those of them that are outside protected time, and the free time they leave, as if holds were read too.
 export type CalendarExtra = {
   feeds: Schemas['CalendarFeed'][]
   occupations: Schemas['CalendarOccupation'][]
   conflicts: Schemas['CalendarConflict'][]
-  holds?: Schemas['CalendarHold'][]
   freeTime?: Schemas['CalendarFreeStretch'][]
   sessions?: Schemas['Session'][]
   unprotectedSessions?: Schemas['CalendarUnprotectedSession'][]
@@ -130,11 +129,11 @@ export type CalendarExtra = {
 // Has the page see the studio's calendar (GET /api/admin/calendar) with `extra` added to what the server answers, as if
 // it had read them from feeds, which the server under test has none of: it only reads https links, and couldn't reach a
 // feed of the tests' own. It also adds sessions, which the server would refuse where another test's are. Like the
-// server, it gives only the sessions, occupations, holds and stretches of free time that take some of the days asked
-// for, in its order, by start, then end, but every conflict and session outside protected time, whatever the days.
-// `extra` has to follow the server's other rules (see docs/design/server/calendar.md), e.g. the conflicts' order, since
-// they're added after the server's, which has none, and the sessions outside protected time's and the free time's,
-// which the server, without a holds feed, has none of either.
+// server, it gives only the sessions, occupations and stretches of free time that take some of the days asked for, in
+// its order, by start, then end, but every conflict and session outside protected time, whatever the days. `extra` has
+// to follow the server's other rules (see docs/design/server/calendar.md), e.g. the conflicts' order, since they're added
+// after the server's, which has none, and the sessions outside protected time's and the free time's, which the server,
+// without a holds feed, has none of either.
 export async function withCalendar(page: Page, extra: CalendarExtra) {
   await page.route(
     (url) => url.pathname === '/api/admin/calendar',
@@ -153,7 +152,6 @@ export async function withCalendar(page: Page, extra: CalendarExtra) {
           feeds: [...calendar.feeds, ...extra.feeds],
           sessions: [...calendar.sessions, ...(extra.sessions ?? []).filter(within)].sort(byTime),
           occupations: [...calendar.occupations, ...extra.occupations.filter(within)].sort(byTime),
-          holds: [...calendar.holds, ...(extra.holds ?? []).filter(within)].sort(byTime),
           freeTime: [...calendar.freeTime, ...(extra.freeTime ?? []).filter(within)].sort(byTime),
           conflicts: [...calendar.conflicts, ...extra.conflicts],
           unprotectedSessions: [...calendar.unprotectedSessions, ...(extra.unprotectedSessions ?? [])],

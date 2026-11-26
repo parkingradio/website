@@ -205,8 +205,7 @@ describe('GET /api/admin/calendar', () => {
       },
     ])
     expect(body.undatedSessions.map(({ id }: { id: string }) => id)).toEqual(['undated-new', 'undated-old'])
-    // Without a `holds` feed, there are no holds, no free time, and nothing is known to be outside protected time.
-    expect(body.holds).toEqual([])
+    // Without a `holds` feed, there's no free time, and nothing is known to be outside protected time.
     expect(body.freeTime).toEqual([])
     expect(body.unprotectedSessions).toEqual([])
 
@@ -216,7 +215,7 @@ describe('GET /api/admin/calendar', () => {
     expect(reads.of).toHaveBeenCalledTimes(2 * FEEDS.length)
   })
 
-  it("gives the holds of the `holds` feeds that take some of the days, without their titles, which are neither occupations nor in conflicts", async () => {
+  it("doesn't give the holds of the `holds` feeds, nor their titles, which are neither occupations nor in conflicts, but protect time", async () => {
     listed = [...FEEDS, ...HOLDS_FEEDS]
     rows = [
       session('in-hold', '2026-11-28T01:00:00Z', 120),
@@ -245,9 +244,12 @@ describe('GET /api/admin/calendar', () => {
       [LOFT, 'holds'],
       [BLOCKED, 'holds'],
     ])
-    expect(body.holds).toEqual([
-      { feedId: LOFT, start: '2026-11-27T15:00:00-05:00', end: '2026-11-28T11:00:00-05:00', wholeDay: false },
-      { feedId: BLOCKED, start: '2026-11-28T00:00:00-05:00', end: '2026-11-29T00:00:00-05:00', wholeDay: true },
+    expect(body).not.toHaveProperty('holds')
+    // The time they protect, of both feeds, around the repair and the sessions.
+    expect(body.freeTime).toEqual([
+      { start: '2026-11-27T15:00:00-05:00', end: '2026-11-27T19:00:00-05:00' },
+      { start: '2026-11-27T22:00:00-05:00', end: '2026-11-28T14:00:00-05:00' },
+      { start: '2026-11-28T15:00:00-05:00', end: '2026-11-30T00:00:00-05:00' },
     ])
     expect(body.occupations.map(({ feedId }: { feedId: string }) => feedId)).toEqual([TEAM])
     // Only the session and the repair conflict: holds overlap them, and each other, without conflicting.
@@ -377,10 +379,13 @@ describe('GET /api/admin/calendar', () => {
     listed = [HOLDS_FEEDS[0]]
     const asHolds = (await calendar(await buildApp(), 'from=2026-12-09&to=2026-12-09')).json()
     expect(asHolds).toMatchObject({ occupations: [], conflicts: [], unprotectedSessions: [] })
-    expect(asHolds.holds).toHaveLength(1)
+    expect(asHolds.freeTime).toEqual([
+      { start: '2026-12-09T00:00:00-05:00', end: '2026-12-09T19:00:00-05:00' },
+      { start: '2026-12-09T21:00:00-05:00', end: '2026-12-10T00:00:00-05:00' },
+    ])
     listed = [{ ...HOLDS_FEEDS[0], kind: 'occupations' }]
     const asOccupations = (await calendar(await buildApp(), 'from=2026-12-09&to=2026-12-09')).json()
-    expect(asOccupations).toMatchObject({ holds: [], unprotectedSessions: [] })
+    expect(asOccupations).toMatchObject({ freeTime: [], unprotectedSessions: [] })
     expect(asOccupations.occupations).toEqual([{ feedId: LOFT, start: '2026-12-09T00:00:00-05:00', end: '2026-12-10T00:00:00-05:00', wholeDay: true, title: 'Gardé' }])
     expect(asOccupations.conflicts).toHaveLength(1)
   })

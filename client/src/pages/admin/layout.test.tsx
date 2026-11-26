@@ -222,7 +222,6 @@ describe("The menu's badge on calendrier", () => {
     feeds: [{ ...FEED, id: 'team' }],
     sessions: [],
     occupations: [],
-    holds: [],
     freeTime: [],
     unprotectedSessions: [],
     undatedSessions: [],

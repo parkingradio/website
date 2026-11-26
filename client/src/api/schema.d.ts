@@ -2977,7 +2977,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, the holds that protect its time for sessions, its free time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date */
+        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, its free time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date */
         get: operations["get_calendar"];
         put?: never;
         post?: never;
@@ -4071,16 +4071,6 @@ export interface components {
             start: string;
             /** Format: date-time */
             end: string;
-        };
-        CalendarHold: {
-            /** @description The id of the feed it's read from, one of `feeds` */
-            feedId: string;
-            /** Format: date-time */
-            start: string;
-            /** Format: date-time */
-            end: string;
-            /** @description Whether it takes whole days */
-            wholeDay: boolean;
         };
         CalendarOccupation: {
             /** @description The id of the feed it's read from, one of `feeds` */
@@ -7843,8 +7833,6 @@ export interface operations {
                         sessions: components["schemas"]["Session"][];
                         /** @description The occupations that take some of the days, by start, then end */
                         occupations: components["schemas"]["CalendarOccupation"][];
-                        /** @description The holds that take some of the days, by start, then end */
-                        holds: components["schemas"]["CalendarHold"][];
                         /** @description The free time that takes some of the days, stretch by stretch, by start: the protected time of the next 365 days, from 00:00 today, that no session that isn't cancelled, nor occupation, takes */
                         freeTime: components["schemas"]["CalendarFreeStretch"][];
                         /** @description The conflicts of the next 365 days, from today, whatever the days asked for */

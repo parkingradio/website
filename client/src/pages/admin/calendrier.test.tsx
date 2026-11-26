@@ -43,10 +43,9 @@ const TEAM = {
 }
 // A feed of the guests' stays, whose last read failed.
 const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', link: 'https://example.com/stays.ics', error: "The link can't be read: its server fails (503)" }
-// A feed of the time protected for sessions, with a hold over the 365 days from today, and beyond, which are free time
-// where nothing takes them.
+// A feed of the time protected for sessions, which protects the 365 days from today: they're free time where nothing
+// takes them.
 const LOFT = { ...TEAM, id: 'loft', name: 'Loft', kind: 'holds' as const, link: 'https://example.com/loft.ics' }
-const ALWAYS = { feedId: 'loft', start: '2026-10-01T00:00:00-04:00', end: '2028-01-01T00:00:00-05:00', wholeDay: true }
 const [TODAY, LAST] = ['2026-11-19T00:00:00-05:00', '2027-11-19T00:00:00-05:00']
 
 const TAKEOVER = session('session-1', 'HAUTE RIVE TAKEOVER', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00', { sets: [performers('Aurore', 'Brume'), performers('Cyan')] as Session['sets'] })
@@ -73,7 +72,6 @@ const CALENDAR: Calendar = {
   feeds: [TEAM, STAYS, LOFT],
   sessions: [PLAYED, TAKEOVER, CANCELLED],
   occupations: [STAY, REPAIR, CLOSED],
-  holds: [ALWAYS],
   // Around the stay, which the takeover is within, the repair, and the closed days, but not the cancelled session.
   freeTime: [
     { start: TODAY, end: STAY.start },
@@ -314,12 +312,11 @@ describe('Calendrier', () => {
     it('shows the free time the server gives, around a session too, and none when it gives none', async () => {
       // Protected from 11 h to 18 h on the 23rd, around a session, and nowhere else.
       const tea = session('session-7', 'APÉRO', '2026-11-23T13:00:00-05:00', '2026-11-23T15:00:00-05:00')
-      const holds = [{ feedId: 'loft', start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T18:00:00-05:00', wholeDay: false }]
       const freeTime = [
-        { start: holds[0].start, end: tea.start! },
-        { start: tea.end!, end: holds[0].end },
+        { start: '2026-11-23T11:00:00-05:00', end: tea.start! },
+        { start: tea.end!, end: '2026-11-23T18:00:00-05:00' },
       ]
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [tea], holds, freeTime } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [tea], freeTime } })
       const first = renderAt('/admin/calendrier')
       await loaded()
 
@@ -332,7 +329,7 @@ describe('Calendrier', () => {
       first.unmount()
 
       // Nothing's protected without a holds feed.
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [TEAM, STAYS], holds: [], freeTime: [] } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [TEAM, STAYS], freeTime: [] } })
       renderAt('/admin/calendrier')
       await loaded()
       expect(document.querySelectorAll('.calendar-month .calendar-free, .calendar-month .calendar-mark-free, .calendar-available')).toHaveLength(0)

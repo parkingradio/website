@@ -5,7 +5,7 @@ import { Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { Status, after, sessionTitle } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
 import type { SessionWithoutSets, SessionsStore } from '../sessions/store.js'
-import { byStartThenEnd, compareStrings, conflicts, takesSomeOf, takingThings, thingOrder } from './conflicts.js'
+import { compareStrings, conflicts, takesSomeOf, takingThings, thingOrder } from './conflicts.js'
 import type { CalendarSession, OccupationThing, Thing } from './conflicts.js'
 import type { CalendarEvent } from './events.js'
 import type { CalendarFeedsStore } from './feeds.js'
@@ -51,9 +51,6 @@ const Occupation = z
   })
   .meta({ id: 'CalendarOccupation' })
 
-// Holds have no title (see "Feeds" in docs/design/server/calendar.md).
-const Hold = Occupation.omit({ title: true }).meta({ id: 'CalendarHold' })
-
 const FreeStretch = z.object({ start: Timestamp, end: Timestamp }).meta({ id: 'CalendarFreeStretch' })
 
 const UnprotectedSession = z
@@ -81,7 +78,6 @@ const CalendarResponse = z.object({
   feeds: z.array(Feed).meta({ description: 'Every feed, in the order they were added, with when each was last read, and why that failed' }),
   sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start' }),
   occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, by start, then end' }),
-  holds: z.array(Hold).meta({ description: 'The holds that take some of the days, by start, then end' }),
   freeTime: z.array(FreeStretch).meta({
     description:
       "The free time that takes some of the days, stretch by stretch, by start: the protected time of the next 365 days, from 00:00 today, that no session that isn't cancelled, nor occupation, takes",
@@ -96,8 +92,7 @@ const CalendarResponse = z.object({
 })
 
 const timesBody = ({ start, end }: { start: Date; end: Date }) => ({ start: start.toISOString(), end: end.toISOString() })
-const holdBody = ({ feedId, start, end, wholeDay }: Omit<OccupationThing, 'kind'>) => ({ feedId, ...timesBody({ start, end }), wholeDay })
-const occupationBody = (occupation: OccupationThing) => ({ ...holdBody(occupation), title: occupation.title })
+const occupationBody = ({ feedId, start, end, wholeDay, title }: OccupationThing) => ({ feedId, ...timesBody({ start, end }), wholeDay, title })
 
 function thingBody(thing: Thing): z.infer<typeof Thing> {
   if (thing.kind === 'occupation') return { kind: thing.kind, ...occupationBody(thing) }
@@ -125,7 +120,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       schema: {
         operationId: 'get_calendar',
         summary:
-          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, the holds that protect its time for sessions, its free time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date',
+          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, its free time, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date',
         tags: ['Calendar'],
         querystring: CalendarQuery,
         response: { 200: CalendarResponse },
@@ -148,7 +143,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const eventsOf = <Item>(kind: FeedKind, item: (feedId: string, event: CalendarEvent) => Item) =>
         withReads.filter(({ feed }) => feed.kind === kind).flatMap(({ feed, read }) => (read?.events ?? []).map((event) => item(feed.id, event)))
       const occupations: OccupationThing[] = eventsOf('occupations', (feedId, event) => ({ kind: 'occupation' as const, feedId, ...event }))
-      const holds = eventsOf('holds', (feedId, event) => ({ feedId, ...event }))
+      const holds = eventsOf('holds', (_feedId, event) => event)
 
       const sessionsInRange = given
         .filter((row) => row.startAt !== null)
@@ -167,7 +162,6 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
         feeds: withReads.map(({ feed, read }) => feedBody(feed, read)),
         sessions: sessionsInRange.map(sessionBody),
         occupations: occupations.filter(inRange).sort(thingOrder).map(occupationBody),
-        holds: holds.filter(inRange).sort(byStartThenEnd).map(holdBody),
         freeTime: freeTime(holds, takingThings(counted, occupations), window).filter(inRange).map(timesBody),
         conflicts: found.map(({ start, end, things: [first, second] }) => ({
           ...timesBody({ start, end }),

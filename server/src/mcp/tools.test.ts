@@ -158,14 +158,13 @@ describe('the tools of the API', () => {
     expect(hiddenFields({ url: '/api/admin/sessions' })).toEqual([])
   })
 
-  it("say that calendar feeds' links are never shown, and that the calendar has holds, free time and the sessions outside protected time", async () => {
+  it("say that calendar feeds' links are never shown, and that the calendar has free time and the sessions outside protected time", async () => {
     const { tools } = await apiTools()
     expect(tools.find(({ name }) => name === 'list_calendar_feeds')!.description).toBe(
       "Once per conversation, before using it, read the rules with `read_documentation`, area `calendar`. Every calendar feed that the studio's occupations and holds are read from, with its kind, in the order they were added. Calendar feeds' links are never shown.",
     )
     const calendar = tools.find(({ name }) => name === 'get_calendar')!.description
     expect(calendar).toMatch(/ Calendar feeds' links are never shown\.$/)
-    expect(calendar).toContain('the holds that protect its time for sessions')
     expect(calendar).toContain('its free time')
     expect(calendar).toContain('the sessions outside protected time of the next 365 days')
     expect(tools.find(({ name }) => name === 'refresh_calendar_feeds')!.description).toBe(
@@ -189,8 +188,8 @@ describe('rules', () => {
     expect(calendar).toContain('## Conflicts')
     expect(calendar).toContain('## Protected time')
     expect(calendar).toContain('## Free time')
-    expect(calendar).toContain('Sessions are meant to be within protected time (see Rules, in Sessions (read_documentation, area `sessions`)).')
-    expect(calendar).toMatch(/apps\s+should ask for the calendar of every day it takes/)
+    expect(calendar).toContain('Sessions are meant to be within protected time (see Rules, in Sessions (read_documentation, area `sessions`)): the calendar gives')
+    expect(calendar).toMatch(/apps\s+ask for the calendar of the days it would take/)
     expect(calendar).not.toContain('## `')
   })
 

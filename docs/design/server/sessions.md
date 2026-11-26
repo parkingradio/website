@@ -143,8 +143,8 @@ Occupations take the studio too (see [Calendar](calendar.md)), but the server do
 one, since they're read from calendars it doesn't control: that's a conflict. Nor does it refuse a session outside the
 time that's protected for sessions (see [Protected time, in Calendar](calendar.md#protected-time)). Apps that add a
 session with a start, give a session a start, change its start or its duration, or un-cancel it, should look at the
-calendar over its time first, and tell the admin when it would overlap something, or be outside protected time, while
-there's a `holds` feed.
+calendar over its time first, and its free time (see [Free time, in Calendar](calendar.md#free-time)), and tell the
+admin when it would overlap something, or be outside protected time, while there's a `holds` feed.
 
 ## Sets' order
 

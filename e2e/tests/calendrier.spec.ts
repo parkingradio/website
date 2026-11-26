@@ -259,10 +259,6 @@ test('free time shows where nothing takes the protected time, and the sessions o
   const outside = ownSession(`outside-${unique}`, `E2E OUT ${unique}`, at(next, '13:00'), at(next, '17:00'))
   await withCalendar(page, {
     feeds: [ownFeed(`loft-${unique}`, loft, day, { kind: 'holds', error: FAILED }), ownFeed(`blocks-${unique}`, blocks, day, { kind: 'holds', read: false }), ownFeed(`team-${unique}`, team, day)],
-    holds: [
-      { feedId: `loft-${unique}`, start: at(day, '11:00'), end: at(day, '18:00'), wholeDay: false },
-      { feedId: `blocks-${unique}`, start: at(next, '15:00'), end: at(addDays(next, 1), '00:00'), wholeDay: false },
-    ],
     occupations: [{ feedId: `team-${unique}`, start: at(day, '12:00'), end: at(day, '13:00'), wholeDay: false, title: `RÉUNION ${unique}` }],
     sessions: [inside, outside],
     freeTime: [

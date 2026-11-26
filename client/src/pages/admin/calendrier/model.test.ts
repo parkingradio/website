@@ -251,7 +251,7 @@ const ALWAYS = times('2026-11-19T00:00:00-05:00', '2027-11-19T00:00:00-05:00')
 
 function calendar(fields: Partial<Calendar>): Calendar {
   const feeds = [feed('q', 'Séjours'), feed('o', 'Équipe'), feed('h', 'Loft', 'holds')]
-  return { ok: true, today: '2026-11-19', feeds, sessions: [], occupations: [], holds: [], freeTime: [], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
+  return { ok: true, today: '2026-11-19', feeds, sessions: [], occupations: [], freeTime: [], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
 }
 
 const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })

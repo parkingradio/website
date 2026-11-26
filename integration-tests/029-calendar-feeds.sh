@@ -11,8 +11,8 @@
 #   server can't be found fails with 502, without changing it; its kind changes without reading it; reading every feed
 #   again gives it, with why its read failed; and it can be removed
 # - the links are never logged
-# - the calendar gives the sessions of its days, those without a date, the feeds, and holds and sessions outside protected
-#   time once there's a feed of holds, and refuses more than 400 days
+# - the calendar gives the sessions of its days, those without a date, the feeds, and free time and sessions outside
+#   protected time once there's a feed of holds, but never holds, and refuses more than 400 days
 # - in the image, the server's module that goes through a feed's text (calendar/parse.js) starts its process, gets its
 #   events back, and fails a feed that ical.js would go through without end, when its time is up, or it runs out of
 #   memory. That's checked with the module, in a process of its own, rather than through the server, which can only
@@ -138,7 +138,7 @@ request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2031-03-10"
 expect_status 200
 expect_body_contains '"feeds":[],"sessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445566"'
 expect_body_contains '"start":"2031-03-10T23:00:00-04:00","end":"2031-03-11T00:00:00-04:00"'
-expect_body_contains '"occupations":[],"holds":[],"freeTime":[],"conflicts":'
+expect_body_contains '"occupations":[],"freeTime":[],"conflicts":'
 expect_body_contains '"unprotectedSessions":[],"undatedSessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445567"'
 request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2032-04-13"
 expect_status 400
@@ -160,7 +160,8 @@ expect_body_contains "\"unprotectedSessions\":[{\"id\":\"${UPCOMING}\",\"title\"
 day="$(sql "select to_char(start_at at time zone 'America/Toronto', 'YYYY-MM-DD') from sessions where id = '${UPCOMING}'")"
 request --header "Cookie: ${cookie}" "${CALENDAR}?from=${day}&to=${day}"
 expect_status 200
-expect_body_contains '"holds":[],"freeTime":[]'
+expect_body_contains '"occupations":[],"freeTime":[]'
+expect_body_lacks '"holds":'
 sql "delete from sessions where id = '${UPCOMING}'"
 sql "delete from calendar_feeds where id = '${HOLDS}'"
 

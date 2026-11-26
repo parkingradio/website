@@ -169,10 +169,10 @@ async function buildApp(logs?: string[], environment = 'test') {
         const session = { id: 's', start: null, end: null, durationMinutes: 60, type: 'other', title: 'Atelier', takeover: null, application: null }
         const full = { ...session, status: 'planned', announced: false, name: 'Atelier', description: 'Long', sets: [{ id: 'set' }] }
         const feeds = [{ id: 'f', name: 'Séjours', kind: 'holds', link: FEED_LINK }]
-        const holds = [{ feedId: 'f', start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T15:00:00-05:00', wholeDay: false }]
+        const freeTime = [{ start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T15:00:00-05:00' }]
         const unprotectedSessions = [{ id: 'u', title: 'GUEST MIXES', start: '2026-11-24T21:00:00-05:00', end: '2026-11-24T23:00:00-05:00' }]
         const conflicts = [{ things: [{ kind: 'session', id: 's' }] }]
-        return { ok: true, today: '2026-11-23', feeds, sessions: [full], holds, conflicts, unprotectedSessions, undatedSessions: [full] }
+        return { ok: true, today: '2026-11-23', feeds, sessions: [full], freeTime, conflicts, unprotectedSessions, undatedSessions: [full] }
       },
     )
   })
@@ -569,7 +569,7 @@ describe('the MCP server', () => {
         today: '2026-11-23',
         feeds: [{ id: 'f', name: 'Séjours', kind: 'holds' }],
         sessions: [session],
-        holds: [{ feedId: 'f', start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T15:00:00-05:00', wholeDay: false }],
+        freeTime: [{ start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T15:00:00-05:00' }],
         conflicts: [{ things: [{ kind: 'session', id: 's' }] }],
         unprotectedSessions: [{ id: 'u', title: 'GUEST MIXES', start: '2026-11-24T21:00:00-05:00', end: '2026-11-24T23:00:00-05:00' }],
         undatedSessions: [session],
