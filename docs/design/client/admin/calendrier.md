@@ -26,8 +26,8 @@ In the legend, "session", "occupation", "disponible" and "conflit" each have a t
 
 - "session": « Toutes les sessions qui ont une date. »
 - "occupation": « Période où le studio n'est pas disponible pour des sessions. »
-- "disponible": « Plage protégée pour les sessions, qu'aucune session ni occupation ne prend. »
-- "conflit": « Une session et une occupation, ou deux occupations, qui se chevauchent. »
+- "disponible": « Plage disponible au studio, protégée des occupations. »
+- "conflit": « Une session ou une occupation qui chevauche une plage indisponible. »
 
 On narrow screens like phones, the month shows them as marks instead (see [On phones](#on-phones)).
 

@@ -440,8 +440,8 @@ test("the legend says what each kind is, in tooltips, and links to the admin's o
   const tips = {
     session: 'Toutes les sessions qui ont une date.',
     occupation: "Période où le studio n'est pas disponible pour des sessions.",
-    disponible: "Plage protégée pour les sessions, qu'aucune session ni occupation ne prend.",
-    conflit: 'Une session et une occupation, ou deux occupations, qui se chevauchent.',
+    disponible: 'Plage disponible au studio, protégée des occupations.',
+    conflit: 'Une session ou une occupation qui chevauche une plage indisponible.',
   }
   for (const [name, tip] of Object.entries(tips)) {
     const button = legend.getByRole('button', { name })
