@@ -129,6 +129,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
     store: deps.adminCalendars,
     feeds: deps.calendarFeeds,
     reads: deps.calendarReads,
+    sessions: deps.sessions,
     siteOrigin: deps.siteOrigin,
     environment: deps.environment,
   })

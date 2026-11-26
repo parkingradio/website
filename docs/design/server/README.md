@@ -2,18 +2,18 @@
 
 The server provides the API under `/api`, which this directory specifies, and the [MCP server](mcp.md) at `/mcp`, which
 apps connect to through [OAuth](oauth.md), the calendar feed of the public events at
-[`/calendar.ics`](events.md#get-calendarics), the admins' calendars at [`/sessions.ics`](admin-calendars.md) and
-[`/occupations.ics`](admin-calendars.md), and serves the client app.
+[`/calendar.ics`](events.md#get-calendarics), the admins' calendars at [`/sessions.ics`](admin-calendars.md),
+[`/occupations.ics`](admin-calendars.md) and [`/availability.ics`](admin-calendars.md), and serves the client app.
 
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
   is JSON, except for photos, flyers, the calendar feed of the events
   ([`GET /calendar.ics`](events.md#get-calendarics)), and the admins' calendars
-  ([`GET /sessions.ics` and `GET /occupations.ics`](admin-calendars.md)). A body of a type the endpoint doesn't take
-  fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that are larger than any endpoint
-  needs, with a 413. One exception: in production, nginx itself refuses requests whose body is over 52 MB, with a 413
-  that isn't JSON: that's room for a collective's application with 5 photos.
+  ([`GET /sessions.ics`, `GET /occupations.ics` and `GET /availability.ics`](admin-calendars.md)). A body of a type
+  the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that are
+  larger than any endpoint needs, with a 413. One exception: in production, nginx itself refuses requests whose body is
+  over 52 MB, with a 413 that isn't JSON: that's room for a collective's application with 5 photos.
 - **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
   daylight saving time. Instants, e.g. when something was created, or a session's start, are dates and times in Québec
   time, with the offset from UTC in effect in Québec at that instant: since 2007, -05:00, or -04:00 from the second
@@ -98,12 +98,13 @@ Requests and responses are described field by field. A field whose type says "or
 ## Serving the client
 
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
-`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, `/sessions.ics`, `/occupations.ics`, and
-those under `/api`, `/mcp`, `/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where
-the build's files are. The app then shows the page for that path. This includes paths that aren't one of the app's pages
-(a "soft 404", see [Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has.
-Other requests for paths that don't exist, whatever their body, and paths that don't exist under `/assets` and
-`/.well-known`, e.g. `/.well-known/openid-configuration`, get a 404 error (see [Conventions](#conventions)).
+`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, `/sessions.ics`, `/occupations.ics`,
+`/availability.ics`, and those under `/api`, `/mcp`, `/.well-known`, where the metadata documents of [OAuth](oauth.md)
+are, and `/assets`, where the build's files are. The app then shows the page for that path. This includes paths that
+aren't one of the app's pages (a "soft 404", see [Page introuvable](../client/not-found.md)), since the server doesn't
+know which pages the app has. Other requests for paths that don't exist, whatever their body, and paths that don't exist
+under `/assets` and `/.well-known`, e.g. `/.well-known/openid-configuration`, get a 404 error (see
+[Conventions](#conventions)).
 
 Other sites can't show the app in a frame (`X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors
 'none'`), so that they can't trick admins into clicking its buttons, e.g. to allow an app (see
@@ -226,6 +227,7 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
 | [`GET /sessions.ics`](admin-calendars.md#get-sessionsics) | token | An admin's calendar of the sessions, announced or not, in iCalendar: the upcoming ones and those that started in the past year |
 | [`GET /occupations.ics`](admin-calendars.md#get-occupationsics) | token | An admin's calendar of the occupations, in iCalendar, once every calendar feed of occupations has been read, and of those whose last read failed |
+| [`GET /availability.ics`](admin-calendars.md#get-availabilityics) | token | An admin's calendar of the studio's available time over the year ahead, in iCalendar, once every calendar feed has been read while there's a feed of holds, and of the feeds whose last read failed |
 | [`GET /api/admin/ics-subscription-token`](admin-calendars.md#get-apiadminics-subscription-token-admin) | admin | The token of the links of the admin's calendars |
 | [`POST /api/admin/ics-subscription-token`](admin-calendars.md#post-apiadminics-subscription-token-admin) | admin | Replacing that token, which makes the previous links stop working |
 | [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) | admin | What takes the studio over a range of days, sessions and occupations, its available time, and the feeds that occupations and holds are read from, with their status, and, whatever the range, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date |

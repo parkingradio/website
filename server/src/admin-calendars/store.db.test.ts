@@ -38,11 +38,12 @@ beforeAll(async () => {
   // Every admin's session is valid: whether the admin still exists is up to the routes.
   acceptSessions(app)
   const photos = memoryPhotos((count) => count.toString(16).padStart(64, '0'))
-  await app.register(sessionsRoutes, { store: sessionsStore(database.db), photos, resolveTrack: async (link: string) => `track:${link}` })
+  const sessions = sessionsStore(database.db)
+  await app.register(sessionsRoutes, { store: sessions, photos, resolveTrack: async (link: string) => `track:${link}` })
   store = adminCalendarsStore(database.db)
   const feeds = { list: async () => [] } as unknown as CalendarFeedsStore
   const reads = { of: () => undefined } as unknown as CalendarReads
-  await app.register(adminCalendarsRoutes, { store, feeds, reads, siteOrigin: 'https://parking.radio', environment: 'production' })
+  await app.register(adminCalendarsRoutes, { store, feeds, reads, sessions, siteOrigin: 'https://parking.radio', environment: 'production' })
 })
 
 afterAll(async () => {

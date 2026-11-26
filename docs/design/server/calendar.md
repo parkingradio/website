@@ -172,7 +172,8 @@ Available time is where sessions can go: a session placed within a stretch is wi
 nothing. It doesn't include the time a session takes itself: a session that's moved can go within its own time and the
 available time around it. The calendar gives the stretches that take some of the days asked for, each with its `start`
 and `end`, whole, e.g. one that goes on after the last day: to see where a session can go, apps ask for the calendar of
-the days it would take.
+the days it would take. Admins also subscribe to it in their calendar apps (see
+[`GET /availability.ics`, in Admins' calendars](admin-calendars.md#get-availabilityics)).
 
 ## Sessions without a date
 

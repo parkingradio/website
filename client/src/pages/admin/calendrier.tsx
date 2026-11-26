@@ -298,17 +298,28 @@ export function Calendrier() {
   )
 }
 
-// The legend's entries, with their tooltips, and the admin's calendar that each links to, if any.
+// The legend's entries, with their tooltips, and the admin's calendar that each links to, if any: its path, and what its
+// link says it's the calendar of.
 const LEGEND = [
-  { kind: 'session', name: 'session', tip: 'Toutes les sessions qui ont une date.', calendar: 'sessions' },
-  { kind: 'occupation', name: 'occupation', tip: "Période où le studio n'est pas disponible pour des sessions.", calendar: 'occupations' },
-  { kind: 'available', name: 'disponible', tip: 'Plage disponible au studio, protégée des occupations.', calendar: null },
+  { kind: 'session', name: 'session', tip: 'Toutes les sessions qui ont une date.', calendar: { path: 'sessions', of: 'sessions' } },
+  {
+    kind: 'occupation',
+    name: 'occupation',
+    tip: "Période où le studio n'est pas disponible pour des sessions.",
+    calendar: { path: 'occupations', of: 'occupations' },
+  },
+  {
+    kind: 'available',
+    name: 'disponible',
+    tip: 'Plage disponible au studio, protégée des occupations.',
+    calendar: { path: 'availability', of: 'disponibilités' },
+  },
   { kind: 'conflict', name: 'conflit', tip: 'Une session ou une occupation qui chevauche une plage indisponible.', calendar: null },
 ] as const
 
 // What sessions, occupations, available time and conflicts are, in tooltips, with their colors, and on narrow screens
-// their marks (see calendrier.css), and the links to the admin's calendars of the sessions and of the occupations once
-// their token is known.
+// their marks (see calendrier.css), and the links to the admin's calendars of the sessions, the occupations and the
+// available time once their token is known.
 function Legend({ token }: { token: string | null }) {
   return (
     <ul className="calendar-legend" aria-label="Légende">
@@ -331,12 +342,12 @@ function Legend({ token }: { token: string | null }) {
   )
 }
 
-// A link to one of the admin's calendars, which opens the calendar app (see docs/design/server/admin-calendars.md): a
-// calendar with a plus.
-function SubscribeLink({ calendar, token }: { calendar: 'sessions' | 'occupations'; token: string }) {
-  const name = `s'abonner au calendrier des ${calendar}`
+// A link to one of the admin's calendars, at `path`, the calendar of `of`, which opens the calendar app (see
+// docs/design/server/admin-calendars.md): a calendar with a plus.
+function SubscribeLink({ calendar: { path, of }, token }: { calendar: { path: string; of: string }; token: string }) {
+  const name = `s'abonner au calendrier des ${of}`
   return (
-    <a className="calendar-subscribe" href={`webcal://${window.location.host}/${calendar}.ics?token=${token}`} aria-label={name} title={name}>
+    <a className="calendar-subscribe" href={`webcal://${window.location.host}/${path}.ics?token=${token}`} aria-label={name} title={name}>
       <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5">
         <rect x="1.75" y="3" width="12.5" height="11.25" rx="1" />
         <path d="M1.75 6.5h12.5M5 1.5v3M11 1.5v3M8 8.25v4.5M5.75 10.5h4.5" />

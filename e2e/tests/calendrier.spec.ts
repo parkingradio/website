@@ -433,7 +433,7 @@ test("the legend says what each kind is, in tooltips, and links to the admin's o
   const tooltip = page.getByRole('tooltip')
 
   // Once the links to the admin's calendars, which move the words, are there.
-  await expect(legend.getByRole('link')).toHaveCount(2)
+  await expect(legend.getByRole('link')).toHaveCount(3)
   const tips = {
     session: 'Toutes les sessions qui ont une date.',
     occupation: "Période où le studio n'est pas disponible pour des sessions.",
@@ -467,22 +467,23 @@ test("the legend says what each kind is, in tooltips, and links to the admin's o
   // legend's next row.
   if (isMobile) {
     const boxes = await Promise.all((await legend.locator('button, a').all()).map(async (target) => (await target.boundingBox())!))
-    expect(boxes.map(fingerSized)).toEqual(Array(6).fill(true))
+    expect(boxes.map(fingerSized)).toEqual(Array(7).fill(true))
     for (const [i, box] of boxes.entries()) for (const other of boxes.slice(i + 1)) expect(overlap(box, other)).toBe(false)
   }
 
-  for (const calendar of ['sessions', 'occupations']) {
-    const icon = legend.getByRole('link', { name: `s'abonner au calendrier des ${calendar}` })
+  // Each calendar's path, and what it's the calendar of, which its link and its name say.
+  for (const [path, of] of [['sessions', 'sessions'], ['occupations', 'occupations'], ['availability', 'disponibilités']]) {
+    const icon = legend.getByRole('link', { name: `s'abonner au calendrier des ${of}` })
     await expect(icon).toBeVisible()
     const link = new URL((await icon.getAttribute('href'))!)
-    expect([link.protocol, link.host, link.pathname]).toEqual(['webcal:', new URL(baseURL!).host, `/${calendar}.ics`])
-    // The calendar it stands for, which has the seed's sessions, announced or not.
-    const response = await page.request.get(`/${calendar}.ics${link.search}`)
+    expect([link.protocol, link.host, link.pathname]).toEqual(['webcal:', new URL(baseURL!).host, `/${path}.ics`])
+    // The calendar it stands for, which the stack can give: the calendar of the sessions has the seed's, announced or not.
+    const response = await page.request.get(`/${path}.ics${link.search}`)
     expect(response.status()).toBe(200)
     const body = await response.text()
     // The stack doesn't say which environment the server is, so it's development.
-    expect(body).toContain(`X-WR-CALNAME:Parking Radio (development) · ${calendar}`)
-    if (calendar === 'sessions') expect(body).toContain('SUMMARY:[UNANNOUNCED] ')
+    expect(body).toContain(`X-WR-CALNAME:Parking Radio (development) · ${of}`)
+    if (path === 'sessions') expect(body).toContain('SUMMARY:[UNANNOUNCED] ')
   }
   expect(await scrollsSideways(page)).toBe(false)
 })
