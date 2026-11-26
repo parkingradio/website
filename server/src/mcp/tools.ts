@@ -315,7 +315,7 @@ export function failure(status: number, body: unknown): ToolCall {
 export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
   // What sends requests as `as`, with a session of their own, which no header of the MCP request goes in.
   const sender = async (as: ToolUser): Promise<Send> => {
-    const session = await signSessionToken(as, TOOL_SESSION_SECONDS)
+    const session = await signSessionToken(as, { seconds: TOOL_SESSION_SECONDS })
     return async (method, url, payload) => {
       const response = await app.inject({
         method: method as 'GET',

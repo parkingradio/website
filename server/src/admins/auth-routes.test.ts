@@ -49,11 +49,13 @@ import { DrizzleQueryError, eq } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import { db } from '../db/connection.js'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth-routes.js'
-import { hashPassword, verifySessionToken } from './auth.js'
+import { hashPassword, nowSeconds, signSessionToken, verifySessionToken, SESSION_IDLE_SECONDS } from './auth.js'
 import { generateToken, hashToken } from '../core/tokens.js'
 import { config } from '../core/config.js'
 import { acceptSessions, sessionCookies } from './test-sessions.js'
 import { invites, oauthCodes, oauthConnections } from '../db/schema.js'
+
+const DAY = 24 * 60 * 60
 
 describe('auth routes', () => {
   const originalEnv = { ...process.env }
@@ -69,6 +71,7 @@ describe('auth routes', () => {
 
   afterEach(() => {
     process.env = { ...originalEnv }
+    vi.useRealTimers()
   })
 
   // If `logs` is given, every line the app logs is added to it.
@@ -97,7 +100,30 @@ describe('auth routes', () => {
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })
       const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
-      expect(await verifySessionToken(cookie!.value)).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 2 })
+      const session = await verifySessionToken(cookie!.value)
+      expect(session?.admin).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 2 })
+      // It starts now, and lasts 7 days.
+      expect(session?.loggedInAt).toBe(session?.issuedAt)
+      expect(cookie!.maxAge).toBe(SESSION_IDLE_SECONDS)
+    })
+
+    it('starts a new session when logging in again, rather than renewing the one there was', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      const user = { id: 'user-1', email: 'admin@example.com', sessionVersion: 0 }
+      const before = await signSessionToken(user, { loggedInAt: nowSeconds() - 20 * DAY })
+      selectResult.rows = [{ ...user, passwordHash: await hashPassword('correct-password') }]
+      const app = await buildApp()
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'admin@example.com', password: 'correct-password' },
+        cookies: { [config.sessionCookie]: before },
+      })
+
+      const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
+      expect((await verifySessionToken(cookie!.value))?.loggedInAt).toBe(nowSeconds())
+      expect(cookie!.maxAge).toBe(SESSION_IDLE_SECONDS)
     })
 
     it('returns 401 when the password does not match', async () => {
@@ -455,6 +481,24 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })
+      // A session that just started isn't renewed.
+      expect(response.cookies).toEqual([])
+    })
+
+    it('renews a session whose cookie is more than a day old, as opening an admin page does', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      const app = await buildApp()
+      const cookies = await sessionCookies()
+      vi.advanceTimersByTime(2 * DAY * 1000)
+
+      const response = await app.inject({ method: 'GET', url: '/api/admin/me', cookies })
+
+      expect(response.statusCode).toBe(200)
+      const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
+      const session = await verifySessionToken(cookie!.value)
+      expect(session?.issuedAt).toBe(nowSeconds())
+      expect(session?.loggedInAt).toBe(session!.issuedAt - 2 * DAY)
+      expect(cookie!.maxAge).toBe(SESSION_IDLE_SECONDS)
     })
   })
 })

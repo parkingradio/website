@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { users, invites } from '../db/schema.js'
-import { hashPassword, verifyPassword, signSessionToken, setSessionCookie, clearSessionCookie } from './auth.js'
+import { hashPassword, verifyPassword, setSessionCookie, clearSessionCookie } from './auth.js'
 import { hashToken } from '../core/tokens.js'
 import { endConnections } from '../oauth/store.js'
 import { clientAddress } from '../api/client-address.js'
@@ -58,8 +58,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }
         return reply.status(401).send({ ok: false, error: 'Invalid email or password' })
       }
 
-      const token = await signSessionToken(user)
-      setSessionCookie(reply, token)
+      await setSessionCookie(reply, user)
       return { ok: true as const, email: user.email }
     },
   )
