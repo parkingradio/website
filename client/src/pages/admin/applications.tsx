@@ -10,7 +10,6 @@ import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { ApplicationForm } from './application-form'
 import { ApplicationWishes } from './application-wishes'
-import { Button } from './button'
 import {
   KIND_LABELS,
   LISTED_DATES,
@@ -38,9 +37,9 @@ import type { Entry, EntryKind, Owner } from './describe'
 import { ApplicationsFailure, ArtistDetails, ArtistsFailure, CollectiveDetails, CollectivesFailure } from './profile-details'
 import { sessionPath } from './session-errors'
 import { ApplicationSessions, ApplicationSets } from './sessions'
-import { compareText, listQuery, search, useQueryParams, useSearchQuery, useSort, useStatusFilter } from './list'
+import { compareText, listedWith, search, useListAddress, useSearchQuery, useSort } from './list'
 import type { SortColumn, Sorting } from './list'
-import { SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
+import { ListPager, SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in one that came through the original Google Form.
@@ -284,23 +283,13 @@ function applicationSearchFields(application: Application): string[] {
   return [describePerformanceTypes(application), application.details, ...application.dates.map(formatDay)].filter(Boolean)
 }
 
-// The list of applications as the address says:
-// - `status`, the one in the `status` query parameter, the default view without one, or null for every application,
-// - `setStatus`, what changes it,
-// - `given`, whether the address gives it, as the list's links to applications do,
-// - `query`, what keeps the list's status, search and order in another address,
-// - `listPath`, the list's own address, with them when the address gives the status, or else its default view.
-function useListAddress() {
-  const [params] = useQueryParams()
-  const [status, setStatus, given] = useStatusFilter(APPLICATION_STATUSES, DEFAULT_STATUS)
-  const query = listQuery(params, status)
-  return { status, setStatus, given, query, listPath: `/admin/candidatures${given ? query : ''}` }
-}
+// The list of applications as the address says (see `useListAddress`).
+const useApplicationsAddress = () => useListAddress('/admin/candidatures', APPLICATION_STATUSES, DEFAULT_STATUS)
 
 // The applications, and who they're for, to list them as the address says, which the list and the applications' pages
 // share: `inView` tells whether an application has the status listed, `sorting` is the list's order, and `list` gives
-// those of `all` that the search finds, and those of them that the list shows, in its order, with `kept` among them in its
-// place even when it isn't: where it is in `all`, which the order keeps between equals.
+// those of `all` that the search finds, and those of them that the list shows, in its order, with `kept` among them (see
+// `listedWith`).
 function useApplicationList() {
   const applications = useApi('/api/admin/applications')
   const artists = useApi('/api/admin/artists')
@@ -311,7 +300,7 @@ function useApplicationList() {
     collectives.kind === 'loaded' ? collectives.value.collectives : [],
   )
   const { query } = useSearchQuery()
-  const address = useListAddress()
+  const address = useApplicationsAddress()
   const sorting = useSort(applicationColumns(byKey, address.status), 'received')
   const inView = (application: Application) => address.status === null || application.status === address.status
   return {
@@ -324,10 +313,7 @@ function useApplicationList() {
     inView,
     list(all: Application[], kept?: Application) {
       const found = search(all, query, (application) => [...(ownerOf(application, byKey)?.searchFields ?? []), ...applicationSearchFields(application)])
-      const shown = new Set(found.filter(inView))
-      const listed = all.filter((each) => shown.has(each) || each.id === kept?.id)
-      if (kept && !listed.some((each) => each.id === kept.id)) listed.push(kept)
-      return { found, listed: sorting.sorted(listed) }
+      return { found, listed: listedWith(all, new Set(found.filter(inView)), sorting.sorted, kept) }
     },
   }
 }
@@ -402,7 +388,7 @@ function ApplicationById({ id }: { id: string }) {
   const loaded = useApi('/api/admin/applications/{id}', { params: { path: { id } } })
   return (
     <>
-      <ApplicationLinks application={loaded} />
+      <ApplicationLinks id={id} application={loaded} />
       <ApplicationContent loaded={loaded} />
     </>
   )
@@ -480,13 +466,13 @@ function CollectiveApplication({ loaded, collectiveId }: { loaded: Application; 
 // `application` as it was when its page opened. When the address gives the list's status, as the list's links do, the
 // list is the one it was opened from, as it was, which then loads along with the application. Otherwise, e.g. from an
 // artist's page, the link leads to the list's default view, and there's no list to go through.
-function ApplicationLinks({ application }: { application: Loaded<{ application: Application }> }) {
-  const address = useListAddress()
+function ApplicationLinks({ id, application }: { id: string; application: Loaded<{ application: Application }> }) {
+  const address = useApplicationsAddress()
   return (
     <div className="admin-page-links">
       <BackToApplications to={address.listPath} />
       {address.given && application.kind !== 'error' && (
-        <ListNavigation application={application.kind === 'loaded' ? application.value.application : undefined} />
+        <ListNavigation id={id} application={application.kind === 'loaded' ? application.value.application : undefined} />
       )}
     </div>
   )
@@ -495,53 +481,19 @@ function ApplicationLinks({ application }: { application: Loaded<{ application: 
 // Précédente and suivante, and where `application` is in the list, as it was when its page opened, once it's loaded. It
 // keeps its place in the list even when it wouldn't be listed, e.g. once its status changed and the page was loaded again,
 // so that going back to it doesn't lose it.
-function ListNavigation({ application }: { application: Application | undefined }) {
+function ListNavigation({ id, application }: { id: string; application: Application | undefined }) {
   const { applications, artists, collectives, address, list } = useApplicationList()
   const failed = [applications, artists, collectives].find((each) => each.kind === 'error')
-  if (failed) {
-    return (
-      <p className="admin-error" role="alert">
-        La liste des candidatures n'a pas pu être chargée&nbsp;: {failed.message}
-      </p>
-    )
-  }
-
-  // A link to `to`, or, without one, a button that can't be used, saying why (`unavailable`), or only for a moment.
-  const link = (to: Application | undefined, label: string, unavailable: string | null) =>
-    to ? (
-      <Link to={applicationPath(to) + address.query} className="admin-button">
-        {label}
-      </Link>
-    ) : (
-      <Button disabled unavailable={unavailable}>
-        {label}
-      </Button>
-    )
-  // While the list or the application loads.
-  if (!application || applications.kind !== 'loaded' || artists.kind !== 'loaded' || collectives.kind !== 'loaded') {
-    return (
-      <div className="admin-pager">
-        {link(undefined, '← précédente', null)}
-        {link(undefined, 'suivante →', null)}
-      </div>
-    )
-  }
-
-  const { listed } = list(applications.value.applications, application)
-  const at = listed.findIndex((each) => each.id === application.id)
+  const loaded = application && applications.kind === 'loaded' && artists.kind === 'loaded' && collectives.kind === 'loaded'
   return (
-    <div className="admin-pager">
-      {link(listed[at - 1], '← précédente', "C'est la première candidature de la liste.")}
-      <span>
-        <span aria-hidden="true">
-          {at + 1} / {listed.length}
-        </span>
-        <span className="visually-hidden">
-          {at + 1} sur {listed.length}
-        </span>
-      </span>
-      {link(listed[at + 1], 'suivante →', "C'est la dernière candidature de la liste.")}
-    </div>
+    <ListPager
+      id={id}
+      listed={loaded ? list(applications.value.applications, application).listed : undefined}
+      failure={failed && `La liste des candidatures n'a pas pu être chargée\u00a0: ${failed.message}`}
+      path={(to) => applicationPath(to) + address.query}
+      first="C'est la première candidature de la liste."
+      last="C'est la dernière candidature de la liste."
+    />
   )
 }
 
@@ -554,7 +506,7 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
-  const address = useListAddress()
+  const address = useApplicationsAddress()
   const params = { path: { id: application.id } }
   const title = <h1>{name ? `Candidature de ${name}` : 'Candidature'}</h1>
 

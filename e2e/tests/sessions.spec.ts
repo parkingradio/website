@@ -124,6 +124,46 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(page.getByRole('button', { name: 'supprimer le collectif' })).toHaveAttribute('aria-disabled', 'true')
 })
 
+// With the seeded sessions of Ondine: the planned ones that aren't announced, and the live performance, which is.
+test("a session's page goes through the list it was opened from, with its status, its announcement, its search and its order", async ({ page }) => {
+  await logIn(page, { at: '/admin/sessions' })
+  const search = page.getByRole('searchbox', { name: 'Rechercher' })
+  await search.fill('ondine')
+  await page.getByRole('group', { name: 'Annonce' }).getByRole('button', { name: /^non annoncées/ }).click()
+  await page.getByRole('button', { name: 'Nom', exact: true }).click()
+  const names = page.getByRole('row').locator('td:nth-child(3)')
+  const listed = ['LES SŒURS ONDES TAKEOVER', 'MARATHON MODULAIRE', 'SOIRÉE À REVOIR']
+  await expect(names).toHaveText(listed)
+
+  const title = (name: string) => expect(page.getByRole('heading', { level: 1, name, exact: true })).toBeVisible()
+  await rowsOf(page, 'MARATHON MODULAIRE').getByRole('link').first().click()
+  await title('MARATHON MODULAIRE')
+  await expect(page.getByText('2 / 3')).toBeVisible()
+  await page.getByRole('link', { name: '← précédente' }).click()
+  await title('LES SŒURS ONDES TAKEOVER')
+  await expect(page.getByText('1 / 3')).toBeVisible()
+  await expect(page.getByRole('button', { name: '← précédente' })).toHaveAttribute('aria-disabled', 'true')
+  await page.getByRole('link', { name: 'suivante →' }).click()
+  await title('MARATHON MODULAIRE')
+  await page.getByRole('link', { name: 'suivante →' }).click()
+  await title('SOIRÉE À REVOIR')
+  await expect(page.getByText('3 / 3')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'suivante →' })).toHaveAttribute('aria-disabled', 'true')
+  const sessionPage = new URL(page.url()).pathname
+
+  // Back to the list as it was.
+  await page.getByRole('link', { name: '← sessions' }).click()
+  await expect(search).toHaveValue('ondine')
+  await expect(names).toHaveText(listed)
+
+  // Without the list's parameters, e.g. from Calendrier, there's no list to go through.
+  await page.goto(sessionPage)
+  await title('SOIRÉE À REVOIR')
+  await expect(page.getByRole('link', { name: '← sessions' })).toHaveAttribute('href', '/admin/sessions')
+  await expect(page.getByRole('link', { name: /précédente|suivante/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /précédente|suivante/ })).toHaveCount(0)
+})
+
 test('a seeded session says when its sets add up to more than it', async ({ page }) => {
   await logIn(page, { at: '/admin/sessions' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('soirée à revoir')
@@ -590,7 +630,8 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   // Listed in the section, found by its name, among the announced sessions, and on the artist's page.
   await adminMenu(page).getByRole('link', { name: 'sessions' }).click()
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill(unique)
-  const row = page.getByRole('row').filter({ has: page.locator(`a[href="${sessionPage}"]`) })
+  // Whatever the list's parameters, which its links keep.
+  const row = page.getByRole('row').filter({ has: page.locator(`a[href^="${sessionPage}?"]`) })
   const rowAnnounced = row.getByRole('combobox', { name: /^Annonce : / })
   await expect(row).toContainText(mine.artist.name)
   await expect(rowAnnounced).toHaveValue('true')
@@ -654,7 +695,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'supprimer la session' }).click()
   await expect(page).toHaveURL('/admin/sessions')
-  await expect(page.locator(`a[href="${sessionPage}"]`)).toHaveCount(0)
+  await expect(page.locator(`a[href^="${sessionPage}?"]`)).toHaveCount(0)
 
   await deleteOwn(page, mine)
 })

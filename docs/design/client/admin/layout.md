@@ -77,6 +77,24 @@ button gives the same view. Without `sort`, a list is in the order its page give
 statuses. `sort` without `order` sorts that way when it names the column that order is by, and in ascending order
 otherwise.
 
+## Going through a list
+
+The pages of applications and of sessions go through the list they were opened from (see
+[Going through the list, in Candidatures](candidatures.md#going-through-the-list) and
+[in Sessions](sessions.md#going-through-the-list)). The list's links to them give, in their address, its status, even
+for its default view, and its other parameters (see [Searching lists](#searching-lists)). When such a page's address has
+a status the list knows, the link back to the list above its title, e.g. "← candidatures", shows the list with the
+list's parameters, and « ← précédente » and « suivante → » lead to the entries before and after this one in that list,
+keeping the list's parameters in their address, with this one's place between them, e.g. « 3 / 12 » (« 3 sur 12 » for
+screen readers). The first one's « précédente » and the last one's « suivante » can't be used, saying why (see
+[Controls that can't be used](#controls-that-cant-be-used)). Without such a status, e.g. from another section's page,
+the link back shows the list as it opens, and the page has nothing else to go through it.
+
+The list is the one when the page opens: the entry keeps its place in the list's order even when the list doesn't show
+it, e.g. once an application has been accepted while going through the new ones. Other entries that have left it are
+skipped: after accepting the 5th of 12 new applications, « suivante » shows the next one as the 5th of 11, and its
+« précédente » leads to the 4th.
+
 ## Tables
 
 On narrow screens like phones, a list in a table that's too wide for the screen scrolls sideways on its own, rather

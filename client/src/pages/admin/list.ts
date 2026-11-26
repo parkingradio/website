@@ -2,10 +2,11 @@ import { useSearchParams } from 'react-router'
 import Fuse from 'fuse.js'
 import { normalize } from '../../normalize'
 
-// What the lists of artists and applications share: a field that searches them, and columns that sort them. Both are
-// kept in the URL, like the applications' status, so that going back to a list from one of its entries with the
-// browser finds it as it was, and an application's page goes through the list it was opened from. The field and the
-// columns' headers are in list-controls.tsx.
+// What the lists of artists and collectives, of applications and of sessions share: a field that searches them, and
+// columns that sort them. Both are kept in the URL, like the applications' and the sessions' status, so that going back
+// to a list from one of its entries with the browser finds it as it was, and the pages of applications and of sessions go
+// through the list they were opened from (see "Going through a list" in docs/design/client/admin/layout.md). The field,
+// the columns' headers and précédente and suivante are in list-controls.tsx.
 
 // The entries that have every word of `query` in one of their `fields`, whatever its case, accents and ligatures, e.g.
 // "soeurs" for "Sœurs" (see normalize), and allowing for a typo or so, e.g. "monreal" for "Montréal". A date counts as
@@ -178,7 +179,7 @@ export function useQueryFilter<V extends string>(name: string, values: readonly 
 
 // The status a list is filtered by, or null for every status, what changes it, and whether the URL gives it. The URL says
 // which, with `all` for every status, and without one of `statuses`, the list shows `initial`, its default view.
-export function useStatusFilter<S extends string>(statuses: readonly S[], initial: NoInfer<S>): [S | null, (status: S | null) => void, boolean] {
+function useStatusFilter<S extends string>(statuses: readonly S[], initial: NoInfer<S>): [S | null, (status: S | null) => void, boolean] {
   const [params, change] = useQueryParams()
   const param = params.get('status')
   const given = statuses.find((status) => status === param)
@@ -187,12 +188,34 @@ export function useStatusFilter<S extends string>(statuses: readonly S[], initia
 }
 
 // The query that keeps a list as it is in another address, e.g. its entries' pages': its `status`, or `all`, even for its
-// default view, so that those pages tell they were opened from the list, then its search and order, as the URL has them.
-export function listQuery(params: URLSearchParams, status: string | null): string {
+// default view, so that those pages tell they were opened from the list, then its other `filters`, e.g. `announced`, its
+// search and its order, as the URL has them.
+function listQuery(params: URLSearchParams, status: string | null, filters: readonly string[] = []): string {
   const query = new URLSearchParams({ status: status ?? 'all' })
-  for (const name of ['search', 'sort', 'order']) {
+  for (const name of [...filters, 'search', 'sort', 'order']) {
     const value = params.get(name)
     if (value !== null) query.set(name, value)
   }
   return `?${query}`
+}
+
+// The list at `path` as the address says:
+// - `status`, the one in the `status` query parameter, `initial`, the default view, without one, or null for every entry,
+// - `setStatus`, what changes it,
+// - `given`, whether the address gives it, as the list's links to its entries do,
+// - `query`, what keeps the list's status, its other `filters`, search and order in another address,
+// - `listPath`, the list's own address, with them when the address gives the status, or else its default view.
+export function useListAddress<S extends string>(path: string, statuses: readonly S[], initial: NoInfer<S>, filters: readonly string[] = []) {
+  const [params] = useQueryParams()
+  const [status, setStatus, given] = useStatusFilter(statuses, initial)
+  const query = listQuery(params, status, filters)
+  return { status, setStatus, given, query, listPath: `${path}${given ? query : ''}` }
+}
+
+// The entries of `all` that a list `shows`, in its order (`sorted`), with `kept` among them in its place even when it
+// isn't shown: where it is in `all`, which the order keeps between equals, or at the end of `all` when it isn't there.
+export function listedWith<T extends { id: string }>(all: T[], shows: ReadonlySet<T>, sorted: (entries: T[]) => T[], kept?: T): T[] {
+  const listed = all.filter((each) => shows.has(each) || each.id === kept?.id)
+  if (kept && !listed.some((each) => each.id === kept.id)) listed.push(kept)
+  return sorted(listed)
 }
