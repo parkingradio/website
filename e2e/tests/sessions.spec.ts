@@ -320,6 +320,15 @@ test('a takeover and its set are given the applications they come from in their 
   await page.getByRole('button', { name: 'enregistrer' }).click()
   await expect(sets.getByRole('link', { name: /^Candidature/ })).toHaveCount(0)
 
+  // Picked again, as the set's only one, once its performer is taken out and added back, though not as its form opens.
+  await sets.getByRole('button', { name: /^modifier : / }).click()
+  await expect(picker).toHaveValue('Aucune candidature')
+  await page.getByRole('button', { name: `retirer ${mine.artist.name}` }).click()
+  await page.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
+  await page.getByRole('option', { name: mine.artist.name }).click()
+  await expect(picker).toHaveValue(new RegExp(`^${mine.artist.name}, reçue le `))
+  await page.getByRole('button', { name: 'annuler' }).click()
+
   expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
   await deleteOwn(page, mine)
 })

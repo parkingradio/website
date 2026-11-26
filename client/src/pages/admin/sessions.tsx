@@ -9,10 +9,12 @@ import {
   EMPTY_SESSION_FORM,
   STATUSES,
   applicationLink,
+  collectivesApplications,
   findApplication,
   listedSetFields,
   listedSetFromApplication,
   newSetFormValues,
+  pickedApplication,
   sessionFormValues,
   setFormValues,
   setValuesFromApplication,
@@ -723,7 +725,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         <SessionFormWithChoices
           initial={sessionFormValues(session)}
           announced={session.announced}
-          cancelled={cancelled}
+          status={session.status}
           flyer={session.hasFlyer ? shownUrl(flyerUrl(session)) : null}
           submitLabel="enregistrer"
           onCancel={close}
@@ -1021,7 +1023,7 @@ function OpenSet({
       title={set ? setTitle(set) : 'Nouveau set'}
       initial={set ? setFormValues(set) : application ? setFromApplication(application, session) : newSetFormValues(session)}
       takeover={takeover}
-      cancelled={set?.status === 'cancelled'}
+      status={set?.status}
       reveal={application !== undefined}
       submitLabel={set ? 'enregistrer' : 'ajouter le set'}
       onCancel={onClose}
@@ -1118,7 +1120,10 @@ function SessionFormWithChoices({
                 ...initial,
                 type: 'takeover',
                 takeover: { id: takeover.id, name: takeover.name },
-                application: fromCollective ? applicationLink(fromCollective) : initial.application,
+                // From the collective's page, its application is picked as when the collective is picked in the form.
+                application: fromCollective
+                  ? applicationLink(fromCollective)
+                  : pickedApplication(initial.application, applicationList && collectivesApplications(applicationList, takeover), true),
               }
             : initial
         }

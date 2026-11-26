@@ -8,8 +8,8 @@ import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxFilter } from '../../combobox'
 import { matching } from '../../combobox-matching'
-import { checkSet, isPerformersApplication } from '../../session-fields'
-import type { Reference, SetFields, SetFormValues } from '../../session-fields'
+import { checkSet, performersApplications, pickedApplication } from '../../session-fields'
+import type { Reference, SessionStatus, SetFields, SetFormValues } from '../../session-fields'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
 import { artistOption, genreNames, membersGenres } from './describe'
@@ -39,18 +39,18 @@ type SetFormProps = {
   applications: Application[] | null
   // The collective of the set's session, for a takeover, or null when it isn't one, or its collective couldn't be loaded.
   takeover: TakeoverCollective | null
-  // Whether the set is cancelled, which a new one isn't.
-  cancelled?: boolean
+  // The set's status, which a new one has as planned.
+  status?: SessionStatus
   submitLabel: string
   // Sends the set's fields, which `form` has, and returns the error, if it failed.
   onSubmit: (fields: SetFields, form: SetFormValues) => Promise<ReactNode | null>
   onCancel: () => void
 }
 
-export function SetForm({ initial, artists, applications, takeover, cancelled = false, submitLabel, onSubmit, onCancel }: SetFormProps) {
+export function SetForm({ initial, artists, applications, takeover, status = 'planned', submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
-  const checked = checkSet(form, applications)
+  const checked = checkSet(form)
   const errors = checked.errors ?? {}
   // There are fields, since there are no errors by then.
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!, form))
@@ -59,8 +59,7 @@ export function SetForm({ initial, artists, applications, takeover, cancelled = 
   const suggested =
     artists && form.genres.length === 0 ? membersGenres(form.performers, new Map(artists.map((artist) => [artist.id, artist]))).slice(0, SUGGESTED_GENRES) : []
 
-  // The applications of its performers, in their order: each performer's on their own, to keep that order.
-  const candidates = form.performers.flatMap((performer) => applications?.filter((application) => isPerformersApplication(application, [performer])) ?? [])
+  const candidates = performersApplications(applications, form.performers)
   const artistName = (application: Application) => (artists ?? form.performers).find((artist) => artist.id === application.artistId)?.name
 
   const input = (field: 'soundcloudTrack' | 'youtubeVideo') => ({
@@ -77,9 +76,10 @@ export function SetForm({ initial, artists, applications, takeover, cancelled = 
         artists={artists}
         takeover={takeover}
         onChange={(performers) => {
-          update({ performers })
-          // So that it says right away when its application isn't one of theirs anymore.
-          leave('application')()
+          // Its application changes as an artist is added or taken out, but not as they're reordered.
+          if (sameArtists(performers, form.performers)) return update({ performers })
+          const candidates = applications && performersApplications(applications, performers)
+          update({ performers, application: pickedApplication(form.application, candidates, status === 'planned') })
         }}
         error={shown('performers')}
         onLeave={leave('performers')}
@@ -90,7 +90,7 @@ export function SetForm({ initial, artists, applications, takeover, cancelled = 
         applications={applications}
         own={initial.application}
         selected={form.application}
-        cancelled={cancelled}
+        cancelled={status === 'cancelled'}
         ownerName={artistName}
         empty={
           form.performers.length === 0
@@ -98,8 +98,6 @@ export function SetForm({ initial, artists, applications, takeover, cancelled = 
             : `Aucune candidature ${form.performers.length === 1 ? 'de cet artiste' : 'de ces artistes'}.`
         }
         onChange={(application) => update({ application })}
-        error={shown('application')}
-        onLeave={leave('application')}
       />
 
       <div onBlur={leaving(leave('duration'))}>
@@ -131,6 +129,9 @@ export function SetForm({ initial, artists, applications, takeover, cancelled = 
     </form>
   )
 }
+
+// Whether `a` and `b` are the same artists, whatever their order.
+const sameArtists = (a: Reference[], b: Reference[]) => a.length === b.length && a.every(({ id }) => b.some((artist) => artist.id === id))
 
 // What a set's form starts with, given the artists and the applications it loaded, or null when they couldn't be: null
 // shows nothing.

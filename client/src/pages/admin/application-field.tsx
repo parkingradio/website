@@ -5,7 +5,6 @@ import type { ComboboxOption } from '../../combobox'
 import { applicationLink } from '../../session-fields'
 import type { ApplicationLink } from '../../session-fields'
 import { STATUS_LABELS, capitalized, listedDates, receivedOn } from './describe'
-import { FieldError } from './fields'
 
 // The application a set or a session comes from, in their forms (see "Applications" in
 // docs/design/client/admin/sessions.md).
@@ -17,7 +16,8 @@ type ApplicationFieldProps = {
   candidates: Application[]
   // Every application, or null when they couldn't be loaded.
   applications: Application[] | null
-  // The set's or the session's application when the form opened, which stays among the options.
+  // The set's or the session's application when the form opened, which is offered when the applications couldn't be
+  // loaded.
   own: ApplicationLink | null
   // The application picked, or null for none.
   selected: ApplicationLink | null
@@ -31,31 +31,24 @@ type ApplicationFieldProps = {
   // loaded.
   empty: string
   onChange: (application: ApplicationLink | null) => void
-  error?: string
-  onLeave: () => void
 }
 
-// The application picked among `candidates`, or none, or the one picked before, which stays among the options even when
-// it isn't one of them anymore, e.g. once its artist is taken out of the set, so that what's wrong with it can be seen.
-export function ApplicationField({ candidates, applications, own, selected, cancelled, ownerName, empty, onChange, error, onLeave }: ApplicationFieldProps) {
+// The application picked among `candidates`, or none, or among the set's or the session's own and none when the
+// applications couldn't be loaded.
+export function ApplicationField({ candidates, applications, own, selected, cancelled, ownerName, empty, onChange }: ApplicationFieldProps) {
   const id = useId()
-  const optionOf = (link: ApplicationLink): ComboboxOption => {
-    const application = applications?.find((application) => application.id === link.id)
-    // When the applications couldn't be loaded, it's only named by when it was received.
-    if (!application) return { key: link.id, label: capitalized(receivedOn(link)) }
+  const optionOf = (application: Application): ComboboxOption => {
     const name = ownerName?.(application)
     return {
-      key: link.id,
+      key: application.id,
       label: name ? `${name}, ${receivedOn(application)}` : capitalized(receivedOn(application)),
       detail: `${STATUS_LABELS[application.status]} · ${listedDates(application.dates)}`,
       unavailable: application.decision === 'rejected' && !cancelled,
     }
   }
-  const kept = [own, selected].filter(
-    (link, i, links): link is ApplicationLink =>
-      link !== null && !candidates.some(({ id }) => id === link.id) && links.findIndex((other) => other?.id === link.id) === i,
-  )
-  const options = [...kept, ...candidates].map(optionOf)
+  // When the applications couldn't be loaded, only its own can be picked, named by when it was received.
+  const choices: ApplicationLink[] = applications ? candidates : own ? [own] : []
+  const options = applications ? candidates.map(optionOf) : choices.map((link) => ({ key: link.id, label: capitalized(receivedOn(link)) }))
   // Without anything to pick, the field shows what it says instead, unless the applications couldn't be loaded, since
   // there might be some.
   if (options.length > 0 || applications === null) options.unshift(NO_APPLICATION)
@@ -67,15 +60,11 @@ export function ApplicationField({ candidates, applications, own, selected, canc
         options={options}
         selected={selected?.id ?? ''}
         onSelect={(key) => {
-          const link = [...kept, ...candidates].find((link) => link.id === key)
+          const link = choices.find((link) => link.id === key)
           onChange(link ? applicationLink(link) : null)
         }}
-        onBlur={onLeave}
-        invalid={!!error}
         placeholder={empty}
       />
-      {/* Announced, since changing another field, e.g. the set's performers, can make it wrong. */}
-      <FieldError message={error} alert />
     </div>
   )
 }

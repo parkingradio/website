@@ -3,6 +3,7 @@ import type { Application } from './application-fields'
 import {
   EMPTY_SESSION_FORM,
   findApplication,
+  pickedApplication,
   checkSession,
   checkSet,
   durationOf,
@@ -314,25 +315,6 @@ describe('checkSession', () => {
     expect(checkSession({ ...FORM, type: 'other', name: 'ATELIER DE DJing' }).fields).toMatchObject({ type: 'other', name: 'ATELIER DE DJing' })
   })
 
-  it("needs a takeover's application to be its collective's, once the applications are known", () => {
-    const applications = [
-      { id: 'application-1', artistId: null, collectiveId: 'collective-1' },
-      { id: 'application-2', artistId: null, collectiveId: 'collective-2' },
-      { id: 'application-3', artistId: 'artist-1', collectiveId: null },
-    ]
-    expect(checkSession(FORM, undefined, applications).fields).toMatchObject({ takeover: 'collective-1', application: 'application-1' })
-    const error = 'La candidature doit être celle du collectif du takeover\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0».'
-    for (const application of ['application-2', 'application-3']) {
-      expect(checkSession({ ...FORM, application: link(application) }, undefined, applications).errors).toEqual({ application: error })
-    }
-    expect(checkSession({ ...FORM, takeover: { id: 'collective-2', name: 'Vagues' } }, undefined, applications).errors).toEqual({ application: error })
-    // Left to the server when they aren't known, or when it isn't one of them.
-    expect(checkSession({ ...FORM, application: link('application-2') }).fields).toMatchObject({ application: 'application-2' })
-    expect(checkSession({ ...FORM, application: link('application-9') }, undefined, applications).fields).toMatchObject({ application: 'application-9' })
-    // Another type doesn't send it, whatever it is.
-    expect(checkSession({ ...FORM, type: 'guest-mixes', application: link('application-3') }, undefined, applications).fields).toMatchObject({ application: null })
-  })
-
   it('says what is wrong with each field', () => {
     expect(checkSession({ ...FORM, start: '', name: 'x'.repeat(101) }).errors).toEqual({
       start: "Indiquez l'heure de début.",
@@ -445,23 +427,6 @@ describe('checkSet', () => {
     }
   })
 
-  it("needs its application to be one of its performers', once the applications are known", () => {
-    const applications = [
-      { id: 'application-1', artistId: 'artist-1', collectiveId: null },
-      { id: 'application-2', artistId: 'artist-3', collectiveId: null },
-      { id: 'application-3', artistId: null, collectiveId: 'collective-1' },
-    ]
-    expect(checkSet(FORM, applications).fields).toMatchObject({ application: 'application-1' })
-    const error = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
-    for (const application of ['application-2', 'application-3']) {
-      expect(checkSet({ ...FORM, application: link(application) }, applications).errors).toEqual({ application: error })
-    }
-    expect(checkSet({ ...FORM, performers: [{ id: 'artist-2', name: 'Brume' }] }, applications).errors).toEqual({ application: error })
-    expect(checkSet({ ...FORM, application: null }, applications).fields).toMatchObject({ application: null })
-    // Left to the server when they aren't known.
-    expect(checkSet({ ...FORM, application: link('application-2') }).fields).toMatchObject({ application: 'application-2' })
-  })
-
   it('says what is wrong with each field', () => {
     expect(
       checkSet({
@@ -538,5 +503,42 @@ describe('the application a form starts from', () => {
   it("can't be told without the applications, or the artists for an artist's", () => {
     expect(findApplication('application-1', null, ARTISTS)).toBeUndefined()
     expect(findApplication('application-1', APPLICATIONS, null)).toBeUndefined()
+  })
+})
+
+describe('the application a form picks as its performers or its collective change', () => {
+  const candidate = (id: string, status: Application['status']) => ({ id, receivedAt: '2026-09-01T16:00:00.000Z', status })
+  const link = (id: string) => ({ id, receivedAt: '2026-09-01T16:00:00.000Z' })
+  const only = [candidate('application-1', 'new')]
+
+  it("is their only new or accepted one, e.g. one whose sets are all cancelled, the planned, done and rejected ones aside", () => {
+    expect(pickedApplication(null, only, true)).toEqual(link('application-1'))
+    expect(pickedApplication(null, [candidate('application-1', 'accepted')], true)).toEqual(link('application-1'))
+    const others = [candidate('application-2', 'planned'), candidate('application-3', 'done'), candidate('application-4', 'rejected')]
+    expect(pickedApplication(null, [...others, ...only], true)).toEqual(link('application-1'))
+    expect(pickedApplication(null, others, true)).toBeNull()
+  })
+
+  it('is none when they have none, or several', () => {
+    expect(pickedApplication(null, [], true)).toBeNull()
+    expect(pickedApplication(null, [...only, candidate('application-2', 'accepted')], true)).toBeNull()
+  })
+
+  it("keeps one that's theirs, and replaces one that isn't, or else takes it away", () => {
+    expect(pickedApplication(link('application-2'), [candidate('application-2', 'planned'), ...only], true)).toEqual(link('application-2'))
+    expect(pickedApplication(link('application-9'), only, true)).toEqual(link('application-1'))
+    expect(pickedApplication(link('application-9'), [], true)).toBeNull()
+    expect(pickedApplication(link('application-9'), [...only, candidate('application-3', 'accepted')], true)).toBeNull()
+  })
+
+  it("only takes one away for a set or a session that isn't planned", () => {
+    expect(pickedApplication(null, only, false)).toBeNull()
+    expect(pickedApplication(link('application-9'), only, false)).toBeNull()
+    expect(pickedApplication(link('application-1'), only, false)).toEqual(link('application-1'))
+  })
+
+  it("leaves it as it is when the applications couldn't be loaded", () => {
+    expect(pickedApplication(link('application-9'), null, true)).toEqual(link('application-9'))
+    expect(pickedApplication(null, null, true)).toBeNull()
   })
 })
