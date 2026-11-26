@@ -6,7 +6,7 @@ import App from '../../app'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { jsonBody, mockFetch, requestsTo, timeParts, typeTime } from '../../test-utils'
+import { jsonBody, mockFetch, named, requestsTo, spaced, timeParts, typeTime } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
 beforeAll(() => import('./admin-pages'))
@@ -116,7 +116,7 @@ const rows = () =>
   screen
     .queryAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? cell.textContent))
+    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? spaced(cell.textContent)))
 const received = () => rows().map((row) => row[0])
 // What the buttons that filter the list by status say.
 const counts = () =>
@@ -214,8 +214,8 @@ describe('The list of applications', () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications } })
     renderAt('/admin/candidatures?status=all')
 
-    expect(await screen.findByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
-    expect(screen.getByRole('link', { name: 'jouée : SOIRÉE, ven. 2 oct. 2026' })).toHaveAttribute('href', '/admin/sessions/session-2')
+    expect(await screen.findByRole('link', { name: named('planifiée : ONDES TAKEOVER, sam. 12 sept. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(screen.getByRole('link', { name: named('jouée : SOIRÉE, ven. 2 oct. 2026') })).toHaveAttribute('href', '/admin/sessions/session-2')
     expect(screen.getByRole('link', { name: 'planifiée : GUEST MIXES, date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-3')
     expect(rows().map((row) => row.at(-1))).toEqual(['planifiée', 'jouée', 'planifiée'])
   })
@@ -1095,7 +1095,7 @@ describe('An application’s page', () => {
     const table = await screen.findByRole('table', { name: 'Sets' })
     const rows = within(table)
       .getAllByRole('row')
-      .map((row) => within(row).queryAllByRole('cell').map((cell) => cell.textContent))
+      .map((row) => within(row).queryAllByRole('cell').map((cell) => spaced(cell.textContent)))
       .slice(1)
     expect(rows).toEqual([
       ['date à déterminer', '1 h 30', 'ONDES TAKEOVER', 'planifié'],
@@ -1155,7 +1155,7 @@ describe('An application’s page', () => {
       const table = await screen.findByRole('table', { name: 'Sessions' })
       const rows = within(table)
         .getAllByRole('row')
-        .map((row) => within(row).queryAllByRole('cell').map((cell) => cell.textContent))
+        .map((row) => within(row).queryAllByRole('cell').map((cell) => spaced(cell.textContent)))
         .slice(1)
       expect(rows).toEqual([
         ['date à déterminer', '4 h', 'ONDES TAKEOVER', 'planifiée'],
@@ -1627,7 +1627,7 @@ describe('Adding a set or a session from an application’s page', () => {
 
   const picker = () => screen.getByRole('combobox', { name: 'Session' })
   const go = () => screen.getByRole('button', { name: 'créer le set' })
-  const options = () => screen.queryAllByRole('option').map((option) => option.textContent)
+  const options = () => screen.queryAllByRole('option').map((option) => spaced(option.textContent))
 
   it('picks the session among the planned ones, those on the days the artist would like to play first, then leads to it with the application', async () => {
     mockFetch(WITH_SESSIONS)

@@ -169,8 +169,8 @@ function IssueGroup({ tag, heading, children }: { tag: ReactNode; heading: strin
 }
 
 // The feeds whose last read failed, which are changed in Configuration, or that haven't been read yet, each with what it
-// affects: an `occupations` feed's conflicts, and free time while there's a `holds` feed, which there's none of
-// otherwise, and a `holds` feed's free time and sessions outside protected time.
+// affects: an `occupations` feed's conflicts, and available time while there's a `holds` feed, which there's none of
+// otherwise, and a `holds` feed's available time and sessions outside protected time.
 function FeedWarnings({ feeds }: { feeds: Feed[] }) {
   const holds = feeds.some(({ kind }) => kind === 'holds')
   return feeds

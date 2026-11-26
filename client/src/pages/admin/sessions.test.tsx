@@ -6,7 +6,7 @@ import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
-import { CONFIG, held, jsonBody, mockFetch, moveWithKeyboard, requestsTo, shownTime, timeParts, typeTime, visibleText } from '../../test-utils'
+import { CONFIG, held, jsonBody, mockFetch, moveWithKeyboard, named, requestsTo, shownTime, spaced, timeParts, typeTime, visibleText } from '../../test-utils'
 import type { Body } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
@@ -118,7 +118,7 @@ const options = () =>
     .queryAllByRole('option')
     // Not those of the sets' statuses.
     .filter((option) => !option.closest('select'))
-    .map((option) => option.textContent)
+    .map((option) => spaced(option.textContent))
 
 const TRACKED = {
   createdAt: '2026-10-01T16:00:00.000Z',
@@ -261,7 +261,7 @@ const rows = (table: HTMLElement | null = screen.queryByRole('table')) =>
       within(row)
         .getAllByRole('cell')
         .filter((cell) => !cell.querySelector('.admin-handle'))
-        .map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? visibleText(cell)),
+        .map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? spaced(visibleText(cell))),
     )
 const days = () => rows().map((row) => row[0])
 
@@ -297,7 +297,7 @@ describe('The list of sessions', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()[0].slice(0, 2)).toEqual(['ven. 13 nov. 2026', '18 h – dim. 15 nov., 2 h'])
-    fireEvent.click(screen.getByRole('link', { name: 'ven. 13 nov. 2026' }))
+    fireEvent.click(screen.getByRole('link', { name: named('ven. 13 nov. 2026') }))
     expect(await screen.findByText('du vendredi 13 novembre 2026 à 18 h au dimanche 15 novembre 2026 à 2 h')).toBeInTheDocument()
     expect(value('Durée')).toHaveTextContent(/^32 h$/)
   })
@@ -308,10 +308,10 @@ describe('The list of sessions', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
-      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée', ''],
-      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée', ''],
+      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée', 'non annoncée'],
+      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée', 'non annoncée'],
       ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', 'Autre', 'Brume', 'jouée', 'annoncée'],
-      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée', ''],
+      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée', 'non annoncée'],
     ])
     // Done sessions are greyed out, and cancelled ones faded out in their own color.
     const sessionRows = screen.getAllByRole('row').slice(1)
@@ -319,7 +319,7 @@ describe('The list of sessions', () => {
     expect(sessionRows[1]).toHaveClass('admin-status-planned')
     expect(sessionRows[2]).toHaveClass('admin-status-done')
     expect(sessionRows[3]).toHaveClass('admin-status-cancelled')
-    expect(screen.getByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(screen.getByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(screen.getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-2')
     expect(screen.getAllByRole('link', { name: 'Brume' })[0]).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'Takeover' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
@@ -415,6 +415,122 @@ describe('The list of sessions', () => {
   })
 })
 
+describe('Announcing a session from the list', () => {
+  const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
+  const PUT = 'PUT /api/admin/sessions/session-1/announced'
+  const ANNOUNCED = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
+  // SOIRÉE, which is announced, un-announced.
+  const UNANNOUNCE_SOIREE = { 'PUT /api/admin/sessions/session-3/announced': { ok: true, session: { ...SESSIONS[2], announced: false } } }
+  const select = (of: string) => screen.findByRole('combobox', { name: named(`Annonce : ${of}`) })
+  const counts = (name: string) => within(screen.getByRole('group', { name })).getAllByRole('button').map((button) => button.textContent)
+
+  it('offers « non annoncée » and « annoncée », by a name that tells the sessions apart', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    const planned = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    expect(planned).toHaveValue('false')
+    expect(within(planned).getAllByRole('option').map((option) => option.textContent)).toEqual(['non annoncée', 'annoncée'])
+    expect(await select('SOIRÉE, ven. 2 oct. 2026')).toHaveValue('true')
+    expect(screen.getAllByRole('combobox').map((each) => spaced(each.getAttribute('aria-label')))).toEqual([
+      'Annonce : GUEST MIXES, date à déterminer',
+      'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026',
+      'Annonce : SOIRÉE, ven. 2 oct. 2026',
+      'Annonce : LIVE PERFORMANCE, lun. 31 août 2026',
+    ])
+  })
+
+  it("can't announce a session without a date, whose dropdown is greyed out, saying why, but keeps the focus", async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    const undated = await select('GUEST MIXES, date à déterminer')
+    expect(undated).toHaveTextContent(/^non annoncée$/)
+    expect(undated).toHaveAttribute('aria-disabled', 'true')
+    expect(undated).toHaveAttribute('aria-expanded', 'false')
+    expect(undated).not.toBeDisabled()
+    expect(undated).toHaveAccessibleDescription("La session n'a pas de date.")
+    undated.focus()
+    expect(undated).toHaveFocus()
+    fireEvent.click(undated)
+    expect(undated).toHaveFocus()
+    expect(requestsTo('PUT', '/api/admin/sessions/session-2/announced')).toHaveLength(0)
+  })
+
+  it('takes a session out of the announced ones once it is un-announced, without loading the list again', async () => {
+    mockFetch({ ...LIST, ...UNANNOUNCE_SOIREE })
+    renderAt('/admin/sessions?status=all&announced=true')
+
+    fireEvent.change(await select('SOIRÉE, ven. 2 oct. 2026'), { target: { value: 'false' } })
+
+    await waitFor(() => expect(rows()).toEqual([]))
+    expect(screen.getByText('Aucune session ne correspond à ces filtres.')).toBeInTheDocument()
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-3/announced')[0])).toEqual({ announced: false })
+    expect(requestsTo('GET', '/api/admin/sessions')).toHaveLength(1)
+    expect(counts('Annonce')).toEqual(['toutes (4)', 'annoncées (0)', 'non annoncées (4)'])
+    expect(counts('Statut')).toEqual(['toutes (0)', 'planifiées (0)', 'jouées (0)', 'annulées (0)'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&announced=true$/)
+  })
+
+  it('takes a session out of those that are not announced once it is announced', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
+    renderAt('/admin/sessions?status=all&announced=false')
+
+    fireEvent.change(await select('ONDES TAKEOVER, sam. 14 nov. 2026'), { target: { value: 'true' } })
+
+    await waitFor(() => expect(days()).toEqual(['date à déterminer', 'lun. 31 août 2026']))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
+    expect(counts('Annonce')).toEqual(['toutes (4)', 'annoncées (2)', 'non annoncées (2)'])
+  })
+
+  it('keeps a session listed among all of them, with its new value', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    fireEvent.change(changed, { target: { value: 'true' } })
+
+    await waitFor(() => expect(counts('Annonce')).toEqual(['toutes (4)', 'annoncées (2)', 'non annoncées (2)']))
+    expect(changed).toHaveValue('true')
+    expect(rows()).toHaveLength(4)
+  })
+
+  it('shows the value picked and keeps only that session from being changed while it is saved', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    const other = await select('SOIRÉE, ven. 2 oct. 2026')
+    fireEvent.change(changed, { target: { value: 'true' } })
+
+    expect(changed).toBeDisabled()
+    expect(changed).toHaveValue('true')
+    expect(other).toBeEnabled()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('true')
+  })
+
+  it('says why it could not be changed, above the list, naming the session, which keeps its value, until the next change', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: false, error: 'No such session' } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    fireEvent.change(changed, { target: { value: 'true' } })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("L'annonce de « ONDES TAKEOVER, sam. 14 nov. 2026 » n'a pas pu être changée : No such session")
+    expect(Boolean(alert.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('false')
+
+    mockFetch({ ...LIST, ...UNANNOUNCE_SOIREE })
+    const other = await select('SOIRÉE, ven. 2 oct. 2026')
+    fireEvent.change(other, { target: { value: 'false' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(other).toBeEnabled())
+  })
+})
+
 describe('The default view of the list of sessions', () => {
   // A session that's still planned, though it's past.
   const PAST = { ...SESSION, id: 'session-5', start: '2026-01-11T01:00:00.000Z', end: '2026-01-11T02:00:00.000Z', durationMinutes: 60, sets: [] }
@@ -500,7 +616,7 @@ describe('The default view of the list of sessions', () => {
 const PAGE = { ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the sets say when they add up to more than their session, if they do.
-const tooLong = () => screen.queryByText(/Les sets durent /)?.textContent ?? null
+const tooLong = () => spaced(screen.queryByText(/Les sets durent /)?.textContent ?? null)
 // What the session's record says for `label`.
 const value = (label: string) =>
   [...screen.getByLabelText('Session').querySelectorAll(':scope > dt')].find((term) => term.textContent === label)!.nextElementSibling as HTMLElement
@@ -891,7 +1007,7 @@ describe("A session's page", () => {
     expect(screen.getByLabelText('Nom')).toHaveValue('')
     expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'ONDES TAKEOVER')
     // Once RA's events are read, the session's is named by its title and its day.
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('HAUTE RIVE TAKEOVER, sam. 31 oct. 2026'))
+    await waitFor(() => expect(spaced(screen.getByRole<HTMLInputElement>('combobox', { name: 'Événement RA' }).value)).toBe('HAUTE RIVE TAKEOVER, sam. 31 oct. 2026'))
     // Offered once, by its title, rather than by its number too.
     fireEvent.click(screen.getByRole('combobox', { name: 'Événement RA' }))
     expect(options()).toEqual([
@@ -2617,7 +2733,7 @@ describe('Adding a session', () => {
     expect(found('https://ra.co/events/1234567')).toEqual([])
     expect(found(' 6683748 ')).toEqual(['PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
     fireEvent.keyDown(picker, { key: 'Enter' })
-    expect(picker).toHaveValue('PLUS TÔT, mar. 1 sept. 2026')
+    expect(spaced((picker as HTMLInputElement).value)).toBe('PLUS TÔT, mar. 1 sept. 2026')
     expect(screen.getByRole('link', { name: 'https://ra.co/events/6683748' })).toHaveAttribute('href', 'https://ra.co/events/6683748')
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))

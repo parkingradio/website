@@ -51,10 +51,10 @@ describe('Admin pages', () => {
     await waitFor(() => expect(adminMenu()).toBeInTheDocument())
     expect(within(adminMenu()).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['calendrier', '/admin/calendrier'],
-      ['rotation radio', '/admin/rotation'],
       ['candidatures', '/admin/candidatures'],
       ['sessions', '/admin/sessions'],
       ['artistes', '/admin/artistes'],
+      ['rotation radio', '/admin/rotation'],
       ['intégrations', '/admin/integrations'],
       ['admins', '/admin/admins'],
       ['configuration', '/admin/configuration'],
@@ -222,7 +222,7 @@ describe("The menu's badge on calendrier", () => {
     feeds: [{ ...FEED, id: 'team' }],
     sessions: [],
     occupations: [],
-    holds: [],
+    availability: [],
     unprotectedSessions: [],
     undatedSessions: [],
     conflicts: Array.from({ length: conflicts }, (_, i) => ({

@@ -98,22 +98,30 @@ export function StatusButtons<S extends string>({
 }
 
 // A status, as a dropdown named `label` that changes it to another of the `statuses`, each named by `labels`, e.g. in a
-// row of a list. It shows the one picked, and can't be used while it's saved, nor while `disabled`.
-export function StatusSelect<S extends string>({
-  label,
-  statuses,
-  labels,
-  status,
-  disabled = false,
-  onChange,
-}: {
+// row of a list. It shows the one picked, and can't be used while it's saved, nor while `disabled`. One that a rule keeps
+// from being used is greyed out, saying why (`unavailable`, see "Controls that can't be used" in
+// docs/design/client/admin/layout.md). A select can't be: disabled, it loses the keyboard's focus, and only
+// aria-disabled, it still opens. It's then a button that looks like one instead, and that screen readers read as one,
+// by its label and its value, which keeps the focus and has a tooltip (see button.tsx).
+export function StatusSelect<S extends string>({ unavailable, ...props }: SelectProps<S> & { unavailable?: string | null }) {
+  if (!unavailable) return <Select {...props} />
+  return (
+    <Button className="admin-status-select" role="combobox" aria-expanded={false} aria-label={props.label} unavailable={unavailable}>
+      {props.labels[props.status]}
+    </Button>
+  )
+}
+
+type SelectProps<S extends string> = {
   label: string
   statuses: readonly S[]
   labels: Record<S, string>
   status: S
   disabled?: boolean
   onChange: (status: S) => Promise<void>
-}) {
+}
+
+function Select<S extends string>({ label, statuses, labels, status, disabled = false, onChange }: SelectProps<S>) {
   const [saving, setSaving] = useState<S | null>(null)
   const locked = disabled || saving !== null
   const select = useRef<HTMLSelectElement>(null)

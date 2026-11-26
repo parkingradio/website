@@ -40,7 +40,7 @@ design: when they disagree, these documents still win.
 | [Applications](server/applications.md) | Artists' and collectives' applications, applying through the form, and the emails about them |
 | [Sessions](server/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings on SoundCloud and YouTube |
 | [Events](server/events.md) | The public schedule: the announced sessions, as events, with their sets, and their calendar feed |
-| [Calendar](server/calendar.md) | The studio's calendar, with its conflicts, the occupations that take the studio besides sessions, the holds that protect its time for sessions, and the calendar feeds they're read from |
+| [Calendar](server/calendar.md) | The studio's calendar, with its conflicts, its available time, the occupations that take the studio besides sessions, the holds that protect its time for sessions, and the calendar feeds they're read from |
 | [Admins' calendars](server/admin-calendars.md) | Admins' calendars of the sessions and of the occupations, which they subscribe to in their calendar apps, and the token in their links |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
@@ -64,12 +64,12 @@ design: when they disagree, these documents still win.
 | [Contribuer](client/contribuer.md) | Donations |
 | [Page introuvable](client/not-found.md) | Any URL that isn't one of the site's pages |
 | [Admin](client/admin/layout.md) | What every admin page shares: logging in, the menu |
-| [Calendrier](client/admin/calendrier.md) | The studio's calendar: sessions and occupations, its free time, their conflicts, the sessions outside protected time, and the sessions without a date |
-| [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
+| [Calendrier](client/admin/calendrier.md) | The studio's calendar: sessions and occupations, its available time, their conflicts, the sessions outside protected time, and the sessions without a date |
 | [Candidatures](client/admin/candidatures.md) | Going through applications |
 | [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |
 | [Publier sur RA](client/admin/publier-sur-ra.md) | Creating a session's event on Resident Advisor, with a bookmarklet |
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
+| [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Intégrations](client/admin/integrations.md) | Connecting Claude, the admin's connected apps, and the RA bookmarklet |
 | [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin |
 | [Admins](client/admin/admins.md) | Who can access the admin pages |

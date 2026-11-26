@@ -48,6 +48,11 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   const undated = rowsOf(page, 'LES SŒURS ONDES TAKEOVER')
   await expect(undated).toContainText('date à déterminer')
   await expect(undated).toContainText('3 h')
+  // Which can't be announced, which its greyed-out dropdown says.
+  const undatedAnnounced = undated.getByRole('combobox', { name: /^Annonce : / })
+  await expect(undatedAnnounced).toHaveText('non annoncée')
+  await expect(undatedAnnounced).toHaveAttribute('aria-disabled', 'true')
+  await expect(undatedAnnounced).toHaveAccessibleDescription("La session n'a pas de date.")
   await undated.getByRole('link', { name: 'date à déterminer' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'LES SŒURS ONDES TAKEOVER' })).toBeVisible()
   const sets = page.getByRole('table', { name: 'Sets' })
@@ -60,9 +65,9 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   // The one over three days, which says the day it ends on, in the list and on its page.
   await search.fill('marathon modulaire')
   const marathon = rowsOf(page, 'MARATHON MODULAIRE')
-  await expect(marathon).toContainText(/18 h – \S+\. \d+ \S+, \d+ h/)
+  await expect(marathon).toContainText(/18\sh\s– \S+\.\s\d+\s\S+, \d+\sh/)
   await marathon.getByRole('link').first().click()
-  await expect(value(page, 'Quand')).toHaveText(/^du .+ à 18 h au .+ à \d+ h$/)
+  await expect(value(page, 'Quand')).toHaveText(/^du .+ à 18\sh au .+ à \d+\sh$/)
   await expect(value(page, 'Durée')).toHaveText('31 h')
   await page.goBack()
 
@@ -71,7 +76,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^annulées/ }).click()
   await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annulée')
   // Which stays announced.
-  await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annoncée')
+  await expect(rowsOf(page, 'Les Nuits Basses').getByRole('combobox', { name: /^Annonce : / })).toHaveValue('true')
 
   // Those of the other types, among which a synth meetup, which has no sets: the one that's been played.
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
@@ -453,7 +458,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   // Its event on RA, found by its number, exactly.
   await page.getByRole('combobox', { name: 'Événement RA' }).fill('1234567')
   await expect(page.getByRole('option')).toHaveCount(1)
-  await page.getByRole('option', { name: /^GUEST MIXES, sam\. 10 oct\. 2026/ }).click()
+  await page.getByRole('option', { name: /^GUEST MIXES, sam\.\s10\soct\.\s2026/ }).click()
   await expect(page.getByRole('link', { name: 'https://ra.co/events/1234567' })).toBeVisible()
 
   // Its sets, listed in its form until it's added, each for an hour, of the 2 h 30 the session lasts, unless it's changed,
@@ -567,7 +572,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
 
   // Moved to another day, its end with it, its sets in their order.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
-  await expect(page.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('GUEST MIXES, sam. 10 oct. 2026')
+  await expect(page.getByRole('combobox', { name: 'Événement RA' })).toHaveValue(/^GUEST MIXES, sam\.\s10\soct\.\s2026$/)
   await dayInput(page, 'Début').fill(otherDay)
   await expect(dayInput(page, 'Fin')).toHaveValue(addDays(otherDay, 1))
   await page.getByRole('button', { name: 'enregistrer' }).click()
@@ -586,13 +591,24 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await adminMenu(page).getByRole('link', { name: 'sessions' }).click()
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill(unique)
   const row = page.getByRole('row').filter({ has: page.locator(`a[href="${sessionPage}"]`) })
+  const rowAnnounced = row.getByRole('combobox', { name: /^Annonce : / })
   await expect(row).toContainText(mine.artist.name)
-  await expect(row).toContainText('annoncée')
+  await expect(rowAnnounced).toHaveValue('true')
   const announced = page.getByRole('group', { name: 'Annonce' })
   await announced.getByRole('button', { name: /^non annoncées/ }).click()
   await expect(row).toHaveCount(0)
   await announced.getByRole('button', { name: /^annoncées/ }).click()
   await expect(row).toHaveCount(1)
+  // Un-announced from its row, which takes it out of the announced sessions, then announced again from its row among
+  // those that aren't.
+  await rowAnnounced.selectOption('false')
+  await expect(row).toHaveCount(0)
+  await announced.getByRole('button', { name: /^non annoncées/ }).click()
+  await expect(rowAnnounced).toHaveValue('false')
+  await rowAnnounced.selectOption('true')
+  await expect(row).toHaveCount(0)
+  await announced.getByRole('button', { name: /^annoncées/ }).click()
+  await expect(rowAnnounced).toHaveValue('true')
   await page.goto(`/admin/artistes/${mine.artist.id}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
 
@@ -682,7 +698,7 @@ test("a set is moved to another session from its row, which says where it went, 
   await notice.getByRole('link').click()
   await expect(page.getByRole('heading', { level: 1, name: `E2E ${unique} ARRIVÉE` })).toBeVisible()
   await expect(sets.getByRole('row')).toHaveCount(3)
-  await expect(page.getByText(/^\u26a0\ufe0e Les sets durent 2 h, plus que la session \(1 h\)\.$/)).toBeVisible()
+  await expect(page.getByText(/^\u26a0\ufe0e Les sets durent 2\sh, plus que la session \(1\sh\)\.$/)).toBeVisible()
 
   // Once that session is cancelled, the set that's left can't be moved there, which its button says.
   expect((await page.request.put(`/api/admin/sessions/${joined.id}/status`, { data: { status: 'cancelled' } })).ok()).toBe(true)

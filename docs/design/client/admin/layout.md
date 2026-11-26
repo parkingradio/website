@@ -20,10 +20,10 @@ The admin pages keep the site's navigation bar. Under it, a menu lists the secti
 logged-in admin's email and a "se déconnecter" button:
 
 - [Calendrier](calendrier.md)
-- [Rotation radio](rotation.md)
 - [Candidatures](candidatures.md)
 - [Sessions](sessions.md)
 - [Artistes](artistes.md)
+- [Rotation radio](rotation.md)
 - [Intégrations](integrations.md)
 - [Admins](admins.md)
 - [Configuration](configuration.md)
@@ -43,7 +43,9 @@ The admin pages show "-" in place of what an admin left out of an artist's or a 
 the country, when the other one is, and in place of a collective's genres when its artists have none.
 
 The admin pages show dates and times in Québec time, whatever the browser's time zone, since that's where Parking Radio
-is (see [Times, in Conventions](../../server/README.md#conventions)), and take them in Québec time too.
+is (see [Times, in Conventions](../../server/README.md#conventions)), and take them in Québec time too. Times, durations
+and short days never break across lines, e.g. "11 h 30", "45 min" or "mer. 2 déc.": lines only break between them, and
+"–" and "→" stay with what comes before them, as in "15 h – mer. 2 déc., 11 h".
 
 ## Searching lists
 

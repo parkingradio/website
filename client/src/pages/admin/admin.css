@@ -471,8 +471,12 @@
 
 /* A status, as a dropdown that changes it in a list's row, e.g. an application's: a pill, with its own arrow, in the
    color and the weight of the row's text, which overflows into its cell's padding (see `.admin-table-controls`). Its
-   line height is set since, otherwise, Chrome makes it a pixel taller the first time it's hovered or focused. */
-.admin-status-select {
+   line height is set since, otherwise, Chrome makes it a pixel taller the first time it's hovered or focused. The
+   button that stands in for one that can't be used (see list-controls.tsx) looks the same, rather than like the pills
+   that `.admin button` makes, even when hovered, since it's greyed out. */
+.admin-status-select,
+.admin button.admin-status-select,
+.admin button.admin-status-select[aria-disabled='true']:hover {
   appearance: none;
   margin-block: calc(-4.5px - 1px);
   padding: 4.5px 24px 4.5px 10px;
@@ -486,6 +490,12 @@
   color: inherit;
   font: inherit;
   line-height: 16px;
+  /* For its stand-in, which would otherwise wrap in a narrow column, where a select doesn't. */
+  white-space: nowrap;
+}
+
+/* Only the dropdown itself, since its stand-in is always greyed out. */
+select.admin-status-select {
   cursor: pointer;
 }
 
@@ -1029,7 +1039,9 @@ tr[data-dragging] > td {
   }
 
   /* At least 16px, or iOS zooms into the page when it gets focus, with its taller line overflowing too. */
-  .admin-status-select {
+  .admin-status-select,
+  .admin button.admin-status-select,
+  .admin button.admin-status-select[aria-disabled='true']:hover {
     margin-block: calc(-4.5px - 1px - 2px);
     font-size: 16px;
     line-height: 20px;

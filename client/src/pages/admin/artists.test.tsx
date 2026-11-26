@@ -6,7 +6,7 @@ import App from '../../app'
 import type { Artist, Profile } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
-import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, named, requestsTo, spaced } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
 beforeAll(() => import('./admin-pages'))
@@ -182,7 +182,7 @@ const rows = () =>
   screen
     .queryAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+    .map((row) => within(row).getAllByRole('cell').map((cell) => spaced(cell.textContent)))
 const names = () => rows().map((row) => row[0])
 
 // Searches for `query`, and waits for the list to show `found`, by their first column.
@@ -472,7 +472,7 @@ describe('An artist’s page', () => {
     renderAt('/admin/artistes/artist-1')
 
     const table = await screen.findByRole('table', { name: 'Candidatures' })
-    expect(within(table).getByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(within(table).getByRole('link', { name: named('planifiée : ONDES TAKEOVER, sam. 12 sept. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
   })
 
   it('only shows the statuses that admins decide, even with sets, all of them cancelled', async () => {
@@ -620,7 +620,7 @@ describe('An artist’s page', () => {
       within(table)
         .getAllByRole('row')
         .slice(1)
-        .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent)),
+        .map((row) => within(row).getAllByRole('cell').map((cell) => spaced(cell.textContent))),
     ).toEqual([['sam. 14 nov. 2026', '1 h', 'ONDES TAKEOVER', 'Aurore, Brume', 'DJ', '-', 'Candidature', 'annulé']])
     expect(within(table).getByRole('link', { name: 'Candidature reçue le 5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-cancelled')

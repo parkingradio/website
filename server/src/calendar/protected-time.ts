@@ -1,8 +1,8 @@
 import type { CalendarSession, Period } from './conflicts.js'
 import { takesSomeOf } from './conflicts.js'
 
-// The time that's protected for sessions, from the holds of the `holds` feeds, and the sessions outside it (see "Protected
-// time" in docs/design/server/calendar.md).
+// The time that's protected for sessions, from the holds of the `holds` feeds, the sessions outside it, and the
+// available time (see "Protected time" and "Availability" in docs/design/server/calendar.md).
 
 type Span = { start: Date; end: Date }
 
@@ -43,4 +43,27 @@ export function unprotectedSessions<Session extends CalendarSession>(
   // Since the periods don't overlap or follow each other, what's protected is within a single one of them.
   const isProtected = (start: Date, end: Date) => periods.some((period) => period.start <= start && end <= period.end)
   return judged.filter(({ start, end }) => !isProtected(start > now ? start : now, end)).sort((a, b) => a.start.getTime() - b.start.getTime())
+}
+
+// The available time of `window`, the 365 days from today: the time `holds` protect, of any feeds, that nothing of
+// `taking` takes, as stretches that don't overlap or follow each other, by start, cut only at the window's edges.
+// `taking` is what takes the studio: the sessions that aren't cancelled, with a start, and the occupations.
+export function availableTime(holds: Span[], taking: Span[], window: Period): Span[] {
+  const { from, to } = window
+  // Only what takes some of the window, rather than all that reads keep, from a year before them to two years after.
+  const inWindow = takesSomeOf(window)
+  const taken = taking.filter(inWindow).sort((a, b) => a.start.getTime() - b.start.getTime())
+  const stretches: Span[] = []
+  for (const period of protectedTime(holds.filter(inWindow))) {
+    const end = period.end < to ? period.end : to
+    // From when the period is available, as far as what's taken so far goes.
+    let availableFrom = period.start > from ? period.start : from
+    for (const { start, end: takenUntil } of taken) {
+      if (availableFrom >= end || start >= end) break
+      if (start > availableFrom) stretches.push({ start: availableFrom, end: start })
+      if (takenUntil > availableFrom) availableFrom = takenUntil
+    }
+    if (availableFrom < end) stretches.push({ start: availableFrom, end })
+  }
+  return stretches
 }

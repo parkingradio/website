@@ -32,7 +32,7 @@ export const takesSomeOf =
     start !== null && end !== null && start < end && end > from && start < to
 
 // By start, then end.
-export const byStartThenEnd = (a: { start: Date; end: Date }, b: { start: Date; end: Date }) =>
+const byStartThenEnd = (a: { start: Date; end: Date }, b: { start: Date; end: Date }) =>
   a.start.getTime() - b.start.getTime() || a.end.getTime() - b.end.getTime()
 
 // The order of things: by start, then end, then sessions before occupations, and sessions by id. Occupations that are
@@ -46,15 +46,20 @@ export function thingOrder(a: Thing, b: Thing): number {
   )
 }
 
+// What takes the studio, among `sessions` and `occupations`: the sessions with a start that aren't cancelled, done ones
+// too, and the occupations.
+export function takingThings(sessions: CalendarSession[], occupations: OccupationThing[]): Thing[] {
+  const counted = sessions.flatMap(({ id, title, start, end, status }) =>
+    start && end && status !== 'cancelled' ? [{ kind: 'session' as const, id, title, start, end, status }] : [],
+  )
+  return [...counted, ...occupations]
+}
+
 // The conflicts of `sessions` and `occupations` whose overlap takes some of `window`: by start, then end, then the places
 // of their two things in the order of things (see `thingOrder`), each conflict's things in that order too.
 export function conflicts(sessions: CalendarSession[], occupations: OccupationThing[], window: Period): Conflict[] {
-  const inWindow = takesSomeOf(window)
-  const counted: Thing[] = sessions.flatMap(({ id, title, start, end, status }) =>
-    start && end && status !== 'cancelled' ? [{ kind: 'session' as const, id, title, start, end, status }] : [],
-  )
   // The overlap of two things takes some of the window exactly when they overlap, and each one takes some of it.
-  const things = [...counted, ...occupations].filter(inWindow).sort(thingOrder)
+  const things = takingThings(sessions, occupations).filter(takesSomeOf(window)).sort(thingOrder)
 
   // Going through the things in order, each one overlaps the things before it that haven't ended yet, which started at
   // the same time as it, or before.

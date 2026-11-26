@@ -1,0 +1,26 @@
+import { useState } from 'react'
+import type { ReactNode } from 'react'
+import { api } from '../../api/client'
+import type { Session } from '../../session-fields'
+import { sessionName } from './describe'
+import type { Announced } from './describe'
+import { failure } from './session-errors'
+
+// Announcing sessions of a list, or un-announcing them, from their rows: `current` gives the sessions loaded as the
+// changes left them, `announce` changes one, and `error` says why the last change couldn't be made, if it couldn't.
+export function useAnnouncing() {
+  const [changed, setChanged] = useState<Record<string, Session>>({})
+  const [error, setError] = useState<ReactNode>(null)
+  return {
+    current: (sessions: Session[]) => sessions.map((session) => changed[session.id] ?? session),
+    error,
+    async announce(session: Session, announced: Announced) {
+      setError(null)
+      const result = await api.PUT('/api/admin/sessions/{id}/announced', { params: { path: { id: session.id } }, body: { announced: announced === 'true' } })
+      if (result.ok) setChanged((changed) => ({ ...changed, [session.id]: result.session }))
+      else setError(failure(`L'annonce de «\u00a0${sessionName(session)}\u00a0» n'a pas pu être changée`, result, session.id))
+    },
+  }
+}
+
+export type Announcing = ReturnType<typeof useAnnouncing>
