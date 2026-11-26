@@ -242,6 +242,9 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
   return found
 }
 
+// Whether a session with a start has ended at `now`: it's past from its end on, which its period excludes.
+export const hasEnded = (now: Date) => sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
+
 // The sessions that match `where`, in the order of `list`, or only the first `limit` of them, with their takeovers and
 // their sets.
 export async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<StoredSession[]> {

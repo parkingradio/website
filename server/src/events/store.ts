@@ -4,7 +4,7 @@ import { RECENT_PAST_EVENTS } from '../api/formats.js'
 import { keyNamed } from '../artists/keys.js'
 import type { Queryable } from '../db/connection.js'
 import { collectiveMembers, sessions, setPerformers, sets } from '../db/schema.js'
-import { sessionsWhere } from '../sessions/store.js'
+import { hasEnded, sessionsWhere } from '../sessions/store.js'
 import type { StoredSession } from '../sessions/store.js'
 
 // What's public: the events, which are the announced sessions, and the artists and collectives they make public (see
@@ -13,13 +13,9 @@ import type { StoredSession } from '../sessions/store.js'
 // Whether a session is an event.
 const isEvent = eq(sessions.announced, true)
 
-// Whether an event's end has passed at `now`. An event always has a start, and it's past from its end on, which its period
-// excludes.
-const hasEnded = (now: Date) => sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
-
-// Whether a session is in a calendar of sessions at `now`, the public events' feed or an admin's calendar: it has a
-// start, and it starts at most a year before `now`, or its end hasn't passed then.
-export function inFeed(now: Date): SQL {
+// Whether a session is in the public events' feed at `now`, if it's an event: it has a start, and it starts at most a year
+// before `now`, or its end hasn't passed then.
+function inFeed(now: Date): SQL {
   const since = new Date(now)
   since.setUTCFullYear(since.getUTCFullYear() - 1)
   return and(isNotNull(sessions.startAt), or(gte(sessions.startAt, since), not(hasEnded(now))))!

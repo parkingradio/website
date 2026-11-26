@@ -45,12 +45,12 @@ export function unprotectedSessions<Session extends CalendarSession>(
   return judged.filter(({ start, end }) => !isProtected(start > now ? start : now, end)).sort((a, b) => a.start.getTime() - b.start.getTime())
 }
 
-// The available time of `window`, the 365 days from today: the time `holds` protect, of any feeds, that nothing of
-// `taking` takes, as stretches that don't overlap or follow each other, by start, cut only at the window's edges.
-// `taking` is what takes the studio: the sessions that aren't cancelled, with a start, and the occupations.
+// The available time of `window`: the time `holds` protect, of any feeds, that nothing of `taking` takes, as stretches
+// that don't overlap or follow each other, by start, cut only at the window's edges. `taking` is what takes the studio:
+// the sessions that aren't cancelled, with a start, and the occupations.
 export function availableTime(holds: Span[], taking: Span[], window: Period): Span[] {
   const { from, to } = window
-  // Only what takes some of the window, rather than all that reads keep, from a year before them to two years after.
+  // Only what takes some of the window.
   const inWindow = takesSomeOf(window)
   const taken = taking.filter(inWindow).sort((a, b) => a.start.getTime() - b.start.getTime())
   const stretches: Span[] = []

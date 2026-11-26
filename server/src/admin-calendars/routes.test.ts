@@ -56,6 +56,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.clearAllMocks()
   feeds.list.mockImplementation(async () => FEEDS)
   read.clear()
@@ -80,6 +81,9 @@ async function buildApp() {
 }
 
 const PATHS = ['/sessions.ics', '/occupations.ics', '/availability.ics']
+
+// An event read from a feed.
+const span = (start: string, end: string, { title = '', wholeDay = false } = {}) => ({ start: new Date(start), end: new Date(end), wholeDay, title })
 
 describe('the calendars', () => {
   it("refuse requests whose token isn't an admin's, before anything else is read, without quoting the token", async () => {
@@ -124,13 +128,23 @@ describe('GET /sessions.ics', () => {
     expect(response.headers['cache-control']).toBe('no-store')
   })
 
-  it('has the sessions of the calendar at the time of the request', async () => {
+  it('has the sessions that end after a year back, 00:00 on the day 365 days before today, in Québec', async () => {
     const app = await buildApp()
-    const before = Date.now()
-    await app.inject({ method: 'GET', url: `/sessions.ics?token=${TOKEN}` })
-    const [[now]] = store.sessions.mock.calls
-    expect(now.getTime()).toBeGreaterThanOrEqual(before)
-    expect(now.getTime()).toBeLessThanOrEqual(Date.now())
+    vi.useFakeTimers({ toFake: ['Date'] })
+    for (const [now, since] of [
+      ['2026-11-19T15:30:00Z', '2025-11-19T05:00:00Z'],
+      // 22:00 on November 19th in Québec, already the 20th in UTC.
+      ['2026-11-20T03:00:00Z', '2025-11-19T05:00:00Z'],
+      // In summer, when Québec is 4 hours behind UTC.
+      ['2026-07-01T12:00:00Z', '2025-07-01T04:00:00Z'],
+      // After February 29th, 365 days back isn't the same date.
+      ['2028-03-01T17:00:00Z', '2027-03-02T05:00:00Z'],
+    ]) {
+      vi.setSystemTime(new Date(now))
+      store.sessions.mockClear()
+      await app.inject({ method: 'GET', url: `/sessions.ics?token=${TOKEN}` })
+      expect(store.sessions, now).toHaveBeenCalledExactlyOnceWith(new Date(since))
+    }
   })
 })
 
@@ -187,6 +201,27 @@ describe('GET /occupations.ics', () => {
     expect(response.body).toContain('SUMMARY:Gardé (Airbnb)\r\n')
   })
 
+  it('only has the occupations that end after a year back, whole, as far ahead as reads keep them', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    // Thursday, November 19th, 2026, at 10:30 in Québec: a year back is 00:00 on November 19th, 2025.
+    vi.setSystemTime(new Date('2026-11-19T15:30:00Z'))
+    read.set('feed-0', {
+      events: [
+        span('2025-11-19T03:00:00Z', '2025-11-19T05:00:00Z', { title: 'Until then' }),
+        span('2025-11-19T04:00:00Z', '2025-11-19T05:01:00Z', { title: 'Across' }),
+        span('2025-11-18T05:00:00Z', '2025-11-19T05:00:00Z', { title: 'The day before', wholeDay: true }),
+        span('2025-11-19T05:00:00Z', '2025-11-20T05:00:00Z', { title: 'That day', wholeDay: true }),
+        span('2028-11-01T14:00:00Z', '2028-11-01T16:00:00Z', { title: 'Far ahead' }),
+      ],
+      readAt: new Date(),
+      error: null,
+    })
+    read.set('feed-1', { events: [], readAt: new Date(), error: null })
+    const body = (await get()).body
+    expect([...body.matchAll(/\r\nSUMMARY:(.+) \(Séjours\)\r\n/g)].map(([, title]) => title)).toEqual(['Across', 'That day', 'Far ahead'])
+    expect(body).toContain('DTSTART:20251119T040000Z\r\n')
+  })
+
   it('gives an empty calendar without any feed', async () => {
     feeds.list.mockResolvedValueOnce([])
     const response = await get()
@@ -200,7 +235,6 @@ describe('GET /availability.ics', () => {
   const NOW = new Date('2026-11-19T15:30:00Z')
   const TODAY = new Date('2026-11-19T05:00:00Z')
   const LOFT: StoredFeed = { ...FEEDS[0], id: 'feed-loft', name: 'Loft', kind: 'holds', link: 'https://calendar.example/loft.ics' }
-  const span = (start: string, end: string) => ({ start: new Date(start), end: new Date(end), wholeDay: false, title: '' })
   const get = async () => (await buildApp()).inject({ method: 'GET', url: `/availability.ics?token=${TOKEN}` })
   // The stretches of the calendar, as their DTSTART and DTEND.
   const stretches = (body: string) =>
@@ -216,10 +250,6 @@ describe('GET /availability.ics', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(NOW)
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   it('gives an empty calendar right away without any `holds` feed, even before the feeds of occupations are read', async () => {
@@ -249,7 +279,7 @@ describe('GET /availability.ics', () => {
     expect(response.statusCode).toBe(200)
   })
 
-  it('gives the available time of the year ahead, from 00:00 today, as the calendar has it for those days, with stretches across midnight whole', async () => {
+  it('gives the available time until the end of the year ahead, with stretches across midnight whole, the one across 00:00 today too', async () => {
     readAll({
       holds: [
         span('2026-11-18T23:00:00Z', '2026-11-19T20:00:00Z'),
@@ -258,12 +288,26 @@ describe('GET /availability.ics', () => {
       ],
     })
     const body = (await get()).body
-    // The first from 00:00 today, the part that's over too, the second across midnight in one, the last until the year ahead's end.
-    expect(stretches(body)).toEqual(['20261119T050000Z–20261119T200000Z', '20261121T020000Z–20261122T200000Z', '20271118T050000Z–20271119T050000Z'])
-    // The calendar of the year ahead's days.
+    // The first from yesterday, across 00:00 today, the second across midnight in one, the last until the year ahead's end.
+    expect(stretches(body)).toEqual(['20261118T230000Z–20261119T200000Z', '20261121T020000Z–20261122T200000Z', '20271118T050000Z–20271119T050000Z'])
+    // The sessions of the year ahead's days, and those that take the studio from two years back, which the available time
+    // is worked out from, so that the stretch going on a year back is whole.
     const yearAhead = { from: TODAY, to: new Date('2027-11-19T05:00:00Z') }
-    expect(sessions.forCalendar).toHaveBeenCalledExactlyOnceWith(yearAhead, yearAhead)
+    expect(sessions.forCalendar).toHaveBeenCalledExactlyOnceWith(yearAhead, { from: new Date('2024-11-19T05:00:00Z'), to: yearAhead.to })
     expect(body).toContain('DTSTAMP:20261119T153000Z')
+  })
+
+  it('keeps the stretches that end after a year back, 00:00 on November 19th, 2025, whole, and leaves out the others', async () => {
+    readAll({ holds: [span('2025-11-18T20:00:00Z', '2025-11-19T20:00:00Z'), span('2025-11-17T14:00:00Z', '2025-11-17T16:00:00Z')] })
+    // A done session, a year and a day ago, cuts the stretch across a year back, which starts after it.
+    rows = [storedSession({ id: 'done', startAt: new Date('2025-11-18T21:00:00Z'), durationMinutes: 60, status: 'done' })]
+    expect(stretches((await get()).body)).toEqual(['20251118T220000Z–20251119T200000Z'])
+    // One that ends a year back exactly is left out, while one that ends a minute later is there.
+    rows = []
+    readAll({ holds: [span('2025-11-18T20:00:00Z', '2025-11-19T05:00:00Z')] })
+    expect(stretches((await get()).body)).toEqual([])
+    readAll({ holds: [span('2025-11-18T20:00:00Z', '2025-11-19T05:01:00Z')] })
+    expect(stretches((await get()).body)).toEqual(['20251118T200000Z–20251119T050100Z'])
   })
 
   it("is taken by occupations, and by sessions that aren't cancelled, done ones and one going on now too", async () => {

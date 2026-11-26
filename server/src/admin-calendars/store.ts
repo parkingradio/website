@@ -1,11 +1,10 @@
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, not, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { TOKEN_FORMAT, randomToken } from '../core/tokens.js'
 import type { Queryable } from '../db/connection.js'
-import { users } from '../db/schema.js'
+import { sessions, users } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { inFeed } from '../events/store.js'
-import { sessionsWhere } from '../sessions/store.js'
+import { hasEnded, sessionsWhere } from '../sessions/store.js'
 import type { StoredSession } from '../sessions/store.js'
 
 // The tokens of admins' calendars, and the sessions of their calendar of sessions (see
@@ -20,9 +19,8 @@ export type AdminCalendarsStore = {
   replace(adminId: string): Promise<string | null>
   // Whether `token` is an admin's.
   isToken(token: string): Promise<boolean>
-  // The sessions of the calendar of sessions at `now` (see `inFeed` in events/store.ts), whatever their status, announced or
-  // not, in any order.
-  sessions(now: Date): Promise<StoredSession[]>
+  // The sessions with a start that end after `since`, whatever their status, announced or not, in any order.
+  sessions(since: Date): Promise<StoredSession[]>
 }
 
 export function adminCalendarsStore(db: Queryable): AdminCalendarsStore {
@@ -45,6 +43,6 @@ export function adminCalendarsStore(db: Queryable): AdminCalendarsStore {
       return row !== undefined
     },
 
-    sessions: (now) => sessionsWhere(db, inFeed(now)),
+    sessions: (since) => sessionsWhere(db, and(isNotNull(sessions.startAt), not(hasEnded(since)))),
   }
 }

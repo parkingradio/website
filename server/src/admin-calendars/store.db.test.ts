@@ -141,24 +141,32 @@ async function change(url: string, payload: object) {
 }
 
 describe('AdminCalendarsStore.sessions', () => {
-  const now = new Date('2026-11-14T21:00-05:00')
-  const idsOf = async (at = now) => (await store.sessions(at)).map(({ id }) => id).toSorted()
+  const since = new Date('2025-11-14T00:00-05:00')
+  const idsOf = async () => (await store.sessions(since)).map(({ id }) => id).toSorted()
 
-  it('has the sessions that start at most a year before `now`, whatever their status, announced or not, but not those without a start', async () => {
-    await createSession('2025-11-14T20:59-05:00', 1)
+  it('has the sessions that end after `since`, whatever their status, announced or not, however far ahead, but not those without a start', async () => {
+    // One that ends at `since`, exactly, cancelled, so that another can take its time.
+    await change(`/api/admin/sessions/${await createSession('2025-11-13T23:00-05:00', 60)}/status`, { status: 'cancelled' })
     await createSession(null)
-    const ids = [await createSession('2026-11-14T22:00-05:00'), await createSession('2025-11-14T21:00-05:00'), await createSession('2026-06-01T21:00-04:00')]
+    const ids = [
+      // One that ends a minute after `since`, and one that starts then.
+      await createSession('2025-11-13T23:00-05:00', 61),
+      await createSession('2025-11-14T00:01-05:00'),
+      await createSession('2026-06-01T21:00-04:00'),
+      await createSession('2990-01-01T21:00-05:00'),
+    ]
     await change(`/api/admin/sessions/${ids[0]}/announced`, { announced: true })
     await change(`/api/admin/sessions/${ids[1]}/status`, { status: 'cancelled' })
     await change(`/api/admin/sessions/${ids[2]}/status`, { status: 'done' })
     expect(await idsOf()).toEqual(ids.toSorted())
   })
 
-  it('has a session that started more than a year before `now` while it has not ended', async () => {
+  it('has a session that started long before `since`, whole, while it has not ended then', async () => {
     // Two years long, until January 1st, 2027, at 21:00.
     const id = await createSession('2025-01-01T21:00-05:00', 2 * 365 * 24 * 60)
-    expect(await idsOf()).toEqual([id])
-    expect(await idsOf(new Date('2027-02-01T00:00-05:00'))).toEqual([])
+    const [session] = await store.sessions(since)
+    expect(session.id).toBe(id)
+    expect(session.startAt).toEqual(new Date('2025-01-01T21:00-05:00'))
   })
 })
 

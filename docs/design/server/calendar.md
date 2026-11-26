@@ -163,16 +163,16 @@ by start.
 
 ## Availability
 
-**Available time** is the protected time of [the year ahead](#the-calendar) that nothing takes: no session that isn't
-cancelled, done ones included, and no occupation. The part of today that's over is in it too, so apps shouldn't suggest
-it. It's in stretches, cut only at the ends of the year ahead, not e.g. at midnight: two stretches never overlap or
-follow each other.
+**Available time** is the protected time that nothing takes: no session that isn't cancelled, done ones included, and no
+occupation. It's in stretches, not cut e.g. at midnight: two stretches never overlap or follow each other. The calendar
+works it out over [the year ahead](#the-calendar), so its stretches are cut at its ends, and the part of today that's
+over is in it too, so apps shouldn't suggest it.
 
 Available time is where sessions can go: a session placed within a stretch is within protected time, and overlaps
 nothing. It doesn't include the time a session takes itself: a session that's moved can go within its own time and the
 available time around it. The calendar gives the stretches that take some of the days asked for, each with its `start`
 and `end`, whole, e.g. one that goes on after the last day: to see where a session can go, apps ask for the calendar of
-the days it would take. Admins also subscribe to it in their calendar apps (see
+the days it would take. Admins also subscribe to it in their calendar apps, from a year back (see
 [`GET /availability.ics`, in Admins' calendars](admin-calendars.md#get-availabilityics)).
 
 ## Sessions without a date
