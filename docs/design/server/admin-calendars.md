@@ -69,8 +69,8 @@ with the day after the last one as `DTEND`. Text values are escaped and folded a
 ## `GET /sessions.ics`
 
 The sessions with a start, whatever their status, announced or not, that end after a year back (see
-[A year back, in Conventions](README.md#conventions)), however far ahead. Sessions without a start aren't in it. Each one
-is a `VEVENT` with:
+[A year back, in Conventions](README.md#conventions)), however far ahead. Sessions without a start aren't in it. Each
+one is a `VEVENT` with:
 
 | Property | Value |
 |---|---|

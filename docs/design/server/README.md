@@ -26,10 +26,10 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   offset, e.g. an application's `dates` and `timeSlots`. RA events' `start` and `end` are instants too: Resident Advisor
   gives them as local times, which the server reads in the time zone of the event's venue (see
   [RA events](ra-events.md#times)).
-- **A year back.** The calendars that calendar apps subscribe to, [`GET /calendar.ics`](events.md#get-calendarics) and
-  [the admins'](admin-calendars.md), go back to 00:00 on the day 365 days before the request's, in Québec, which is a
-  year back. They have what ends after then, whole, even when it started before, so that calendar apps keep the past
-  year. How far ahead each one goes is in its section.
+- **A year back.** For the calendars that calendar apps subscribe to, [`GET /calendar.ics`](events.md#get-calendarics)
+  and [the admins'](admin-calendars.md), a year back is 00:00 on the day 365 days before the request's, in Québec. They
+  have what ends after it, whole, even when it started before, so that calendar apps keep the past year. How far ahead
+  each one goes is in its section.
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Names.** The API's paths, query parameters and fields, and the values they take from fixed lists (e.g. statuses,
