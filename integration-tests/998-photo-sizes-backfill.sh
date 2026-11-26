@@ -25,7 +25,7 @@ request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Rattrapage"}
 expect_status 200
 artist="$(body_id)"
 key="$(sql "select photo_key from artists where id = '${artist}'")"
-docker exec "$CONTAINER" rm "/tmp/private-bucket/${key}.w320.webp"
+docker exec "$CONTAINER" rm "/tmp/private-bucket/${key}.w320.v2.webp"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${artist}/photo?width=320"
 expect_status 404
 expect_body_contains '"error":"The photo of this artist has no size 320 pixels wide"'

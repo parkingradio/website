@@ -114,12 +114,13 @@ expect_output() {
 # sessions' (their flyers), in the directory that stands in for the private bucket, without their sizes (see
 # `sizes_on_disk`).
 photos_on_disk() {
-    _files_on_disk "${1:-artists}" | grep -cvE '\.w[0-9]+\.webp$' || true
+    _files_on_disk "${1:-artists}" | grep -cvE '\.w[0-9]+\.v2\.webp$' || true
 }
 
-# sizes_on_disk [<folder>] -- how many sizes of photos the server keeps in a folder, like `photos_on_disk`.
+# sizes_on_disk [<folder>] -- how many sizes of photos the server keeps in a folder, like `photos_on_disk`, by the end of
+# their keys (see `sizeName` in server/src/artists/sizes.ts).
 sizes_on_disk() {
-    _files_on_disk "${1:-artists}" | grep -cE '\.w[0-9]+\.webp$' || true
+    _files_on_disk "${1:-artists}" | grep -cE '\.w[0-9]+\.v2\.webp$' || true
 }
 
 _files_on_disk() {
@@ -134,7 +135,7 @@ content_name() {
 }
 
 # flyer_path <file> -- the path under which the public gets the sizes of a flyer that's this file, e.g.
-# `<path>/w320.webp`: it's named after its content.
+# `<path>/w320.v2.webp`: it's named after its content.
 flyer_path() {
     printf '/api/events/flyers/%s' "$(content_name "$1")"
 }

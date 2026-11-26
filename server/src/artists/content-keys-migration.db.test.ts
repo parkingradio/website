@@ -55,7 +55,7 @@ describe('the migration 0017_content_keys', () => {
       await refused('artists', 'photo_key', key, 'artists_photo_key')
     }
     await refused('collectives', 'photo_key', `artists/${HASH}.jpg`, 'collectives_photo_key')
-    await refused('sessions', 'flyer_key', `sessions/${HASH}.jpg.w320.webp`, 'sessions_flyer_key')
+    await refused('sessions', 'flyer_key', `sessions/${HASH}.jpg.w320.v2.webp`, 'sessions_flyer_key')
   })
 
   it('applies when there are no photos or flyers', async () => {

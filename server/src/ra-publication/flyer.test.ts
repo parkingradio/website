@@ -1,19 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
-import { UNREADABLE_JPEG, testImage } from '../artists/test-photos.js'
+import { TEST_COLOUR, UNREADABLE_JPEG, colourTestImages, expectColour, testImage } from '../artists/test-photos.js'
 import { RA_FLYER_MAX_BYTES, raFlyer } from './flyer.js'
 
 // The flyer as RA takes it, made from real images (see "The flyer" in docs/design/server/ra-publication.md).
-
-// The colour of the pixel at the top left of `image`, as RGB.
-const pixel = async (image: Buffer) => [...(await sharp(image).raw().toBuffer()).subarray(0, 3)]
-
-// Expects the pixel at the top left of `image` to be `rgb`, give or take `tolerance` on each channel.
-async function expectColour(image: Buffer, rgb: number[], tolerance: number) {
-  const actual = await pixel(image)
-  rgb.forEach((value, channel) => expect(Math.abs(actual[channel] - value), `channel ${channel} of ${actual}`).toBeLessThanOrEqual(tolerance))
-}
 
 describe('raFlyer', () => {
   it('makes a JPEG of at most 2000 × 2000 pixels, keeping its proportions, but never larger than the flyer', async () => {
@@ -39,24 +30,15 @@ describe('raFlyer', () => {
   })
 
   it('is in sRGB, converted from the profile of the flyer, 16-bit ones included', async () => {
-    // `testImage` makes its colour, (228, 87, 46) in sRGB, in Display P3, where it's about (212, 96, 59).
-    const p3 = await testImage('png', 64, 64)
-    const srgb = () => sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 228, g: 87, b: 46 } } })
-    const flyers = {
-      p3,
-      'p3 16-bit': await sharp(p3).keepIccProfile().toColourspace('rgb16').png().toBuffer(),
-      'sRGB 16-bit, with its profile': await srgb().toColourspace('rgb16').withIccProfile('srgb').png().toBuffer(),
-      'sRGB 16-bit, without a profile': await srgb().toColourspace('rgb16').png().toBuffer(),
-    }
-    for (const [name, flyer] of Object.entries(flyers)) {
+    for (const [name, { image: flyer, colour }] of Object.entries(await colourTestImages())) {
       expect((await sharp(flyer).metadata()).icc === undefined, name).toBe(name.endsWith('without a profile'))
-      await expectColour(await raFlyer(flyer), [228, 87, 46], 3)
+      await expectColour(await raFlyer(flyer), colour, 3, name)
     }
   })
 
   it('puts the transparent parts of the flyer on white', async () => {
     // Half transparent: halfway between its colour and white.
-    await expectColour(await raFlyer(await testImage('png', 64, 64, { alpha: true })), [(228 + 255) / 2, (87 + 255) / 2, (46 + 255) / 2], 4)
+    await expectColour(await raFlyer(await testImage('png', 64, 64, { alpha: true })), TEST_COLOUR.map((value) => (value + 255) / 2), 4)
   })
 
   it('reads grayscale flyers, and 16-bit ones', async () => {

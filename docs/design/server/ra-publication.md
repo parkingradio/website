@@ -65,8 +65,9 @@ RA has it (see [The flyer](#the-flyer)).
 
 The session's flyer (see [Flyers, in Sessions](sessions.md#flyers)), as the bookmarklet uploads it to RA: a JPEG of at
 most 2000 × 2000 pixels and 3,000,000 bytes, as RA takes them, with the flyer's proportions, never larger than it,
-upright and without any of its metadata, as photos' sizes are (see [Photos, in Artists](artists.md#photos)), in sRGB,
-with its transparent parts, if any, on white, lowering its quality only as far as it needs to fit.
+upright and without any of its metadata, e.g. where it was taken, as photos' sizes are (see
+[Photos, in Artists](artists.md#photos)), in sRGB without a colour profile, converted from its own when it has one, with
+its transparent parts, if any, on white, lowering its quality only as far as it needs to fit.
 
 ## `POST /api/admin/sessions/:id/ra-publication` (admin)
 
