@@ -86,14 +86,19 @@ for its default view, and its other parameters (see [Searching lists](#searching
 a status the list knows, the link back to the list above its title, e.g. "← candidatures", shows the list with the
 list's parameters, and « ← précédente » and « suivante → » lead to the entries before and after this one in that list,
 keeping the list's parameters in their address, with this one's place between them, e.g. « 3 / 12 » (« 3 sur 12 » for
-screen readers). The first one's « précédente » and the last one's « suivante » can't be used (see
-[Controls that can't be used](#controls-that-cant-be-used)). Without such a status, e.g. from another section's page,
-the link back shows the list as it opens, and the page has nothing else to go through it.
+screen readers, which also describes the two arrows). The first one's « précédente » and the last one's « suivante »
+can't be used (see [Controls that can't be used](#controls-that-cant-be-used)). Without such a status, e.g. from another
+section's page, the link back shows the list as it opens, and the page has nothing else to go through it.
 
 The list is the one when the page opens: the entry keeps its place in the list's order even when the list doesn't show
 it, e.g. once an application has been accepted while going through the new ones. Other entries that have left it are
 skipped: after accepting the 5th of 12 new applications, « suivante » shows the next one as the 5th of 11, and its
 « précédente » leads to the 4th.
+
+After « précédente » or « suivante », the keyboard's focus is on the same one on the page it leads to, or else on the
+other one if it can be used, e.g. « précédente » once « suivante » has led to the last entry, so that going through the
+list takes one key for each entry. It gets there once they can be used, unless it was put elsewhere in the meantime, but
+not when going back or forward with the browser.
 
 ## Tables
 

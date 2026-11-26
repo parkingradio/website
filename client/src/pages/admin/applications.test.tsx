@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
+import type { InitialEntry } from 'react-router'
 import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { jsonBody, mockFetch, named, requestsTo, spaced, timeParts, typeTime } from '../../test-utils'
+import { held, jsonBody, mockFetch, named, requestsTo, spaced, timeParts, typeTime } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
 beforeAll(() => import('./admin-pages'))
@@ -100,14 +101,17 @@ function CurrentPath() {
   return <div data-testid="path">{location.pathname + location.search}</div>
 }
 
-function renderAt(path: string) {
-  return render(
-    // Without transitions, like the app (see main.tsx).
-    <MemoryRouter initialEntries={[path]} useTransitions={false}>
-      <App />
-      <CurrentPath />
-    </MemoryRouter>,
-  )
+// The app at `entry`, e.g. a path. Rendering it again keeps where it is.
+const appAt = (entry: InitialEntry) => (
+  // Without transitions, like the app (see main.tsx).
+  <MemoryRouter initialEntries={[entry]} useTransitions={false}>
+    <App />
+    <CurrentPath />
+  </MemoryRouter>
+)
+
+function renderAt(entry: InitialEntry) {
+  return render(appAt(entry))
 }
 
 // What a profile shows for `term`.
@@ -1241,7 +1245,8 @@ describe('Going through the list from an application’s page', () => {
   // Where the application is in the list, as it's shown, e.g. "2 / 3".
   const POSITION = /^\d+ \/ \d+$/
   const position = () => screen.findByText(POSITION)
-  const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href')
+  const arrow = (name: string) => screen.getByRole('link', { name })
+  const href = (name: string) => arrow(name).getAttribute('href')
 
   it('is where the links of the list lead, which keep its status, even for the default view, its search and its order', async () => {
     mockFetch(pages())
@@ -1255,31 +1260,80 @@ describe('Going through the list from an application’s page', () => {
     )
   })
 
-  it('goes from one application to the next, keeping the list’s parameters', async () => {
+  it('goes from one application to the next and back, keeping the list’s parameters, and the focus on the arrow used', async () => {
     mockFetch(pages())
     renderAt('/admin/candidatures/application-5?status=new')
 
     expect(await position()).toHaveTextContent('2 / 3')
-    // Read as "2 sur 3".
+    // Read as "2 sur 3", which also describes the arrows.
     expect(screen.getByText('2 sur 3')).toBeInTheDocument()
+    expect(arrow('← précédente')).toHaveAccessibleDescription('2 sur 3')
+    expect(arrow('suivante →')).toHaveAccessibleDescription('2 sur 3')
     expect(href('← précédente')).toBe('/admin/candidatures/application-1?status=new')
     expect(href('suivante →')).toBe('/admin/candidatures/application-6?status=new')
     expect(href('← candidatures')).toBe('/admin/candidatures?status=new')
 
-    fireEvent.click(screen.getByRole('link', { name: 'suivante →' }))
+    // The last one has no next one, so the focus goes to its précédente.
+    const following = arrow('suivante →')
+    following.focus()
+    fireEvent.click(following)
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Brume' })).toBeInTheDocument())
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\/application-6\?status=new$/)
     expect(await position()).toHaveTextContent('3 / 3')
     expect(href('← précédente')).toBe('/admin/candidatures/application-5?status=new')
     expect(href('← candidatures')).toBe('/admin/candidatures?status=new')
-    // The last one has no next one: its suivante is only greyed out, without a tooltip, since its place says why, and
-    // clicking it does nothing.
+    await waitFor(() => expect(arrow('← précédente')).toHaveFocus())
+    // Its suivante is only greyed out, without a tooltip, since its place says why, and clicking it does nothing.
     const next = screen.getByRole('button', { name: 'suivante →' })
     expect(next).toBeDisabled()
     expect(next).not.toHaveAccessibleDescription()
     const path = screen.getByTestId('path').textContent
     fireEvent.click(next)
     expect(screen.getByTestId('path').textContent).toBe(path)
+
+    // Back, then on to the same one again: the focus stays on the arrow used.
+    fireEvent.click(arrow('← précédente'))
+    expect(await screen.findByText('2 / 3')).toBeInTheDocument()
+    await waitFor(() => expect(arrow('← précédente')).toHaveFocus())
+    fireEvent.click(arrow('← précédente'))
+    expect(await screen.findByText('1 / 3')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
+    await waitFor(() => expect(arrow('suivante →')).toHaveFocus())
+    fireEvent.click(arrow('suivante →'))
+    expect(await screen.findByText('2 / 3')).toBeInTheDocument()
+    await waitFor(() => expect(arrow('suivante →')).toHaveFocus())
+  })
+
+  it('leaves the focus where it was put while the next one loaded, and where it is when the page is shown again', async () => {
+    mockFetch(pages())
+    const { rerender } = renderAt('/admin/candidatures/application-5?status=new')
+    expect(await position()).toHaveTextContent('2 / 3')
+
+    const list = held()
+    mockFetch({ ...pages(), '/api/admin/applications': list.body })
+    fireEvent.click(arrow('suivante →'))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Brume' })).toBeInTheDocument())
+    const back = screen.getByRole('link', { name: '← candidatures' })
+    back.focus()
+    await list.answer({ ok: true, applications: ALL })
+    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+    expect(back).toHaveFocus()
+
+    // Once the list is there, the arrow that was used is forgotten, whatever has the focus when the page is shown again.
+    back.blur()
+    // The router stays where it is: only the page renders again.
+    rerender(appAt('/'))
+    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+    expect(document.body).toHaveFocus()
+  })
+
+  it('leaves the focus as it is when going back or forward with the browser, or when the page is loaded again', async () => {
+    mockFetch(pages())
+    // As when the browser goes back to a page that précédente or suivante led to: it gets there without following a link.
+    renderAt({ pathname: '/admin/candidatures/application-5', search: '?status=new', state: { pager: 'next' } })
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    expect(document.body).toHaveFocus()
   })
 
   it('has no previous one at the start of the list', async () => {
