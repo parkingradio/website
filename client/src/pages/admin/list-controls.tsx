@@ -168,7 +168,7 @@ function Select<S extends string>({ label, statuses, labels, status, disabled = 
 // The page is built afresh for each entry, so the link that was used is gone: the one it leads to is told which one it
 // was, in the location's state, and gives the focus to its own once the list is there, or to the other one if it can't
 // be used, so that going through the list with the keyboard takes one key each time. Only for a link that was followed,
-// not when going back or forward, nor once something else has the focus.
+// not when the browser goes back or forward to the page, or loads it again, nor once something else has the focus.
 export function ListPager<T extends { id: string }>({
   id,
   listed,
@@ -184,14 +184,15 @@ export function ListPager<T extends { id: string }>({
   const navigationType = useNavigationType()
   const placeId = useId()
   const links = useRef<Record<Arrow, HTMLAnchorElement | null>>({ previous: null, next: null })
-  // The arrow that led here, used up once the list is there, since `listed` changes with each render of the page.
+  // The arrow that led here, used up once the list is there, whether the focus moved or not, so that no later render can
+  // move the focus. The effect runs when the list comes, rather than on each render, which gives a new `listed`.
   const arrived = useRef(navigationType === 'PUSH' ? (location.state as PagerState | null)?.pager : undefined)
   const loaded = listed !== undefined
   useLayoutEffect(() => {
     const used = arrived.current
     if (!loaded || !used) return
     arrived.current = undefined
-    if (nothingFocused()) (links.current[used] ?? links.current[OTHER[used]])?.focus()
+    if (nothingFocused()) (links.current[used] ?? links.current[OTHER[used]])?.focus({ preventScroll: true })
   }, [loaded])
 
   if (failure) {

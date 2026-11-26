@@ -1291,7 +1291,7 @@ describe('Going through the list from an application’s page', () => {
     fireEvent.click(next)
     expect(screen.getByTestId('path').textContent).toBe(path)
 
-    // Back, then on to the same one again: the focus stays on the arrow used.
+    // Back to the first one, where the focus goes to suivante, then on with it, which keeps the focus.
     fireEvent.click(arrow('← précédente'))
     expect(await screen.findByText('2 / 3')).toBeInTheDocument()
     await waitFor(() => expect(arrow('← précédente')).toHaveFocus())
@@ -1306,7 +1306,8 @@ describe('Going through the list from an application’s page', () => {
 
   it('leaves the focus where it was put while the next one loaded, and where it is when the page is shown again', async () => {
     mockFetch(pages())
-    const { rerender } = renderAt('/admin/candidatures/application-5?status=new')
+    const entry = '/admin/candidatures/application-5?status=new'
+    const { rerender } = renderAt(entry)
     expect(await position()).toHaveTextContent('2 / 3')
 
     const list = held()
@@ -1321,8 +1322,8 @@ describe('Going through the list from an application’s page', () => {
 
     // Once the list is there, the arrow that was used is forgotten, whatever has the focus when the page is shown again.
     back.blur()
-    // The router stays where it is: only the page renders again.
-    rerender(appAt('/'))
+    // The router stays where it is, on the next one: only the page renders again.
+    rerender(appAt(entry))
     expect(screen.getByText('3 / 3')).toBeInTheDocument()
     expect(document.body).toHaveFocus()
   })

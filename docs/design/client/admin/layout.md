@@ -98,7 +98,7 @@ skipped: after accepting the 5th of 12 new applications, « suivante » shows th
 After « précédente » or « suivante », the keyboard's focus is on the same one on the page it leads to, or else on the
 other one if it can be used, e.g. « précédente » once « suivante » has led to the last entry, so that going through the
 list takes one key for each entry. It gets there once they can be used, unless it was put elsewhere in the meantime, but
-not when going back or forward with the browser.
+not when the browser goes back or forward to the page, or loads it again.
 
 ## Tables
 
