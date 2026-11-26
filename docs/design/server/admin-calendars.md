@@ -66,13 +66,11 @@ occupations and the events about feeds whose last read failed, has dates (`VALUE
 with the day after the last one as `DTEND`. Text values are escaped and folded as in
 [`GET /calendar.ics`](events.md#get-calendarics).
 
-**A year back** is 00:00 on the day 365 days before today, in Québec. Each calendar keeps what ends after then, whole,
-even when it started before, so that calendar apps keep the past: how far ahead each one goes is in its section.
-
 ## `GET /sessions.ics`
 
 The sessions with a start, whatever their status, announced or not, that end after a year back (see
-[The calendars](#the-calendars)), however far ahead. Sessions without a start aren't in it. Each one is a `VEVENT` with:
+[A year back, in Conventions](README.md#conventions)), however far ahead. Sessions without a start aren't in it. Each
+one is a `VEVENT` with:
 
 | Property | Value |
 |---|---|
@@ -89,8 +87,8 @@ The sessions with a start, whatever their status, announced or not, that end aft
 The occupations, as the server has them from the last reads of the `occupations` calendar feeds (see
 [Reading the feeds, in Calendar](calendar.md#reading-the-feeds)): a feed whose last read failed still gives what it read
 before, as [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) does, and nothing when no read of it
-succeeded. It has those that end after a year back (see [The calendars](#the-calendars)), among what reads keep, from a
-year before them to two years after them (see [Events, in Calendar](calendar.md#events)).
+succeeded. It has those that end after a year back (see [A year back, in Conventions](README.md#conventions)), among
+what reads keep, from a year before them to two years after them (see [Events, in Calendar](calendar.md#events)).
 
 Until every `occupations` feed has been read with the link it has, since the server started, whether that read
 succeeded or failed, it fails with 503, rather than give a calendar without the occupations of the feeds that haven't
@@ -121,7 +119,7 @@ that what it shows of them can be missing or out of date: each one is a whole-da
 ## `GET /availability.ics`
 
 The studio's available time (see [Availability, in Calendar](calendar.md#availability)) from a year back (see
-[The calendars](#the-calendars)) to the end of the year ahead (see
+[A year back, in Conventions](README.md#conventions)) to the end of the year ahead (see
 [The calendar, in Calendar](calendar.md#the-calendar)), worked out as
 [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) does: a feed whose last read failed still counts
 with what it read before. It has one event per stretch, whole, e.g. across midnight or a year back, except the one going

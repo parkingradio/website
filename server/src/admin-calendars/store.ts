@@ -1,10 +1,10 @@
-import { and, eq, isNotNull, not, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { TOKEN_FORMAT, randomToken } from '../core/tokens.js'
 import type { Queryable } from '../db/connection.js'
-import { sessions, users } from '../db/schema.js'
+import { users } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { hasEnded, sessionsWhere } from '../sessions/store.js'
+import { endsAfter, sessionsWhere } from '../sessions/store.js'
 import type { StoredSession } from '../sessions/store.js'
 
 // The tokens of admins' calendars, and the sessions of their calendar of sessions (see
@@ -43,6 +43,6 @@ export function adminCalendarsStore(db: Queryable): AdminCalendarsStore {
       return row !== undefined
     },
 
-    sessions: (since) => sessionsWhere(db, and(isNotNull(sessions.startAt), not(hasEnded(since)))),
+    sessions: (since) => sessionsWhere(db, endsAfter(since)),
   }
 }

@@ -89,7 +89,7 @@ missing.
 The events as a calendar feed, in iCalendar (RFC 5545), which calendar apps subscribe to and read again on their own
 schedule, so that their calendar follows as events are announced, changed or cancelled. It's public, and it isn't JSON,
 so it isn't under `/api`, nor a tool of the [MCP server](mcp.md). It takes no parameters. Admins also have a private
-feed of every session, announced or not, from a year back, which gives them as this one gives events
+feed of every session, announced or not, which gives them as this one gives events
 ([`GET /sessions.ics`](admin-calendars.md#get-sessionsics)).
 
 It responds with `Content-Type: text/calendar; charset=utf-8` and `Cache-Control: public, max-age=300`: browsers and
@@ -100,9 +100,8 @@ The calendar has `VERSION:2.0`, a `PRODID`, and is named "Parking Radio", in bot
 apps read. It asks apps to read it again every hour (`REFRESH-INTERVAL;VALUE=DURATION:PT1H` and `X-PUBLISHED-TTL:PT1H`),
 which some of them do, while others keep their own schedule.
 
-It has every event that starts at most a year before the request, and every upcoming one (see
-[Upcoming and past](#upcoming-and-past)). Older events fall out of the feed, and so out of subscribers' calendars. Each
-event is a `VEVENT` with:
+It has the events that end after a year back (see [A year back, in Conventions](README.md#conventions)), however far
+ahead. Older events fall out of the feed, and so out of subscribers' calendars. Each event is a `VEVENT` with:
 
 | Property | Value |
 |---|---|

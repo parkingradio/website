@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gt, gte, inArray, isNull, lt, ne, not, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, gt, gte, inArray, isNotNull, isNull, lt, ne, not, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
@@ -244,6 +244,10 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
 
 // Whether a session with a start has ended at `now`: it's past from its end on, which its period excludes.
 export const hasEnded = (now: Date) => sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
+
+// Whether a session has a start and ends after `since`, e.g. a year back (see "A year back" in
+// docs/design/server/README.md).
+export const endsAfter = (since: Date): SQL => and(isNotNull(sessions.startAt), not(hasEnded(since)))!
 
 // The sessions that match `where`, in the order of `list`, or only the first `limit` of them, with their takeovers and
 // their sets.

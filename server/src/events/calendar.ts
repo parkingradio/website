@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { yearBack } from '../api/formats.js'
 import { TRANSPARENT, calendar as icalendar, dateTime, text } from '../core/icalendar.js'
 import { SYNTH_MEETUP_LINEUP } from '../sessions/lineup.js'
 import { event } from './routes.js'
@@ -79,9 +80,9 @@ type CalendarRoutesOptions = {
 // the MCP server, and it can't be one of the routes of `zodRoutes`, which need one.
 export async function calendarRoutes(app: FastifyInstance, { store, siteOrigin }: CalendarRoutesOptions) {
   app.get('/calendar.ics', async (_request, reply) => {
-    // Every event that starts at most a year before the request, and every upcoming one.
+    // The events that end after a year back, however far ahead.
     const now = new Date()
-    const events = (await store.feed(now)).map(event)
+    const events = (await store.feed(yearBack(now))).map(event)
     return reply.type('text/calendar; charset=utf-8').header('cache-control', CACHE_CONTROL).send(calendar(events, { siteOrigin, now }))
   })
 }
