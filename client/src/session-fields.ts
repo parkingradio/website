@@ -487,22 +487,22 @@ export function findApplication(
   return artist ? { application, artist: { id: artist.id, name: artist.name } } : null
 }
 
-// What a set filled in from an artist's application has: its artist, as its only performer, its performance types and
-// "autre", and the application itself.
+// What a set filled in from an artist's application has: its artist, as its only performer, with `genres`, the genres a
+// set takes from them, its performance types and "autre", and the application itself.
 export function setValuesFromApplication(
   application: Pick<Schema<'Application'>, 'id' | 'receivedAt' | 'performanceTypes' | 'otherPerformanceType'>,
   artist: Reference,
-): Pick<SetFormValues, 'performers' | 'performanceTypes' | 'otherPerformanceType' | 'application'> {
+  genres: GenreId[],
+): Pick<SetFormValues, 'performers' | 'genres' | 'performanceTypes' | 'otherPerformanceType' | 'application'> {
   const { performanceTypes, otherPerformanceType } = application
-  return { performers: [artist], performanceTypes, otherPerformanceType, application: applicationLink(application) }
+  return { performers: [artist], genres, performanceTypes, otherPerformanceType, application: applicationLink(application) }
 }
 
 // A set listed in a new session's form, filled in from an artist's application, whose duration isn't known yet.
-export function listedSetFromApplication(application: Parameters<typeof setValuesFromApplication>[0], artist: Reference): ListedSet {
+export function listedSetFromApplication(application: Parameters<typeof setValuesFromApplication>[0], artist: Reference, genres: GenreId[]): ListedSet {
   return {
-    ...setValuesFromApplication(application, artist),
+    ...setValuesFromApplication(application, artist, genres),
     durationMinutes: null,
-    genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
   }

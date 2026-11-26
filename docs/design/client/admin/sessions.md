@@ -305,14 +305,18 @@ top to bottom, the form has:
   sets fill it, "Durée" starts empty.
 - "Prestation": what the performers do, picked from the same list as the application form's (see
   [Candidatures](candidatures.md)), and "Autre", in a few words.
-- "Genres": tags to click, like an artist's (see [Adding an artist](artistes.md#adding-an-artist)). While it has none,
-  and its performers have some, "reprendre les genres des artistes" pins its performers' first genres, in the order of
-  [a collective's genres](artistes.md#a-collectives-genres), up to 3.
+- "Genres": the set's genres, in order, e.g. "house, techno", or "-", and "modifier", which unfolds the tags to click,
+  like an artist's (see [Adding an artist](artistes.md#adding-an-artist)), and gives them the focus. Screen readers
+  name it "modifier les genres". Once unfolded, the field stays so, without "modifier", until the form closes. Each time
+  the performers change, an artist being added, taken out or moved, the set's genres become its performers': their
+  first genres, in the order of [a collective's genres](artistes.md#a-collectives-genres), up to 3, or none, even when
+  they were picked by hand. Genres that differ from the performers' (see [Sets](../../server/sessions.md#sets)) are
+  picked once the performers are. Opening a set's form leaves them as they are.
 - "SoundCloud" and "YouTube": links to the set's track and video (see [Links](../../server/sessions.md#links)).
 
-When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked. On a
-takeover's page, its collective is loaded along with them: when it can't be, the form says so, and lists the artists as
-in other sets.
+When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked, and changing
+them leaves the set's genres as they are, since their genres aren't known. On a takeover's page, its collective is
+loaded along with them: when it can't be, the form says so, and lists the artists as in other sets.
 
 ## Moving a set to another session
 
@@ -387,8 +391,8 @@ An application's page leads to a session's page, or to "nouvelle session", with 
 (see [Candidatures](candidatures.md)), whose forms then start from it:
 
 - On a session's page, unless the session is cancelled, a new set's form opens, filled in from the application: its
-  artist as the only performer, its performance types and "autre", and the application itself. The page scrolls to the
-  form, whose heading gets the focus.
+  artist as the only performer, and their genres as the set's (see [A set's form](#a-sets-form)), its performance types
+  and "autre", and the application itself. The page scrolls to the form, whose heading gets the focus.
 - On "nouvelle session", an artist's application lists a set, filled in the same way, whose duration isn't known yet. A
   collective's application makes the session its collective's takeover, in place of `?takeover`, with the application
   picked. Above the form, the application's days and time slots are shown as its page shows them, with a link to it,
@@ -428,7 +432,7 @@ its sets in the way is named without a link.
   `PUT /api/admin/sets/:id/position`, `PUT /api/admin/sets/:id/session` and `DELETE /api/admin/sets/:id`, for its sets,
   and `GET /api/admin/sessions`, in the panel that moves a set to another session, each time it opens.
 - `GET /api/admin/collectives`, in the session form, to pick a takeover's collective and list its artists first in a new
-  session's sets, and `GET /api/admin/artists`, in a set's form, to pick the performers and suggest their genres, each
+  session's sets, and `GET /api/admin/artists`, in a set's form, to pick the performers and take their genres, each
   time the form opens.
 - `GET /api/admin/collectives/:id`, in a set's form on a takeover's page, to list its collective's artists first, each
   time the form opens.

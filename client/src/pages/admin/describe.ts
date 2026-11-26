@@ -157,6 +157,15 @@ export function membersGenres(members: { id: string }[], artists: Map<string, Ar
   return genres
 }
 
+// How many of its performers' genres a set takes.
+const SET_GENRES = 3
+
+// The genres a set takes from its `performers` (see "A set's form" in docs/design/client/admin/sessions.md): their first
+// ones, in the order of a collective's genres (see `membersGenres`), up to `SET_GENRES`, among `artists`.
+export function performersGenres(performers: { id: string }[], artists: Artist[]): GenreId[] {
+  return membersGenres(performers, new Map(artists.map((artist) => [artist.id, artist]))).slice(0, SET_GENRES)
+}
+
 // The names of a collective's genres, from its `members`' (see `membersGenres`), or null when they're unknown, e.g.
 // because its members couldn't be loaded.
 export function collectiveGenreNames(collective: Collective, members: Artist[] | null): string | null {
