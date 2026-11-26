@@ -128,10 +128,11 @@ function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
 }
 
 // A row across the table's four columns, e.g. the form that changes a feed. `headers` is the id of the header its cell
-// is under, rather than the columns'.
-function SpanRow({ headers, children }: { headers?: string; children: ReactNode }) {
+// is under, rather than the columns'. `continued` when the next row continues it, e.g. the line under the form, so that
+// it has no border under it.
+function SpanRow({ headers, continued, children }: { headers?: string; continued?: boolean; children: ReactNode }) {
   return (
-    <tr>
+    <tr className={continued ? 'admin-table-continued' : undefined}>
       <td colSpan={4} className="admin-table-span" headers={headers}>
         <div>{children}</div>
       </td>
@@ -158,11 +159,13 @@ function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
   }
 
   const failed = feed.error !== null
+  // Whether the line under the feed's row, or its form, shows.
+  const continued = failed || Boolean(error)
 
   return (
     <tbody>
       {editing ? (
-        <SpanRow>
+        <SpanRow continued={continued}>
           <p className="admin-meta">{byWhom('Ajouté', feed.createdBy, feed.createdAt)}</p>
           {feed.updatedBy && <p className="admin-meta">{byWhom('Modifié', feed.updatedBy, feed.updatedAt)}</p>}
           <FeedForm
@@ -182,7 +185,7 @@ function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
           />
         </SpanRow>
       ) : (
-        <tr>
+        <tr className={continued ? 'admin-table-continued' : undefined}>
           <th scope="row" id={nameId}>
             {feed.name}
           </th>
@@ -198,7 +201,7 @@ function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
           </td>
         </tr>
       )}
-      {(failed || error) && (
+      {continued && (
         // Across the table, so that a long message doesn't widen a column, and under its feed's name, while its row is
         // shown.
         <SpanRow headers={editing ? undefined : nameId}>
