@@ -6,6 +6,8 @@ import { checkLine, checkText, everyOne } from './checks'
 import type { FieldErrors } from './checks'
 import { addDays, daysBetween, quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstants } from './quebec-time'
 import { isSoundcloudTrackLink, youtubeVideoId, youtubeVideoUrl } from './session-links'
+import { TIME_SLOTS } from './time-slots'
+import type { TimeSlot, TimeSlotId } from './time-slots'
 
 // How sessions and sets are checked in the browser, by the admin pages, and how their forms' times of day become what the
 // server takes (see docs/design/client/admin/sessions.md).
@@ -276,6 +278,27 @@ export function startChanges(form: SessionFormValues, changes: Partial<Pick<Sess
     Object.assign(result, { endDay: end.day, end: end.time })
   }
   return result
+}
+
+// How long `slot` lasts, in minutes.
+function slotMinutes({ start, end }: TimeSlot): number {
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3))
+  return minutes(end) - minutes(start)
+}
+
+// What picking `slot` changes in `form`: its times, with the end on the start's day, which is empty while the start has
+// none, or only the duration while the session's date isn't known (see "The session form" in
+// docs/design/client/admin/sessions.md).
+export function slotChanges(form: SessionFormValues, slot: TimeSlot): Partial<SessionFormValues> {
+  if (form.undated) return { duration: durationOf(slotMinutes(slot)) }
+  return { start: slot.start, end: slot.end, endDay: form.day }
+}
+
+// The time slot whose times are the start's and the end's, with the end on the start's day, or null, e.g. while the
+// session's date isn't known.
+export function pickedSlot({ undated, day, start, endDay, end }: SessionFormValues): TimeSlotId | null {
+  if (undated || endDay !== day) return null
+  return TIME_SLOTS.find((slot) => slot.start === start && slot.end === end)?.id ?? null
 }
 
 // Checks a session as it's being filled in the form, with its `times` if they're worked out already, who the

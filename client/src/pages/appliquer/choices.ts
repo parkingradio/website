@@ -45,15 +45,6 @@ export const PRIORITY_COUNTRIES = ['CA', 'US', 'FR', 'BE', 'CH']
 // Every country, with their codes, e.g. to find the United States by typing "US".
 export const COUNTRY_OPTIONS = countryOptions(PRIORITY_COUNTRIES).map((option) => ({ ...option, detail: option.key }))
 
-// The programmation's time slots, in Québec time. A collective takes a whole slot, an artist an hour of one. They're
-// sent as the times they start and end.
-export const TIME_SLOTS = [
-  { id: '11-15', label: '11 h – 15 h', start: '11:00', end: '15:00' },
-  { id: '13-17', label: '13 h – 17 h', start: '13:00', end: '17:00' },
-  { id: '18-22', label: '18 h – 22 h', start: '18:00', end: '22:00' },
-] as const
-export type TimeSlotId = (typeof TIME_SLOTS)[number]['id']
-
 // Artists can only pick dates from MIN_MONTHS_AHEAD months from now, which leaves time to plan the programmation, up to
 // MAX_MONTHS_AHEAD months from now, and at most MAX_DATES of them.
 export const MIN_MONTHS_AHEAD = 2

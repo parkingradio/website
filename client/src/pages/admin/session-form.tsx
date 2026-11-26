@@ -15,13 +15,18 @@ import {
   checkSession,
   durationOf,
   isCollectivesApplication,
+  pickedSlot,
   sessionTimes,
+  slotChanges,
   startChanges,
   typeName,
 } from '../../session-fields'
 import type { ListedSet, RaEventLink, Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
 import { raEventId } from '../../session-links'
+import { TIME_SLOTS } from '../../time-slots'
+import type { TimeSlot, TimeSlotId } from '../../time-slots'
 import { ApplicationField } from './application-field'
+import { Button } from './button'
 import { leaving, useCheckedForm } from './checked-form'
 import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, TimeInput } from './fields'
@@ -238,7 +243,7 @@ function TimesField({
       {form.undated ? (
         <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
       ) : (
-        <>
+        <div className="admin-session-times">
           <DayAndTime
             label="Début"
             day={form.day}
@@ -248,6 +253,7 @@ function TimesField({
             dayError={errors.day}
             timeError={errors.start}
           />
+          <To />
           <DayAndTime
             label="Fin"
             day={form.endDay}
@@ -257,18 +263,46 @@ function TimesField({
             dayError={errors.endDay}
             timeError={errors.end}
           />
-          {lasts !== null && (
-            <p className="admin-hint" role="status">
-              Dure {formatDuration(lasts)}.
-            </p>
-          )}
-        </>
+        </div>
+      )}
+      <SlotChoices picked={pickedSlot(form)} onPick={(slot) => onChange(slotChanges(form, slot))} />
+      {lasts !== null && (
+        <p className="admin-hint" role="status">
+          Dure {formatDuration(lasts)}.
+        </p>
       )}
     </fieldset>
   )
 }
 
-// A day and a time, in Québec time, under `label`, with what's wrong with either.
+// What goes between a session's start and its end, which screen readers name "Début" and "Fin", rather than labels.
+export const To = () => <span className="admin-times-to">à</span>
+
+// The programmation's time slots, as suggestions under a session's times, which they fill in, with the one `picked`, if
+// any, pressed (see "The session form" in docs/design/client/admin/sessions.md). Pressing one doesn't take the focus, e.g.
+// from a time, whose error would then show and move the slots down before the click lands. The click then takes it, once
+// the times are filled in, so that an hour typed in part (e.g. "1" for 18) isn't finished by what's typed next.
+export function SlotChoices({ picked, onPick }: { picked: TimeSlotId | null; onPick: (slot: TimeSlot) => void }) {
+  return (
+    <div className="admin-slots admin-status-buttons" role="group" aria-label="Plages horaires">
+      {TIME_SLOTS.map((slot) => (
+        <Button
+          key={slot.id}
+          aria-pressed={slot.id === picked}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            onPick(slot)
+            event.currentTarget.focus()
+          }}
+        >
+          {slot.label}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+// A day and a time, in Québec time, which screen readers name `label`, with what's wrong with either under them.
 function DayAndTime({
   label,
   day,
@@ -286,16 +320,11 @@ function DayAndTime({
   dayError: string | undefined
   timeError: string | undefined
 }) {
-  const id = useId()
   return (
     <div className="admin-field">
-      <span id={id}>{label}</span>
-      <div className="admin-row admin-times" role="group" aria-labelledby={id}>
-        <label>
-          date
-          <input type="date" value={day} aria-invalid={dayError ? true : undefined} onChange={(event) => onDay(event.target.value)} />
-        </label>
-        <TimeInput label="heure" value={time} invalid={!!timeError} onChange={onTime} />
+      <div className="admin-row admin-times" role="group" aria-label={label}>
+        <input type="date" aria-label="date" value={day} aria-invalid={dayError ? true : undefined} onChange={(event) => onDay(event.target.value)} />
+        <TimeInput aria-label="heure" value={time} invalid={!!timeError} onChange={onTime} />
       </div>
       <FieldError message={dayError ?? timeError} />
     </div>
