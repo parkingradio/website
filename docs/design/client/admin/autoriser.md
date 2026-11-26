@@ -31,9 +31,9 @@ the admin may have been logged out meanwhile. It loads with the public pages, ca
 
 Without `failed` in its query, it's titled « Application connectée », and says « L'application est maintenant connectée
 à Parking Radio. Vous pouvez fermer cet onglet. ». With `failed` in its query, with or without a value (e.g. `?failed` or
-`?failed=1`), it's titled « Application non connectée », and says « L'application n'a pas pu être connectée à Parking
-Radio. Revenez à l'application pour savoir pourquoi. ». It shows nothing from its address, not even the app's name,
-since anyone can link to it.
+`?failed=1`), it's titled « Échec de connexion », and says « L'application n'a pas pu être connectée à Parking Radio.
+Revenez à l'application pour savoir pourquoi. ». It shows nothing from its address, not even the app's name, since
+anyone can link to it.
 
 ## Endpoints
 

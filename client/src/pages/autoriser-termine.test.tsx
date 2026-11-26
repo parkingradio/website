@@ -29,7 +29,7 @@ describe('/autoriser/termine', () => {
     (search) => {
       const { container } = renderAt(`/autoriser/termine?${search}`)
 
-      expect(screen.getByRole('heading', { name: 'Application non connectée' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Échec de connexion' })).toBeInTheDocument()
       expect(
         screen.getByText("L'application n'a pas pu être connectée à Parking Radio. Revenez à l'application pour savoir pourquoi."),
       ).toBeInTheDocument()

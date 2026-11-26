@@ -7,7 +7,7 @@ import './autoriser-termine.css'
 export function AutoriserTermine() {
   const [searchParams] = useSearchParams()
   const [title, text] = searchParams.has('failed')
-    ? ['Application non connectée', "L'application n'a pas pu être connectée à Parking Radio. Revenez à l'application pour savoir pourquoi."]
+    ? ['Échec de connexion', "L'application n'a pas pu être connectée à Parking Radio. Revenez à l'application pour savoir pourquoi."]
     : ['Application connectée', "L'application est maintenant connectée à Parking Radio. Vous pouvez fermer cet onglet."]
   return (
     <div className="autoriser-termine">
