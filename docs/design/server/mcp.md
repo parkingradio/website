@@ -69,7 +69,8 @@ There's no rate limit (see [Conventions](README.md#conventions)).
 Each tool does what one endpoint does, as the connection's user, with its arguments as the request, and gives back the
 endpoint's response: e.g. what it changes has that admin's email in `updatedBy`. The tools are those of the admin
 endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/events`, `GET /api/artists/:id` and
-`GET /api/collectives/:id`, e.g. to check what the public sees once a session is announced, except:
+`GET /api/collectives/:id`, e.g. to check that a session is public once it's announced, and so are its artists' and
+its collective's profiles, except:
 
 - The admin endpoints of [Admins](admins.md) and of [OAuth](oauth.md), and `PUT /api/admin/applications/recipients`,
   which chooses who applications are emailed to: the model reads text that the public wrote, which could try to make it
