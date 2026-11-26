@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FocusEvent, FormEvent, ReactNode } from 'react'
 
-// How the forms for artists and applications check their fields and send them.
+// How the admin forms check their fields and send them.
+
+// Whether a blur only comes from the page itself losing the focus, e.g. to another window, or to a date field's picker,
+// which browsers show as one, which doesn't leave the field: it keeps the focus.
+const keepsFocus = (event: { target: EventTarget | null }) => document.activeElement === event.target
 
 // A blur handler that calls `onLeave` once the focus leaves the element and everything in it, rather than moving
-// within it, e.g. from one of a fieldset's inputs to another. The page itself losing the focus, e.g. to another window,
-// or to a date field's picker, which browsers show as one, doesn't leave it: the field keeps the focus.
+// within it, e.g. from one of a fieldset's inputs to another, but not while the page loses the focus (see `keepsFocus`).
 export function leaving(onLeave: () => void) {
   return (event: FocusEvent<HTMLElement>) => {
-    if (document.activeElement === event.target) return
-    if (!event.currentTarget.contains(event.relatedTarget)) onLeave()
+    if (!keepsFocus(event) && !event.currentTarget.contains(event.relatedTarget)) onLeave()
   }
 }
 
@@ -55,7 +57,12 @@ export function useCheckedForm<Field extends string>(errors: Partial<Record<Fiel
     submitted,
     // What's wrong with `field`, once it's to be shown.
     shown: (field: Field) => (submitted || left.has(field) ? errors[field] : undefined),
-    // A handler that notes that `fields` have been left, e.g. those of a group that's left as a whole.
-    leave: (...fields: Field[]) => () => setLeft((left) => new Set([...left, ...fields])),
+    // A handler that notes that `fields` have been left, e.g. those of a group that's left as a whole, or as a field's
+    // blur handler, unless the page only loses the focus (see `keepsFocus`).
+    leave:
+      (...fields: Field[]) =>
+      (event?: { target: EventTarget | null }) => {
+        if (!event || !keepsFocus(event)) setLeft((left) => new Set([...left, ...fields]))
+      },
   }
 }

@@ -120,6 +120,9 @@ test('a session is in its month, and on its day, where a new session is added', 
   await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
   await expect(start).toHaveText('\u206613 h 00\u2069')
   await expect(end).toHaveText('\u206617 h 00\u2069')
+  await start.getByRole('spinbutton').first().click()
+  await page.keyboard.type('19')
+  await expect(start).toHaveText('\u206619 h 00\u2069')
   // In the 24-hour format, whatever the browser's settings, between marks that keep it left to right.
   await fillTime(start, '18:00')
   await fillTime(end, '22:00')
