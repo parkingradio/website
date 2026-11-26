@@ -146,6 +146,9 @@ function studioSet(id: string, fields: Partial<StudioSet>): StudioSet {
   }
 }
 
+// `session`, and its sets, with `status`.
+const withStatus = (session: Session, status: Session['status']): Session => ({ ...session, status, sets: session.sets.map((set) => ({ ...set, status })) })
+
 // Saturday, November 14th, 2026, from 21:00 to 1:00 in Québec: two sets, then one that's cancelled, whose performer was
 // deleted.
 const SESSION: Session = {
@@ -1056,13 +1059,16 @@ describe("A session's page", () => {
     else expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 10 septembre 2026')
   })
 
+  // Another collective, with an application of its own.
+  const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
+  const vagues = application('application-5', { collectiveId: 'collective-2' }, '2026-09-10T16:00:00.000Z', 'new', ['2026-12-12'])
+
   it("picks a takeover's application among its collective's, which it keeps while another type is picked, but only a takeover sends", async () => {
-    const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
-    const vagues = application('application-5', { collectiveId: 'collective-2' }, '2026-09-10T16:00:00.000Z', 'new', ['2026-12-12'])
+    const MAREES: Collective = { ...ONDES, id: 'collective-3', name: 'Marées', email: 'marees@example.com' }
     mockFetch({
       ...PAGE,
       ...RA_EVENTS,
-      '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] },
+      '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES, MAREES] },
       '/api/admin/applications': { ok: true, total: 5, applications: [vagues, ...APPLICATIONS_LIST] },
       'PATCH /api/admin/sessions/session-1': { ok: true, session: SESSION },
     })
@@ -1075,15 +1081,20 @@ describe("A session's page", () => {
     expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026retenue · 14 nov. 2026, 21 nov. 2026'])
     fireEvent.keyDown(picker(), { key: 'Escape' })
 
-    // Another collective says right away that the application isn't its, until one of its own is picked.
+    // Another collective, without an application, says right away that the application isn't its, and keeps it.
     const error = 'La candidature doit être celle du collectif du takeover : choisissez-en une autre, ou « Aucune candidature ».'
     fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
-    fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Marées/ }))
     expect(screen.getByText(error)).toBeInTheDocument()
+    expect(picker()).toHaveValue('Reçue le 1 septembre 2026')
+    // One with a single new or accepted application gives it that one in its place.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
+    expect(picker()).toHaveValue('Reçue le 10 septembre 2026')
+    expect(screen.queryByText(error)).not.toBeInTheDocument()
     fireEvent.click(picker())
     expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026retenue · 14 nov. 2026, 21 nov. 2026', 'Reçue le 10 septembre 2026nouvelle · 12 déc. 2026'])
-    fireEvent.mouseDown(screen.getByRole('option', { name: /^Reçue le 10 septembre 2026/ }))
-    expect(screen.queryByText(error)).not.toBeInTheDocument()
+    fireEvent.keyDown(picker(), { key: 'Escape' })
 
     // Hidden with the collective for another type, and back with it.
     fireEvent.click(screen.getByRole('radio', { name: 'Guest mixes' }))
@@ -1093,6 +1104,29 @@ describe("A session's page", () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
     expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-2', application: 'application-5' })
+  })
+
+  it.each([
+    ['planned', 'Reçue le 10 septembre 2026'],
+    ['done', 'Aucune candidature'],
+    ['cancelled', 'Aucune candidature'],
+  ] as const)("doesn't pick a %s takeover's application as its form opens, nor with another collective unless it's planned", async (status, picked) => {
+    const session = withStatus({ ...SESSION, application: null }, status)
+    mockFetch({
+      ...PAGE,
+      ...RA_EVENTS,
+      '/api/admin/sessions/session-1': { ok: true, session },
+      '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] },
+      '/api/admin/applications': { ok: true, total: 5, applications: [vagues, ...APPLICATIONS_LIST] },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    // Ondes' only one, since the session can be meant to have none.
+    expect(await screen.findByRole('combobox', { name: 'Candidature' })).toHaveValue('Aucune candidature')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
+    expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue(picked)
   })
 
   it("keeps the takeover's application when the applications could not be loaded, which it says, and lets it be removed", async () => {
@@ -1851,7 +1885,8 @@ describe("A set's form", () => {
       genres: ['house', 'techno', 'acid'],
       soundcloudTrack: null,
       youtubeVideo: null,
-      application: null,
+      // Aurore's, picked as she was added, Cyan's being planned already.
+      application: 'application-3',
     })
   })
 
@@ -2075,7 +2110,9 @@ describe("A set's form", () => {
   const applicationPicker = () => screen.getByRole('combobox', { name: 'Candidature' })
 
   it("picks the set's application among its performers', which it says right away once it isn't one of theirs anymore", async () => {
-    mockFetch({ ...SET_PAGE, 'PATCH /api/admin/sets/set-1': { ok: true, session: SESSION } })
+    // Brume's is planned already, so that none is picked in place of Aurore's once she's taken out.
+    const applications = APPLICATIONS_LIST.map((each) => (each.id === 'application-4' ? { ...each, status: 'planned' as const } : each))
+    mockFetch({ ...SET_PAGE, '/api/admin/applications': { ok: true, total: 4, applications }, 'PATCH /api/admin/sets/set-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore et Brume' }))
@@ -2086,7 +2123,7 @@ describe("A set's form", () => {
     expect(options()).toEqual([
       'Aucune candidature',
       'Aurore, reçue le 15 août 2026nouvelle · 14 nov. 2026, 21 nov. 2026, 28 nov. 2026 (+1)',
-      'Brume, reçue le 20 août 2026retenue · 5 déc. 2026',
+      'Brume, reçue le 20 août 2026planifiée · 5 déc. 2026',
     ])
     fireEvent.mouseDown(screen.getByRole('option', { name: /^Aurore, reçue le 15 août 2026/ }))
     expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
@@ -2153,8 +2190,120 @@ describe("A set's form", () => {
     expect(applicationPicker()).toHaveAttribute('placeholder', 'Aucune candidature de cet artiste.')
     pick('Cyan')
     expect(applicationPicker()).toHaveAttribute('placeholder', 'Aucune candidature de ces artistes.')
+    // Brume's, the only one, is picked as she's added.
     pick('Brume')
+    expect(applicationPicker()).toHaveValue('Brume, reçue le 20 août 2026')
+  })
+
+  it("picks its performers' only new or accepted application as an artist is added or taken out, but not as they're reordered", async () => {
+    mockFetch(SET_PAGE)
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Aurore')
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+    // Kept as Brume is added.
+    pick('Brume')
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+    fireEvent.click(applicationPicker())
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucune candidature' }))
+    // Brume's makes two, until she's taken out, and Cyan's is planned already: Aurore's is then the only one.
+    pick('Cyan')
     expect(applicationPicker()).toHaveValue('Aucune candidature')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Brume' }))
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+    fireEvent.click(applicationPicker())
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucune candidature' }))
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner Cyan' }), -1)
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+  })
+
+  it("replaces an application that isn't its performers' anymore with their only new or accepted one", async () => {
+    mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Aurore')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
+    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
+    pick('Brume')
+    expect(applicationPicker()).toHaveValue('Brume, reçue le 20 août 2026')
+    expect(screen.queryByText(SET_ERROR)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toMatchObject({ performers: [{ id: 'artist-2' }], application: 'application-4' })
+  })
+
+  it("keeps an application that isn't its performers' anymore, saying so, when they have none that's new or accepted, or several", async () => {
+    const brumes = application('application-6', { artistId: 'artist-2' }, '2026-09-05T16:00:00.000Z', 'new', ['2026-12-12'])
+    mockFetch({ ...SET_PAGE, '/api/admin/applications': { ok: true, total: 5, applications: [brumes, ...APPLICATIONS_LIST] } })
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Aurore')
+    // Cyan's is planned already.
+    pick('Cyan')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
+    // Brume has two.
+    pick('Brume')
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+    expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
+  })
+
+  it("doesn't pick a planned application, which can be picked by hand, but picks a new one alongside it", async () => {
+    // Aurore has another one, planned already.
+    const planned = application('application-7', { artistId: 'artist-1' }, '2026-07-01T16:00:00.000Z', 'planned', ['2026-10-10'])
+    mockFetch({ ...SET_PAGE, '/api/admin/applications': { ok: true, total: 5, applications: [...APPLICATIONS_LIST, planned] } })
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Cyan')
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+    fireEvent.click(applicationPicker())
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Cyan, reçue le 2 septembre 2026/ }))
+    // Kept, since it's still one of theirs, though Aurore has one that's new, which replaces it once Cyan is taken out.
+    pick('Aurore')
+    expect(applicationPicker()).toHaveValue('Cyan, reçue le 2 septembre 2026')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+  })
+
+  it.each([
+    ['planned', 'Brume, reçue le 20 août 2026'],
+    ['done', 'Aucune candidature'],
+    ['cancelled', 'Aucune candidature'],
+  ] as const)("doesn't pick a %s set's application as its form opens, nor once an artist is added unless it's planned", async (status, picked) => {
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/sessions/session-2': { ok: true, session: withStatus(UNDATED, status) } })
+    renderAt('/admin/sessions/session-2')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Brume' }))
+    await screen.findByRole('heading', { name: 'Set de Brume' })
+    // Brume's only one, since the set can be meant to have none.
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+    // Cyan's is planned already.
+    pick('Cyan')
+    expect(applicationPicker()).toHaveValue(picked)
+  })
+
+  it('picks no application for a cancelled set in a planned session', async () => {
+    mockFetch(SET_PAGE)
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set' }))
+    await screen.findByRole('heading', { name: 'Set' })
+    pick('Aurore')
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+  })
+
+  it("picks a new set's application in a done session", async () => {
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/sessions/session-2': { ok: true, session: withStatus(UNDATED, 'done') } })
+    renderAt('/admin/sessions/session-2')
+
+    await openNew()
+    pick('Aurore')
+    expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
   })
 
   it('offers no application but none to a set without one when the applications could not be loaded', async () => {
@@ -2211,6 +2360,17 @@ describe("A set's form", () => {
       '/api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, members } },
     }
     const picker = () => screen.getByRole('combobox', { name: 'Ajouter un artiste' })
+
+    it("picks a member's own application, never its collective's", async () => {
+      mockFetch(TAKEOVER_PAGE)
+      renderAt('/admin/sessions/session-1')
+
+      await openNew()
+      pick('Le Brume')
+      expect(applicationPicker()).toHaveValue('')
+      pick('Aurore')
+      expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
+    })
 
     it("offers its collective's artists first, in its order, marked with its name, which stay first while a name is typed, but not the set's", async () => {
       mockFetch(TAKEOVER_PAGE)
@@ -2729,11 +2889,11 @@ describe('Adding a session', () => {
     const first = renderAt('/admin/sessions/nouvelle?takeover=collective-1')
     expect(await screen.findByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
     expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
-    // Its application is picked among the collective's.
-    expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aucune candidature')
+    // Its application, the collective's only one, is picked with it.
+    expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 1 septembre 2026')
     fireEvent.click(screen.getByRole('combobox', { name: 'Candidature' }))
     expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026retenue · 14 nov. 2026, 21 nov. 2026'])
-    fireEvent.mouseDown(screen.getByRole('option', { name: /^Reçue le 1 septembre 2026/ }))
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Candidature' }), { key: 'Escape' })
     await fillIn({ type: null })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
@@ -2743,6 +2903,23 @@ describe('Adding a session', () => {
     renderAt('/admin/sessions/nouvelle?takeover=unknown')
     expect(await screen.findByRole('radio', { name: 'Takeover' })).not.toBeChecked()
     expect(screen.queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
+  })
+
+  it("picks the application of the collective of the link as when the collective is picked, not as the session's own", async () => {
+    const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
+    mockFetch({ ...NEW, '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] } })
+    renderAt('/admin/sessions/nouvelle?takeover=collective-1')
+
+    const picker = await screen.findByRole('combobox', { name: 'Candidature' })
+    expect(picker).toHaveValue('Reçue le 1 septembre 2026')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
+    expect(picker).toHaveValue('Reçue le 1 septembre 2026')
+    fireEvent.click(picker)
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucune candidature' }))
+    // Not offered anymore, as Vagues has none.
+    expect(picker).toHaveValue('')
+    expect(picker).toHaveAttribute('placeholder', 'Aucune candidature de ce collectif.')
   })
 
   it("says when there is no application to pick, before the takeover's collective is picked, or when it has none", async () => {
@@ -2758,6 +2935,10 @@ describe('Adding a session', () => {
     fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
     expect(picker).toHaveValue('')
     expect(picker).toHaveAttribute('placeholder', 'Aucune candidature de ce collectif.')
+    // Ondes' only one is picked with it.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Ondes/ }))
+    expect(picker).toHaveValue('Reçue le 1 septembre 2026')
   })
 
   it('offers no application but none when the applications could not be loaded, which it says', async () => {
@@ -2885,10 +3066,11 @@ describe("A new session's sets", () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/))
-    const empty = { performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, application: null }
+    const empty = { performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null }
+    // With their artists' applications, picked as they were added.
     expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0]).sets).toEqual([
-      { ...empty, performers: [{ id: 'artist-1' }], durationMinutes: null, youtubeVideo: 'dQw4w9WgXcQ' },
-      { ...empty, performers: [{ id: 'artist-2' }], durationMinutes: 60, youtubeVideo: null },
+      { ...empty, performers: [{ id: 'artist-1' }], durationMinutes: null, youtubeVideo: 'dQw4w9WgXcQ', application: 'application-3' },
+      { ...empty, performers: [{ id: 'artist-2' }], durationMinutes: 60, youtubeVideo: null, application: 'application-4' },
     ])
   })
 
@@ -3269,7 +3451,8 @@ describe('From an application', () => {
       renderAt('/admin/sessions/nouvelle?takeover=collective-1&application=unknown')
 
       expect(await screen.findByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
-      expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aucune candidature')
+      // The collective's own, as without the application.
+      expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 1 septembre 2026')
       expect(screen.queryByRole('region', { name: 'Candidature' })).not.toBeInTheDocument()
       expect(screen.getByText('Aucun set.')).toBeInTheDocument()
     })

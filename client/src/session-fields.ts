@@ -45,6 +45,13 @@ export const isPerformersApplication = (application: ApplicationOwner, performer
 export const isCollectivesApplication = (application: ApplicationOwner, takeover: { id: string } | null) =>
   takeover !== null && application.collectiveId === takeover.id
 
+// The applications, among `applications`, that a set of `performers` can have, in their order, each performer's on their
+// own, or that a takeover of the collective `takeover` can have. None when they couldn't be loaded (null).
+export const performersApplications = <A extends ApplicationOwner>(applications: A[] | null, performers: { id: string }[]) =>
+  performers.flatMap((performer) => applications?.filter((application) => isPerformersApplication(application, [performer])) ?? [])
+export const collectivesApplications = <A extends ApplicationOwner>(applications: A[] | null, takeover: { id: string } | null) =>
+  applications?.filter((application) => isCollectivesApplication(application, takeover)) ?? []
+
 const NOT_THE_SETS_APPLICATION = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
 const NOT_THE_SESSIONS_APPLICATION = 'La candidature doit être celle du collectif du takeover\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0».'
 const ANNOUNCED_HAS_A_DATE = "Une session annoncée a une date\u00a0: retirez d'abord son annonce."
@@ -466,6 +473,19 @@ export function listedSetFields({ performers, application, ...fields }: ListedSe
 
 // An application, as a set or a session that comes from it gives it.
 export const applicationLink = ({ id, receivedAt }: Pick<ApplicationLink, 'id' | 'receivedAt'>): ApplicationLink => ({ id, receivedAt })
+
+// The application a planned set's or session's form has once its performers or its collective change, from the one it
+// has, `application`, and `candidates`, the applications of its performers or its collective then: their only one that's
+// new or accepted, in place of none, or of one that isn't theirs anymore, or else the one it has (see "Applications" in
+// docs/design/client/admin/sessions.md).
+export function pickedApplication(
+  application: ApplicationLink | null,
+  candidates: Pick<Schema<'Application'>, 'id' | 'receivedAt' | 'status'>[],
+): ApplicationLink | null {
+  if (application && candidates.some(({ id }) => id === application.id)) return application
+  const eligible = candidates.filter(({ status }) => status === 'new' || status === 'accepted')
+  return eligible.length === 1 ? applicationLink(eligible[0]) : application
+}
 
 // The application whose id is `id`, among `applications`, and its artist, among `artists`, for an artist's, or null for a
 // collective's. Null when there's no such application, or undefined when it can't be told, since the applications, or

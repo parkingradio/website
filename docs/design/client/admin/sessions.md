@@ -188,9 +188,9 @@ Once the session has its event on RA, its "Événement RA" only links to it: "mo
 
 "nouvelle session" adds a session, as planned, with its sets (see [A new session's sets](#a-new-sessions-sets)), at
 `/admin/sessions/nouvelle`, then goes to its page. A new session starts without a type, which has to be picked. A
-collective's page leads to it as its takeover, with "Takeover" and the collective picked (`?takeover=<id>`), unless it
-isn't one of the collectives loaded, e.g. when they can't be loaded, in which case nothing is picked. From top to
-bottom, the form has:
+collective's page leads to it as its takeover, with "Takeover" and the collective picked (`?takeover=<id>`), and its
+application, as when the collective is picked (see [Applications](#applications)), unless it isn't one of the collectives
+loaded, e.g. when they can't be loaded, in which case nothing is picked. From top to bottom, the form has:
 
 - "Quand": the start and the end, each a "date" and an "heure", in Québec time (see [Times](#times)), side by side
   where there's room, with « à » between them and no visible label (screen readers name them "Début" and "Fin"), then
@@ -346,8 +346,18 @@ artistes." or "Aucune candidature de ce collectif.".
 The set's or the session's own application is always among the options, and so is the one picked. That's true even
 when it no longer belongs to the performers or the collective, e.g. once its artist is taken out of the set.
 
-The forms never remove the application on their own. When the set's performers, or the takeover's collective, change
-so that the application isn't theirs anymore, the field shows an error right away, which screen readers announce, e.g.
+While a planned set's or session's form, a new one's included, has no application, or one that isn't its performers' or
+its collective's anymore, adding an artist to the performers or taking one out, or picking the takeover's collective,
+picks their application when they have exactly one that's new or accepted (see
+[Status, in Applications](../../server/applications.md#status)). With none, or several, nothing is picked. A planned
+application isn't picked, since it's already a planned set's or session's, but it can be picked by hand. Reordering the
+performers picks nothing, and neither does opening the form of a set or a session that's already there, since it can be
+meant to have none. A done or cancelled set's or session's form picks nothing either, since that would make the
+application done, or accepted.
+
+The forms never take the application away on their own: they only replace it as above. When the set's performers, or
+the takeover's collective, change so that the application isn't theirs anymore, and it isn't replaced, the field shows
+an error right away, which screen readers announce, e.g.
 « La candidature doit être celle d'un des artistes du set : choisissez-en une autre, ou « Aucune candidature ». ». The
 form can't be sent until another application, or "Aucune candidature", is picked. The one exception is a session saved
 as another type than a takeover: it loses its application, as it loses its collective (see

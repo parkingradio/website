@@ -3,6 +3,7 @@ import type { Application } from './application-fields'
 import {
   EMPTY_SESSION_FORM,
   findApplication,
+  pickedApplication,
   checkSession,
   checkSet,
   durationOf,
@@ -538,5 +539,33 @@ describe('the application a form starts from', () => {
   it("can't be told without the applications, or the artists for an artist's", () => {
     expect(findApplication('application-1', null, ARTISTS)).toBeUndefined()
     expect(findApplication('application-1', APPLICATIONS, null)).toBeUndefined()
+  })
+})
+
+describe('the application a form picks as its performers or its collective change', () => {
+  const candidate = (id: string, status: Application['status']) => ({ id, receivedAt: '2026-09-01T16:00:00.000Z', status })
+  const link = (id: string) => ({ id, receivedAt: '2026-09-01T16:00:00.000Z' })
+
+  it("is their only new or accepted one, e.g. one whose sets are all cancelled, the planned, done and rejected ones aside", () => {
+    expect(pickedApplication(null, [candidate('application-1', 'new')])).toEqual(link('application-1'))
+    expect(pickedApplication(null, [candidate('application-1', 'accepted')])).toEqual(link('application-1'))
+    const others = [candidate('application-2', 'planned'), candidate('application-3', 'done'), candidate('application-4', 'rejected')]
+    expect(pickedApplication(null, [...others, candidate('application-1', 'new')])).toEqual(link('application-1'))
+    expect(pickedApplication(null, others)).toBeNull()
+  })
+
+  it('is none when they have none, or several', () => {
+    expect(pickedApplication(null, [])).toBeNull()
+    expect(pickedApplication(null, [candidate('application-1', 'new'), candidate('application-2', 'accepted')])).toBeNull()
+  })
+
+  it("replaces one that isn't theirs, but never one that is", () => {
+    const only = [candidate('application-1', 'new')]
+    expect(pickedApplication(link('application-9'), only)).toEqual(link('application-1'))
+    const theirs = [candidate('application-2', 'planned'), ...only]
+    expect(pickedApplication(link('application-2'), theirs)).toEqual(link('application-2'))
+    // Kept, though it isn't theirs, when there's nothing to replace it with.
+    expect(pickedApplication(link('application-9'), [])).toEqual(link('application-9'))
+    expect(pickedApplication(link('application-9'), [...only, candidate('application-3', 'accepted')])).toEqual(link('application-9'))
   })
 })
