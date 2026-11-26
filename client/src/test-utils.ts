@@ -109,6 +109,20 @@ export function visibleText(element: Element): string {
   return text
 }
 
+/**
+ * `text` with its non-breaking spaces as spaces, e.g. those the admin pages put within times and short days, as in "21 h"
+ * or "sam. 14 nov." (see pages/admin/describe.ts), to compare it with text written with spaces.
+ */
+export function spaced(text: string): string
+export function spaced(text: string | null): string | null
+export function spaced(text: string | null): string | null {
+  return text?.replace(/\u00a0/g, ' ') ?? null
+}
+
+/** Matches an accessible name that's `name`, or that `name` matches, once it's `spaced`, e.g. for `getByRole`. */
+export const named = (name: string | RegExp) => (accessibleName: string) =>
+  typeof name === 'string' ? spaced(accessibleName) === name : name.test(spaced(accessibleName))
+
 /** The sizes of a list's items, by their place in it, for `mockListLayout`: 800 by 40px unless they're given. */
 export type ListLayout = { widths?: number[]; heights?: number[] }
 

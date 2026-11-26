@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../../api/client'
-import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, requestsTo, spaced } from '../../test-utils'
 import { Admins } from './admins'
 import { dateFormat, dateTimeFormat } from './describe'
 
@@ -97,7 +97,7 @@ describe('Admins', () => {
     expect(me.getByText(added)).toBeInTheDocument()
     expect((await row('other@example.com')).getByText(`${added}, par me@example.com`)).toBeInTheDocument()
     expect(
-      (await row('invited@example.com')).getByText(`invitation envoyée, expire le ${dateTimeFormat.format(new Date(inviteExpiresAt))}`),
+      (await row('invited@example.com')).getByText(spaced(`invitation envoyée, expire le ${dateTimeFormat.format(new Date(inviteExpiresAt))}`)),
     ).toBeInTheDocument()
     expect((await row('expired@example.com')).getByText('invitation expirée')).toBeInTheDocument()
   })

@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import App from '../../app'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { held, mockFetch, requestsTo, shownTime, timeParts, typeTime, visibleText as shownText } from '../../test-utils'
+import { held, mockFetch, named, requestsTo, shownTime, spaced, timeParts, typeTime, visibleText as shownText } from '../../test-utils'
 import type { Calendar, ConflictThing } from './calendrier/model'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
@@ -126,7 +126,7 @@ function renderAt(path: string) {
 }
 
 // What an element shows, with its non-breaking spaces as spaces.
-const visibleText = (element: Element) => shownText(element).replace(/\u00a0/g, ' ')
+const visibleText = (element: Element) => spaced(shownText(element))
 const path = () => screen.getByTestId('path').textContent
 const back = () => fireEvent.click(screen.getByTestId('back'))
 const dayButton = (day: string) => document.querySelector<HTMLButtonElement>(`.calendar-month [data-day="${day}"]`)!
@@ -138,7 +138,7 @@ const newSession = () => screen.queryByRole('form', { name: 'Nouvelle session' }
 const chosenDay = () => screen.queryByRole('region', { name: /2026/ })
 const loaded = () => screen.findByRole('region', { name: 'À régler' })
 const list = () => screen.getByRole('region', { name: 'À venir' })
-const listRow = (name: string | RegExp) => within(list()).getByRole('button', { name })
+const listRow = (name: string | RegExp) => within(list()).getByRole('button', { name: named(name) })
 
 // Where the page brings the chosen day into view, which jsdom has no way to.
 const scrollIntoView = vi.fn()
@@ -275,7 +275,7 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      const free = (day: string) => [...cell(day).querySelectorAll('.calendar-free')].map((tag) => tag.textContent)
+      const free = (day: string) => [...cell(day).querySelectorAll('.calendar-free')].map(visibleText)
       expect(free('2026-11-19')).toEqual(['disponible'])
       expect(cell('2026-11-19')).toHaveClass('calendar-available')
       expect(free('2026-11-26')).toEqual(["dispo jusqu'à 10 h", 'dispo dès 16 h'])
@@ -748,7 +748,7 @@ describe('Calendrier', () => {
 
       const alert = await within(form).findByRole('alert')
       expect(visibleText(alert)).toBe("La session n'a pas pu être ajoutée : The session overlaps another one (HAUTE RIVE TAKEOVER, sam. 21 nov. 2026)")
-      expect(within(alert).getByRole('link', { name: 'HAUTE RIVE TAKEOVER, sam. 21 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+      expect(within(alert).getByRole('link', { name: named('HAUTE RIVE TAKEOVER, sam. 21 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
       expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-21')
     })
 
@@ -924,7 +924,7 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier?view=list&issues=open')
       const box = await loaded()
 
-      const row = () => within(box).getAllByRole('button', { name: /^sam\. 21 nov\./ })[0]
+      const row = () => within(box).getAllByRole('button', { name: named(/^sam\. 21 nov\./) })[0]
       fireEvent.click(row())
       expect(path()).toBe('/admin/calendrier?issues=open&month=2026-11&day=2026-11-21')
       await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-11-21')))
@@ -1042,12 +1042,12 @@ describe('Calendrier', () => {
       // One line each, a single control, without links of its own.
       expect(visibleText(conflict)).toBe('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')
       const showDay = within(conflict).getByRole('button')
-      expect(showDay).toHaveAccessibleName('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')
+      expect(within(conflict).getByRole('button', { name: named('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER') })).toBe(showDay)
       expect(within(conflict).queryByRole('link')).not.toBeInTheDocument()
       expect(visibleText(later)).toBe('sam. 9 janv. 2027 → dim. 10 · Séjours et RÉPARATION')
       // Its duration after its sets' performers, which "·" separates.
       expect(visibleText(undated)).toBe('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')
-      expect(within(undated).getByRole('link')).toHaveAccessibleName('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')
+      expect(within(undated).getByRole('link')).toBe(within(undated).getByRole('link', { name: named('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h') }))
       expect(within(undated).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-4')
 
       // A conflict shows its day, chosen, in its month, with the focus on it.
@@ -1073,7 +1073,7 @@ describe('Calendrier', () => {
       expect(visibleText(evening)).toBe('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE')
       expect(visibleText(newYear)).toBe('sam. 2 janv. 2027 21 h – 1 h · NOUVEL AN')
       const showDay = within(evening).getByRole('button')
-      expect(showDay).toHaveAccessibleName('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE')
+      expect(within(evening).getByRole('button', { name: named('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE') })).toBe(showDay)
       expect(within(evening).queryByRole('link')).not.toBeInTheDocument()
 
       // Its day, chosen, in its month, with the focus on it.

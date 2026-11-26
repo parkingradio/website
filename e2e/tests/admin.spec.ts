@@ -410,7 +410,7 @@ async function withFeeds(page: Page) {
   await logIn(page, { at: '/admin/configuration' })
   const table = page.getByRole('table', { name: 'Calendriers externes' })
   const line = table.getByText(/^La dernière lecture a échoué/)
-  await expect(line).toHaveText(/Dernière lecture réussie le 22 novembre 2026 à 12 h 15\.$/)
+  await expect(line).toHaveText(/Dernière lecture réussie le 22 novembre 2026 à 12\sh\s15\.$/)
   return { table, line }
 }
 

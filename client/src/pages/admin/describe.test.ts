@@ -1,8 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionWhen, setDuration, sessionPerformers, setInSentence, setName, setTitle } from './describe'
+import {
+  collectiveOption,
+  deletedWith,
+  dateTimeFormat,
+  formatDayInYear,
+  formatDuration,
+  formatQuebecDay,
+  formatShortDay,
+  formatWeekdayAndNumber,
+  membersGenres,
+  sessionDay,
+  sessionHours,
+  sessionName,
+  sessionWhen,
+  setDuration,
+  sessionPerformers,
+  setInSentence,
+  setName,
+  setTitle,
+  shortTimes,
+} from './describe'
 import type { Session } from '../../session-fields'
+import { spaced } from '../../test-utils'
 
 describe('membersGenres', () => {
   const artists = new Map(
@@ -66,9 +87,9 @@ describe("sessions' days and times", () => {
     vi.resetModules()
     const { sessionDay, sessionHours, sessionWhen } = await import('./describe')
     const session = { start: '2026-11-15T04:00:00.000Z', end: '2026-11-15T06:30:00.000Z', durationMinutes: 150 }
-    expect(sessionDay(session)).toBe('sam. 14 nov. 2026')
-    expect(sessionHours(session)).toBe('23 h – 1 h 30')
-    expect(sessionWhen(session)).toBe('samedi 14 novembre 2026, de 23 h à 1 h 30 le lendemain')
+    expect(spaced(sessionDay(session))).toBe('sam. 14 nov. 2026')
+    expect(spaced(sessionHours(session))).toBe('23 h – 1 h 30')
+    expect(spaced(sessionWhen(session))).toBe('samedi 14 novembre 2026, de 23 h à 1 h 30 le lendemain')
   })
 
   it("say the day a session ends, when its times alone don't say it", () => {
@@ -76,13 +97,26 @@ describe("sessions' days and times", () => {
     const at = (day: number, time: string) => new Date(`2026-11-${day}T${time}:00-05:00`).toISOString()
     const times = (start: string, end: string) => {
       const session = { start, end, durationMinutes: (Date.parse(end) - Date.parse(start)) / 60000 }
-      return [sessionHours(session), sessionWhen(session)]
+      return [sessionHours(session), sessionWhen(session)].map((text) => spaced(text))
     }
     expect(times(at(14, '21:00'), at(14, '23:00'))).toEqual(['21 h – 23 h', 'samedi 14 novembre 2026, de 21 h à 23 h'])
     expect(times(at(14, '21:00'), at(15, '01:00'))).toEqual(['21 h – 1 h', 'samedi 14 novembre 2026, de 21 h à 1 h le lendemain'])
+    // The next day at an earlier time, at most 12 hours after it starts, or at 00:00.
+    expect(times(at(14, '21:00'), at(15, '09:00'))).toEqual(['21 h – 9 h', 'samedi 14 novembre 2026, de 21 h à 9 h le lendemain'])
+    expect(times(at(14, '10:00'), at(15, '00:00'))).toEqual(['10 h – 0 h', 'samedi 14 novembre 2026, de 10 h à 0 h le lendemain'])
+    // Or later than 12 hours after it starts, which only the full form says without the day it ends.
+    expect(times(at(14, '21:00'), at(15, '09:30'))).toEqual(['21 h – dim. 15 nov., 9 h 30', 'samedi 14 novembre 2026, de 21 h à 9 h 30 le lendemain'])
+    expect(times(at(14, '15:00'), at(15, '11:00'))).toEqual(['15 h – dim. 15 nov., 11 h', 'samedi 14 novembre 2026, de 15 h à 11 h le lendemain'])
+    // 12 hours as they pass, over the night the clocks go back.
+    expect(times('2026-10-31T21:00:00-04:00', '2026-11-01T08:00:00-05:00')[0]).toBe('21 h – 8 h')
+    expect(times('2026-10-31T21:00:00-04:00', '2026-11-01T09:00:00-05:00')[0]).toBe('21 h – dim. 1 nov., 9 h')
+    // And over the night they spring forward, 13 hours on the clock.
+    expect(times('2027-03-13T21:00:00-05:00', '2027-03-14T10:00:00-04:00')[0]).toBe('21 h – 10 h')
     // The next day, at the same time or later.
     expect(times(at(14, '21:00'), at(15, '21:00'))).toEqual(['21 h – dim. 15 nov., 21 h', 'samedi 14 novembre 2026, de 21 h à 21 h le lendemain'])
     expect(times(at(14, '18:00'), at(15, '20:00'))).toEqual(['18 h – dim. 15 nov., 20 h', 'samedi 14 novembre 2026, de 18 h à 20 h le lendemain'])
+    // From 00:00 to 00:00, which isn't earlier.
+    expect(times(at(14, '00:00'), at(15, '00:00'))[0]).toBe('0 h – dim. 15 nov., 0 h')
     // Later.
     expect(times(at(13, '18:00'), at(15, '02:00'))).toEqual([
       '18 h – dim. 15 nov., 2 h',
@@ -96,6 +130,20 @@ describe("sessions' days and times", () => {
   })
 })
 
+describe('times and short days', () => {
+  it('never break within a time, a duration or a short day, only between them, with "–" kept with the start', () => {
+    const nb = '\u00a0'
+    expect(shortTimes({ start: '2026-12-01T15:00:00-05:00', end: '2026-12-02T11:30:00-05:00' })).toBe(`15${nb}h${nb}– mer.${nb}2${nb}déc., 11${nb}h${nb}30`)
+    expect(formatDuration(45)).toBe(`45${nb}min`)
+    expect(formatQuebecDay('2026-11-14T21:00:00-05:00')).toBe(`sam.${nb}14${nb}nov.${nb}2026`)
+    expect(formatShortDay('2026-10-07')).toBe(`7${nb}oct.${nb}2026`)
+    expect(formatDayInYear('2026-10-07')).toBe(`mer.${nb}7${nb}oct.`)
+    expect(formatWeekdayAndNumber('2026-11-24')).toBe(`mar.${nb}24`)
+    // In a long day too, its time.
+    expect(dateTimeFormat.format(new Date('2026-10-05T23:30:00-04:00'))).toBe(`5 octobre 2026 à 23${nb}h${nb}30`)
+  })
+})
+
 describe('dates and times', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -106,7 +154,7 @@ describe('dates and times', () => {
     vi.resetModules()
     const { byWhom, dateFormat } = await import('./describe')
     expect(dateFormat.format(new Date('2026-10-05T23:30:00-04:00'))).toBe('5 octobre 2026')
-    expect(byWhom('Modifiée', 'admin@example.com', '2026-10-05T23:30:00-04:00')).toBe('Modifiée par admin@example.com le 5 octobre 2026 à 23 h 30.')
+    expect(spaced(byWhom('Modifiée', 'admin@example.com', '2026-10-05T23:30:00-04:00'))).toBe('Modifiée par admin@example.com le 5 octobre 2026 à 23 h 30.')
   })
 })
 
@@ -115,15 +163,15 @@ describe('names and times of sessions and sets', () => {
 
   it("are a session's duration while its date isn't known, and a set's duration, which sets have rather than times", () => {
     expect(sessionDay(session)).toBe('date à déterminer')
-    expect(sessionHours(session)).toBe('2 h 30')
+    expect(spaced(sessionHours(session))).toBe('2 h 30')
     expect(sessionWhen(session)).toBe('date à déterminer')
-    expect(setDuration({ durationMinutes: 45 })).toBe('45 min')
-    expect(setDuration({ durationMinutes: 90 })).toBe('1 h 30')
+    expect(spaced(setDuration({ durationMinutes: 45 }))).toBe('45 min')
+    expect(spaced(setDuration({ durationMinutes: 90 }))).toBe('1 h 30')
     expect(setDuration({ durationMinutes: null })).toBe('à déterminer')
   })
 
   it('name a session by its title, with its day, where it is named along with others', () => {
-    expect(sessionName({ start: '2026-11-15T02:00:00.000Z', title: 'HAUTE RIVE TAKEOVER' })).toBe('HAUTE RIVE TAKEOVER, sam. 14 nov. 2026')
+    expect(spaced(sessionName({ start: '2026-11-15T02:00:00.000Z', title: 'HAUTE RIVE TAKEOVER' }))).toBe('HAUTE RIVE TAKEOVER, sam. 14 nov. 2026')
     expect(sessionName(session)).toBe('GUEST MIXES, date à déterminer')
   })
 
@@ -132,7 +180,7 @@ describe('names and times of sessions and sets', () => {
     expect(setTitle(set)).toBe('Set de Aurore et Brume')
     expect(setTitle({ performers: [] })).toBe('Set')
     expect(setName(set)).toBe('Set de Aurore et Brume')
-    expect(setName(set, { start: '2026-11-15T02:00:00.000Z', title: 'HAUTE RIVE' })).toBe('Set de Aurore et Brume, HAUTE RIVE, sam. 14 nov. 2026')
+    expect(spaced(setName(set, { start: '2026-11-15T02:00:00.000Z', title: 'HAUTE RIVE' }))).toBe('Set de Aurore et Brume, HAUTE RIVE, sam. 14 nov. 2026')
     expect(setInSentence(set)).toBe('le set de Aurore et Brume')
     expect(setInSentence({ performers: [] })).toBe('le set')
   })

@@ -40,17 +40,18 @@ A thing's times are written in three ways:
 - **In full**, on a day, e.g. the chosen day: "21 h – 23 h", "18 h – dim. 15 nov., 2 h", or "ven. 13 nov., 21 h – 1 h"
   on a day after the one it starts on.
 - **In brief**, on a day, in the list and in "À régler", where they're as short as they can be: "21 h – 23 h", or "21 h
-  – 1 h" when it ends the next day at an earlier time than it starts; its start, then the last day it takes, when that's
-  a later one, e.g. "15 h → mar. 24"; and on a day it takes from its start, "→ 11 h" when it ends on that day, "journée"
-  when it takes all of it, or else the last day it takes, e.g. "→ jeu. 3". A later day has its weekday and its number,
-  which are another day's only four weeks or more after, and its month too, then, e.g. "→ sam. 2 janv.".
+  – 1 h" when its times alone say when it ends (see below); its start, then the last day it takes, when that's a later
+  one, e.g. "15 h → mar. 24"; and on a day it takes from its start, "→ 11 h" when it ends on that day, "journée" when it
+  takes all of it, or else the last day it takes, e.g. "→ jeu. 3". A later day has its weekday and its number, which are
+  another day's only four weeks or more after, and its month too, then, e.g. "→ sam. 2 janv.".
 
 Something that takes whole days, from 00:00 to 00:00, is written as such, whether it's whole-day or not: "toute la
 journée", or in full "du ven. 13 nov. au dim. 15 nov.". Otherwise, something that starts at 00:00 is written from the
 start of its day: "jusqu'à 11 h", or in full "jusqu'au dim. 29 nov., 11 h" when it ends on a later day, or "du sam. 28
 nov. jusqu'au lun. 30 nov., 11 h" on a day after the one it starts on, and in brief "→ 11 h" or "→ dim. 29". Something
-that ends the next day at an earlier time than it starts is written like a session's times in short (see [Times, in
-Sessions](sessions.md#times)), "21 h – 1 h", then "jusqu'à 1 h" on the next day.
+that ends the next day when its times alone say so, by the rule of a session's times in short (see [Times, in
+Sessions](sessions.md#times)), is written "21 h – 1 h", then "jusqu'à 1 h" on the next day. Anything else that ends the
+next day is written like what ends on a later day, e.g. "dès 15 h" from 15 h to 11 h the next day.
 
 ## The address
 
@@ -233,7 +234,7 @@ color and with its shape, framed in red when it's in a conflict; its times in br
   when their overlap doesn't take some of the row's day, the day it starts, without its year unless it's another year
   than the row's day's.
 
-E.g. « mar. 1 déc. | occupation | 15 h – 11 h | Airbnb Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier
+E.g. « mar. 1 déc. | occupation | 15 h → mer. 2 | Airbnb Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier
 de l'équipe (mer. 2 déc.) », or « sam. 21 nov. | session | 21 h – 1 h | HAUTE RIVE TAKEOVER · Aurore, Brume · Cyan ·
 hors plage protégée ».
 
