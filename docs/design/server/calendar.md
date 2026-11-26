@@ -15,15 +15,14 @@ read from are added, changed and removed on the admin pages, not with the tools,
 
 The server gives the studio's calendar: what takes it over a range of days, its [free time](#free-time), and what needs
 settling: its conflicts, the sessions outside protected time, and the sessions without a date (see
-[The calendar](#the-calendar)). It doesn't give holds: free time, and the sessions outside protected time, say what
-apps need to know of them.
+[The calendar](#the-calendar)). It doesn't give holds themselves.
 
 ## Feeds
 
 A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its link: an `https` or a `webcal` link, e.g.
 the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", and there
-can be several with the same name. Each one also has a kind, which says what its events are: `"occupations"`, whose
-events are occupations, known by the feed's name, or `"holds"`, whose events are holds (see [Events](#events)).
+can be several with the same name. Each one also has a kind, which says what its events are: `"occupations"` or
+`"holds"` (see [Events](#events)).
 
 The titles of an `occupations` feed's events reach the admin pages, the apps connected to the site, and the calendar
 apps that admins subscribe to the occupations in, through their calendar of occupations (see
@@ -90,7 +89,7 @@ occupations, which take the studio then, and a `holds` feed's are holds, which p
   that isn't valid iCalendar fails it. A read with too many events fails, rather than leave some out without anyone
   knowing.
 
-An occupation is known by its feed's name, and has a title, from its event's `SUMMARY`, on one line, cut to 200
+An occupation has a title, from its event's `SUMMARY`, on one line, cut to 200
 characters, or `""` when it has none. A hold has no title. No event's description or location is ever kept.
 
 ## The calendar
@@ -102,20 +101,20 @@ day after its last, e.g. a month:
 - the occupations that take some of it, by start, then end,
 - the stretches of [free time](#free-time) that take some of it, by start,
 - every feed, with its kind, when it was last read (`readAt`) and why that failed (`error`),
-- and, whatever the range, what needs settling: the [conflicts](#conflicts) of the 365 days from `today`, the day in
-  Québec when it's asked for, the [sessions outside protected time](#protected-time), and the
+- and, whatever the range, what needs settling: the [conflicts](#conflicts) and the
+  [sessions outside protected time](#protected-time) of the year ahead, and the
   [sessions without a date](#sessions-without-a-date).
 
-Its occupations, and the holds its free time and its sessions outside protected time come from, are what the feeds' last
-reads gave (see [Reading the feeds](#reading-the-feeds)), so they can be out of date or missing: a feed whose last read
-failed still gives what it read before, and one that hasn't been read yet, e.g. right after the server restarts, gives
-nothing. Apps should tell the admin when a feed's last read failed, or when it hasn't been read yet: for an
-`occupations` feed, conflicts can then be missing or out of date, and free time can be there wrongly, or out of date,
-and for a `holds` feed, free time can be missing or out of date, and sessions can wrongly be, or not be, outside
-protected time. Apps can have every feed read again first when they need the calendar to
-be up to date, e.g. right after the admin changed an event, but not before every calendar they ask for, since that waits
-for every read. Occupations and holds also only cover what a read keeps, from a year before it to two years after it
-(see [Events](#events)), so the calendar of days outside that can lack them.
+**The year ahead** is from 00:00 on `today`, the day in Québec when the calendar is asked for, to 00:00 on the day 365
+days later.
+
+Occupations and holds are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)): a feed whose
+last read failed still gives what it read before, and one that hasn't been read yet, e.g. right after the server
+restarts, gives nothing. What the calendar works out from such a feed, its occupations, conflicts, free time and
+sessions outside protected time, can then be wrong or out of date, so apps should tell the admin. They can have every
+feed read again first when they need the calendar to be up to date, e.g. right after the admin changed an event, but not
+before every calendar they ask for, since that waits for every read. Reads also only keep events from a year before
+them to two years after them (see [Events](#events)), so the calendar of days outside that can lack them.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
 known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).
@@ -129,20 +128,19 @@ occupations, of the same feed or not. Two sessions can't overlap (see [Rules, in
 Cancelled sessions, and sessions without a start, don't count; done ones do. A thing that ends when another starts
 doesn't overlap it, and a whole-day occupation overlaps whatever is on its days.
 
-The conflicts are those of the 365 days from `today`: from 00:00 today to 00:00 on the day 365 days later. A conflict is
-one of them when its two things overlap during some of those days, so one that ended this morning is there until
-midnight, while two things that only overlapped yesterday aren't one, even when one of them is still going on.
+The conflicts are those of [the year ahead](#the-calendar): a conflict is one of them when its two things overlap during
+some of it, so one that ended this morning is there until midnight, while two things that only overlapped yesterday
+aren't one, even when one of them is still going on.
 
 There's one conflict for each pair of things that overlap. Conflicts are by start, then end, and each has:
 
-- `start` and `end`: the time its two things overlap, all of it, even outside the 365 days,
+- `start` and `end`: the time its two things overlap, all of it, even outside the year ahead,
 - `things`: the two things, by start, then end, each with its `kind`: `"session"`, with the session's `id`, `title`,
   `start`, `end` and `status`, or `"occupation"`, with the occupation's fields.
 
 ## Protected time
 
-Holds are time that the studio's other calendars keep for sessions. How a calendar works out its holds is up to it: the
-server only reads them. Holds don't take the studio, and never conflict with anything.
+How a calendar works out its holds is up to it: the server only reads them. Holds never conflict with anything.
 
 Time is **protected** when some hold takes it, of any `holds` feed: several feeds' holds count together, and holds that
 follow each other count as one, e.g. one until 15:00 and one from 15:00. A session is within protected time when every
@@ -151,8 +149,8 @@ moment of it, from its start, included, to its end, excluded, is protected.
 Sessions are meant to be within protected time (see [Rules, in Sessions](sessions.md#rules)): the calendar gives the
 [free time](#free-time), where they can go, and the sessions that aren't, which need settling.
 
-**The sessions outside protected time** need settling, like conflicts. They're the sessions that take some of the 365
-days from `today` (see [Conflicts](#conflicts)), and that:
+**The sessions outside protected time** need settling, like conflicts. They're the sessions that take some of
+[the year ahead](#the-calendar), and that:
 
 - are planned (not done or cancelled),
 - have a start,
@@ -165,18 +163,16 @@ by start.
 
 ## Free time
 
-**Free time** is the protected time that nothing takes: no session that isn't cancelled, done ones included, and no
-occupation. It's that of the 365 days from `today` (see [Conflicts](#conflicts)), from 00:00 today, what's over today
-included, to 00:00 on the day 365 days later. It's in stretches, each from when it starts to when it ends, e.g. across
-midnight, only cut where these 365 days start and end: two stretches never overlap or follow each other. Time that
-nothing takes but that isn't protected isn't free time: while there's no `holds` feed, there's none.
+**Free time** is the protected time of [the year ahead](#the-calendar) that nothing takes: no session that isn't
+cancelled, done ones included, and no occupation. The part of today that's over is in it too, so apps shouldn't suggest
+it. It's in stretches, cut only at the ends of the year ahead, not e.g. at midnight: two stretches never overlap or
+follow each other. While there's no `holds` feed, there's none.
 
 Free time is where sessions can go: a session placed within a stretch is within protected time, and overlaps nothing.
-The part of today that's over is still in it, so apps shouldn't suggest it. Free time doesn't include the time a session
-takes itself: a session that's moved can go within its own time and the free time around it.
-
-A stretch has its `start` and `end`. The calendar gives those that take some of the days asked for, whole, e.g. one
-that goes on after the last day: to see where a session can go, apps ask for the calendar of the days it would take.
+It doesn't include the time a session takes itself: a session that's moved can go within its own time and the free time
+around it. The calendar gives the stretches that take some of the days asked for, each with its `start` and `end`,
+whole, e.g. one that goes on after the last day: to see where a session can go, apps ask for the calendar of the days it
+would take.
 
 ## Sessions without a date
 
@@ -197,12 +193,12 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `today` | string | Today in Québec, `YYYY-MM-DD`, which the conflicts, the sessions outside protected time and the free time are counted from |
+| `today` | string | Today in Québec, `YYYY-MM-DD`, which [the year ahead](#the-calendar) starts on |
 | `feeds` | list of feeds | Every feed, as [`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them |
 | `sessions` | list of sessions | The sessions with a start that take some of the days, whatever their status, as [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) gives them, by start |
 | `occupations` | list of occupations | The occupations that take some of the days, by start, then end |
 | `freeTime` | list | The stretches of [free time](#free-time) that take some of the days, by start, each with its `start` and `end` |
-| `conflicts` | list of conflicts | The conflicts of the 365 days from `today`, whatever the days asked for |
+| `conflicts` | list of conflicts | The conflicts of [the year ahead](#the-calendar), whatever the days asked for |
 | `unprotectedSessions` | list | The [sessions outside protected time](#protected-time), by start, whatever the days asked for, each with its `id`, `title`, `start` and `end` |
 | `undatedSessions` | list of sessions | The sessions without a date, as `GET /api/admin/sessions` gives them, the most recently added first, whatever the days asked for |
 

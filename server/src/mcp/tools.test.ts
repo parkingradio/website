@@ -189,7 +189,7 @@ describe('rules', () => {
     expect(calendar).toContain('## Protected time')
     expect(calendar).toContain('## Free time')
     expect(calendar).toContain('Sessions are meant to be within protected time (see Rules, in Sessions (read_documentation, area `sessions`)): the calendar gives')
-    expect(calendar).toMatch(/apps\s+ask for the calendar of the days it would take/)
+    expect(calendar).toMatch(/apps\s+ask for the calendar of the days it\s+would take/)
     expect(calendar).not.toContain('## `')
   })
 
