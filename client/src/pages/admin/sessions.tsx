@@ -65,6 +65,8 @@ import { Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet, TakeoverCollective } from './set-form'
 import { DragHandle, SortableList } from './sortable'
+import { useAnnouncing } from './use-announcing'
+import type { Announcing } from './use-announcing'
 import { arrayMove, useSortableItem } from './use-sortable'
 
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
@@ -85,6 +87,8 @@ const DEFAULT_STATUS: SessionStatus = 'planned'
 const ANNOUNCED_FILTERS: readonly Announced[] = ['true', 'false']
 const ANNOUNCED_CHOICES: readonly Announced[] = ['false', 'true']
 const announcedOf = (session: Session): Announced => (session.announced ? 'true' : 'false')
+// Why a session can't be announced, if it can't (see "Announced" in docs/design/server/sessions.md).
+const cantAnnounce = (session: Session): string | null => (session.start === null ? "La session n'a pas de date." : null)
 
 // The columns the list of sessions can be sorted by, where statuses are in the order sessions go through them.
 type SessionColumn = 'date' | 'name' | 'status'
@@ -117,15 +121,18 @@ function SessionTypeName({ session }: { session: Session }) {
 }
 
 // Sessions, as listed in this section, or on a collective's page, under the heading whose id is `labelledBy`, where the
-// type is left out since they're all its takeovers. The columns sort the list when there's `sorting`.
+// type is left out since they're all its takeovers. The columns sort the list when there's `sorting`, and whether
+// they're announced is a dropdown that changes it with `announce` (see `useAnnouncing`).
 function SessionsTable({
   sessions,
   sorting,
+  announce,
   labelledBy,
   withType = true,
 }: {
   sessions: Session[]
   sorting?: Sorting<SessionColumn>
+  announce: (session: Session, announced: Announced) => Promise<void>
   labelledBy?: string
   withType?: boolean
 }) {
@@ -167,7 +174,16 @@ function SessionsTable({
               <SessionArtists session={session} />
             </td>
             <td>{SESSION_STATUS_LABELS[session.status]}</td>
-            <td>{session.announced && ANNOUNCED_LABELS.true}</td>
+            <td>
+              <StatusSelect
+                label={`Annonce : ${sessionName(session)}`}
+                statuses={ANNOUNCED_CHOICES}
+                labels={ANNOUNCED_LABELS}
+                status={announcedOf(session)}
+                unavailable={cantAnnounce(session)}
+                onChange={(announced) => announce(session, announced)}
+              />
+            </td>
           </tr>
         ))}
       </tbody>
@@ -175,8 +191,17 @@ function SessionsTable({
   )
 }
 
-// The sessions of a collective's takeovers, on its page, with a link to `newPath`, which adds another one.
-export function OwnSessions({ sessions, newPath }: { sessions: Loaded<{ sessions: Session[] }>; newPath: string }) {
+// The sessions of a collective's takeovers, on its page, with a link to `newPath`, which adds another one. They're
+// announced with `announcing`, which the page keeps, since this unmounts while the collective's form is open.
+export function OwnSessions({
+  sessions,
+  announcing: { current, error, announce },
+  newPath,
+}: {
+  sessions: Loaded<{ sessions: Session[] }>
+  announcing: Announcing
+  newPath: string
+}) {
   const headingId = useId()
   return (
     <>
@@ -187,11 +212,12 @@ export function OwnSessions({ sessions, newPath }: { sessions: Loaded<{ sessions
         </Link>
       </div>
       {sessions.kind === 'error' && <SessionsFailure message={sessions.message} />}
+      <ErrorMessage error={error} />
       {sessions.kind === 'loaded' &&
         (sessions.value.sessions.length === 0 ? (
           <p className="admin-placeholder">Aucune session.</p>
         ) : (
-          <SessionsTable sessions={sessions.value.sessions} labelledBy={headingId} withType={false} />
+          <SessionsTable sessions={current(sessions.value.sessions)} announce={announce} labelledBy={headingId} withType={false} />
         ))}
     </>
   )
@@ -293,8 +319,7 @@ export function ApplicationSets({ application }: { application: Application }) {
   )
 }
 
-// The sessions that come from a collective's application, on its page, linking to them, where they're only shown, like
-// the collective's sessions on its page (see `OwnSessions`).
+// The sessions that come from a collective's application, on its page, linking to them, where they're only shown.
 // "créer une session" adds another one, as the collective's takeover.
 export function ApplicationSessions({ application }: { application: Application }) {
   const headingId = useId()
@@ -366,11 +391,12 @@ function SessionsList({ query }: { query: string }) {
   const [status, setStatus] = useStatusFilter(STATUSES, DEFAULT_STATUS)
   const [announced, setAnnounced] = useQueryFilter('announced', ANNOUNCED_FILTERS)
   const sorting = useSort(sessionColumns(status), 'date')
+  const { current, error, announce } = useAnnouncing()
 
   if (sessions.kind === 'error') return <SessionsFailure message={sessions.message} />
   if (sessions.kind === 'loading') return null
 
-  const all = sessions.value.sessions
+  const all = current(sessions.value.sessions)
   const found = search(all, query, sessionSearchFields)
   const withStatus = (sessions: Session[], shown = status) => (shown ? sessions.filter((session) => session.status === shown) : sessions)
   const withAnnounced = (sessions: Session[], shown = announced) => (shown ? sessions.filter((session) => announcedOf(session) === shown) : sessions)
@@ -400,10 +426,11 @@ function SessionsList({ query }: { query: string }) {
         count={(announced) => withAnnounced(foundWithStatus, announced).length}
         onChange={setAnnounced}
       />
+      <ErrorMessage error={error} />
       {listed.length === 0 ? (
         <p className="admin-placeholder">{empty}</p>
       ) : (
-        <SessionsTable sessions={listed} sorting={sorting} />
+        <SessionsTable sessions={listed} sorting={sorting} announce={announce} />
       )}
     </>
   )
@@ -635,7 +662,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         labels={ANNOUNCED_LABELS}
         status={announcedOf(session)}
         disabled={busy}
-        unavailable={(announced) => (announced === 'true' && session.start === null ? "La session n'a pas de date." : null)}
+        unavailable={(announced) => (announced === 'true' ? cantAnnounce(session) : null)}
         onChange={changeAnnounced}
       />
       {session.announcedUpdatedBy && <p className="admin-meta">{byWhom('Annonce changée', session.announcedUpdatedBy, session.announcedUpdatedAt)}</p>}
