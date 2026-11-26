@@ -79,17 +79,11 @@ describe('OAuth routes', () => {
   })
 
   describe('GET /api/admin/oauth/authorization', () => {
-    it('says which app asks, where the browser goes back to, and what it would get', async () => {
+    it('says which app asks, and what it would get', async () => {
       const app = await buildApp()
       const response = await getAuthorization(app, new URLSearchParams(params()).toString())
       expect(response.statusCode).toBe(200)
-      expect(response.json()).toEqual({ ok: true, client: 'Claude', redirectHost: 'claude.ai', local: false, scopes: ['admin'] })
-    })
-
-    it("says when the app is on the user's computer", async () => {
-      const app = await buildApp()
-      const query = new URLSearchParams(params({ client_id: CLAUDE_CODE, redirect_uri: 'http://127.0.0.1:3118/callback' }))
-      expect((await getAuthorization(app, query.toString())).json()).toMatchObject({ client: 'Claude Code', redirectHost: '127.0.0.1', local: true })
+      expect(response.json()).toEqual({ ok: true, client: 'Claude', scopes: ['admin'] })
     })
 
     it('fails with where to send the browser to tell the app, when it can be told', async () => {

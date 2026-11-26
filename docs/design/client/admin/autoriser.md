@@ -11,8 +11,6 @@ The page shows:
 - The app asking, by its name, e.g. "Claude", and that it will act as the logged-in admin, by their email.
 - What it will be able to do, in plain words: for the `admin` scope, everything the admin does on the admin pages,
   except what the MCP server leaves out, which it lists (see [Tools](../../server/mcp.md#tools)).
-- Where the browser goes back to, by its host, e.g. "claude.ai", or that it's the admin's own computer, e.g. for Claude
-  Code.
 - That the admin should only allow it if they just started connecting it themselves, since anyone can send them a link
   to this page.
 
@@ -22,6 +20,20 @@ wrong, except when it can't (see [Authorizing an app](../../server/oauth.md#auth
 that the link isn't valid, or, for an app the site doesn't know (`unknownClient`), that this app can't connect to
 Parking Radio. The server's errors are shown as it gives them, in English, inside the page's sentences, like on the
 admin pages.
+
+## Once the app is done connecting
+
+At `/autoriser/termine`: where an app, e.g. the Parking Radio CLI, can send the browser once it's done connecting,
+whether it worked or not (see [Authorizing an app](../../server/oauth.md#authorizing-an-app)), rather than show a page of
+its own. It isn't linked from the site, and doesn't require being logged in: it shows nothing that needs a session, and
+the admin may have been logged out meanwhile. It loads with the public pages, calls no endpoint, and is styled like
+[Page introuvable](../not-found.md).
+
+Without `failed` in its query, it's titled « Application connectée », and says « L'application est maintenant connectée
+à Parking Radio. Vous pouvez fermer cet onglet. ». With `failed` in its query, with or without a value (e.g. `?failed` or
+`?failed=1`), it's titled « Application non connectée », and says « L'application n'a pas pu être connectée à Parking
+Radio. Revenez à l'application pour savoir pourquoi. ». It shows nothing from its address, not even the app's name,
+since anyone can link to it.
 
 ## Endpoints
 

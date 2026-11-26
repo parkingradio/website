@@ -67,7 +67,7 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Choisir un mot de passe' })).toBeInTheDocument()
   })
 
-  it.each(['/foo', '/admin/foo'])('renders a not found page, with the navbar, at %s', (path) => {
+  it.each(['/foo', '/admin/foo', '/autoriser/termine/x'])('renders a not found page, with the navbar, at %s', (path) => {
     render(
       <MemoryRouter initialEntries={[path]}>
         <App />
@@ -92,14 +92,15 @@ describe("when the admin pages can't be loaded", () => {
       throw new Error('Failed to fetch dynamically imported module')
     })
     const { default: App } = await import('./app')
-    function ToSessions() {
+    function GoTo({ path }: { path: string }) {
       const navigate = useNavigate()
-      return <button onClick={() => navigate('/admin/sessions')}>sessions</button>
+      return <button onClick={() => navigate(path)}>{path}</button>
     }
     render(
       <MemoryRouter initialEntries={['/admin/calendrier']}>
         <App />
-        <ToSessions />
+        <GoTo path="/admin/sessions" />
+        <GoTo path="/autoriser/termine" />
       </MemoryRouter>,
     )
     const failed = "La page n'a pas pu être chargée. Rechargez la page pour réessayer."
@@ -107,12 +108,15 @@ describe("when the admin pages can't be loaded", () => {
     expect(screen.getByRole('link', { name: 'archives' })).toBeInTheDocument()
     expect(error).toHaveBeenCalledExactlyOnceWith(expect.any(Error))
 
-    fireEvent.click(screen.getByRole('button', { name: 'sessions' }))
+    fireEvent.click(screen.getByRole('button', { name: '/admin/sessions' }))
     expect(screen.getByRole('alert')).toHaveTextContent(failed)
 
     // The public pages still work.
     fireEvent.click(screen.getByRole('link', { name: 'archives' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByTitle('Parking Radio Archives')).toBeInTheDocument()
+    // And so does the page that ends connecting an app, which loads with them.
+    fireEvent.click(screen.getByRole('button', { name: '/autoriser/termine' }))
+    expect(screen.getByRole('heading', { name: 'Application connectée' })).toBeInTheDocument()
   })
 })
