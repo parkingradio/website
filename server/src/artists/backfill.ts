@@ -9,8 +9,8 @@ import type { Photos } from './store.js'
 
 // The sizes of photos and flyers are made when they're sent (see `withSizes` in store.ts). Those that the photos and
 // flyers the server keeps don't have, e.g. those sent before there were sizes, or of a width added since, are made when
-// the server starts, in the background, one photo at a time, so that it only takes the memory of one (see "Photos" in
-// docs/design/server/artists.md).
+// the server starts, in the background, one photo at a time, so that a photo or flyer sent meanwhile waits for one of
+// them at most, never for all of them (see images.ts, and "Photos" in docs/design/server/artists.md).
 
 // A photo or a flyer that the server keeps: what it's of, its id, and its key.
 export type StoredImage = { of: 'artist' | 'collective' | 'session'; id: string; key: string }

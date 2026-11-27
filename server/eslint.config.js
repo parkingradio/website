@@ -12,7 +12,7 @@ export default defineConfig([
       globals: globals.node,
     },
   },
-  // Images are only read by src/artists/images.ts, one at a time, which nothing else may bypass, but tests.
+  // Only src/artists/images.ts reads images, one at a time: nothing else imports sharp, except tests and their helpers.
   {
     files: ['**/*.ts'],
     ignores: ['src/artists/images.ts', '**/*.test.ts', '**/test-*.ts'],

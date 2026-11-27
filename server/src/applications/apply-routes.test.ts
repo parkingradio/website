@@ -305,6 +305,8 @@ describe('POST /api/applications', () => {
     const decoding = watchDecoding()
     const photo = await testImage('jpeg', 2000, 1000)
     const other = await testImage('png', 1000, 2000)
+    // Each from its own address (see `apply`), which the rate limit counts applications by, and fewer than
+    // APPLICATIONS_PER_WINDOW anyway.
     const responses = await Promise.all([
       apply(app, { artist: asArtist({ name: 'Une', email: 'une@example.com' }), photo }),
       apply(app, { artist: asArtist({ name: 'Deux', email: 'deux@example.com' }), photo: other }),
