@@ -323,15 +323,15 @@ const NO_LINK = 'Ajoutez au moins un lien.'
 const BAD_LINK = 'Un des liens est invalide.'
 
 // For a refinement of a field, e.g. an email address's format: it only runs on a value that passed the checks before it,
-// so that a field that's too long only gets that error, without its other checks being run, since some take long on long
-// values (see `isEmailAddress`). zod runs a refinement even after an earlier check failed, unless that check aborts,
+// so that a field that's too long only gets that error, without its other checks being run (see "Profiles" in
+// docs/design/server/artists.md). zod runs a refinement even after an earlier check failed, unless that check aborts,
 // which isn't used here: a union would then take the value for another kind of value, and say so instead, e.g. for a
 // collective's member whose name is too long (see collectives/profile.ts).
 const ONCE_VALID = { when: (payload: z.core.ParsePayload) => payload.issues.length === 0 }
 
 // A text, checked in this order: it's cleaned up (trimmed), then it must be up to `maxLength` characters, then it must not
 // have the NUL character, which the database can't store, then pass the refinements added to it, e.g. an email address's
-// format, which only run on a value that passed the checks before them (see `ONCE_VALID`). `field` names it in the error
+// format, which must use `ONCE_VALID`, so that they don't run on a text that's too long. `field` names it in the error
 // when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when it isn't a string, or when it's empty
 // unless it `canBeEmpty`. openapi.json would read as applying its lengths to what's sent, so the description says they
 // apply after the cleanup. Applications' text fields follow the same rules (see applications/fields.ts). The client has

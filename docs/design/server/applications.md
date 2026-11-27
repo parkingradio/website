@@ -10,7 +10,8 @@ The server checks every application against the rules in `server/src/application
 schema). These rules only make sure the data is valid: every field below has to be there when an application is created,
 with its type, even when it's empty, while a change only sends the fields it changes, which follow the same rules.
 Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are in French, like
-for [profiles](artists.md#profiles), because artists see them.
+for [profiles](artists.md#profiles), because artists see them, and as in profiles, a text field that's too long only gets
+that error.
 
 Applications are created in two ways:
 
