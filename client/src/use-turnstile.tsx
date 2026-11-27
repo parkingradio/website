@@ -21,9 +21,9 @@ export function useTurnstile(): { widget: ReactNode; token: string | null; confi
   // Incremented to get a new token, which takes a new widget.
   const [widget, setWidget] = useState(0)
   return {
-    widget: siteKey && <Turnstile key={widget} siteKey={siteKey} onToken={setToken} />,
+    widget: siteKey ? <Turnstile key={widget} siteKey={siteKey} onToken={setToken} /> : null,
     token,
-    configured: siteKey !== undefined,
+    configured: Boolean(siteKey),
     renew: () => {
       setToken(null)
       setWidget((count) => count + 1)

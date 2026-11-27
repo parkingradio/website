@@ -151,6 +151,9 @@ describe('auth routes', () => {
     // admin's, nor whether that admin has chosen a password yet.
     it('returns 401, having checked the password once, for a wrong password, an unknown email, or an admin who has not chosen a password yet', async () => {
       const app = await buildApp()
+      // Against a hash of the same cost as an admin's, which bcrypt's take as long to check: the first 7 characters of a
+      // bcrypt hash are its version and its cost, e.g. "$2b$10$".
+      const cost = (await hashPassword('x')).slice(0, 7)
       const users = [
         { id: 'user-1', email: 'admin@example.com', passwordHash: await hashPassword('correct-password') },
         null,
@@ -164,7 +167,10 @@ describe('auth routes', () => {
 
         expect(response.statusCode).toBe(401)
         expect(response.json()).toEqual({ ok: false, error: 'Invalid email or password' })
-        expect(verifyPassword).toHaveBeenCalledExactlyOnceWith('wrong-password', expect.any(String))
+        expect(verifyPassword).toHaveBeenCalledOnce()
+        const [password, hash] = vi.mocked(verifyPassword).mock.calls[0]
+        expect(password).toBe('wrong-password')
+        expect(hash.slice(0, 7)).toBe(cost)
       }
     })
 

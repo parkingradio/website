@@ -78,8 +78,9 @@ async function stubTurnstile(context: BrowserContext) {
   )
 }
 
-// Waits for the page's Turnstile widget to have given the page its token, e.g. before sending a form that needs it, since
-// it can't be sent until then.
+// Waits for the page's Turnstile widget to have handed the page its token, e.g. before sending a form that needs it,
+// which can't be sent without one. That's once the token was handed over, not once the page has rendered with it, which
+// follows right away.
 export async function turnstileVouched(page: Page) {
   await page.locator('.turnstile[data-vouched]').waitFor({ state: 'attached' })
 }

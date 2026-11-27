@@ -82,8 +82,8 @@ collective again, delete them first. It only seeds the sessions while there are 
 all first. It doesn't change any setting, e.g. feature flags.
 
 It logs in, and a few artists and collectives apply through the "Appliquer" form, with the token that the Turnstile test
-keys from `.env.example` accept, which needs Cloudflare to be reachable. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send
-emails.
+keys from `.env.example` accept, which needs Cloudflare to be reachable. It refuses to seed when `MAIL_DOMAIN` is set,
+since the server would then send emails.
 
 ### The chat
 

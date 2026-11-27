@@ -45,10 +45,20 @@ describe('Login', () => {
     expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: CONFIG.turnstileSiteKey, language: 'fr', appearance: 'interaction-only' })
   })
 
+  it('keeps no room for the widget until Cloudflare needs the admin to click it', () => {
+    renderLogin()
+    const widget = document.querySelector('.turnstile')!
+    expect(widget).not.toHaveClass('shown')
+
+    act(() => turnstile.callbacks!['before-interactive-callback']())
+
+    expect(widget).toHaveClass('shown')
+  })
+
   it('shows an error after a failed login, and gets a new token from Turnstile, since a token can only be checked once', async () => {
     mockFetch({ 'POST /api/auth/login': { ok: false, error: 'Invalid email or password' } })
     const onLogin = renderLogin()
-    // The next widget vouches once the test says so, rather than while the page shows the error, which it can't wait for.
+    // The next widget only vouches when the test says so, so that the token sent next is shown to come from it.
     turnstile.vouches = false
 
     logIn('admin@example.com', 'wrong-password')
