@@ -115,9 +115,11 @@ export const PhotoFile = z.file().meta({ description: `${PHOTO_RULES}. An empty 
 
 // Whether `value` looks like an email address. Only the shape is checked, not that it exists. Besides spaces and @, it
 // can't have the characters that make it more than a single address, or an address with a name, e.g. "Name <address>"
-// or "address, address": we send emails to these addresses, so each one must be exactly one mailbox.
+// or "address, address": we send emails to these addresses, so each one must be exactly one mailbox. Anything over
+// EMAIL_MAX_LENGTH characters is refused before its shape is checked, which takes time that grows with the square of its
+// length, e.g. more than a second for 100,000 characters.
 export function isEmailAddress(value: string): boolean {
-  return /^[^\s@<>()[\],;:"\\]+@[^\s@<>()[\],;:"\\]+\.[^\s@<>()[\],;:"\\]+$/.test(value)
+  return value.length <= EMAIL_MAX_LENGTH && /^[^\s@<>()[\],;:"\\]+@[^\s@<>()[\],;:"\\]+\.[^\s@<>()[\],;:"\\]+$/.test(value)
 }
 
 // Whether `value` looks like a phone number: at least 7 digits, written however the artist likes.
@@ -320,22 +322,31 @@ const NO_GENRE = 'Choisissez au moins un genre.'
 const NO_LINK = 'Ajoutez au moins un lien.'
 const BAD_LINK = 'Un des liens est invalide.'
 
-// A text, trimmed, then up to `maxLength` characters, and refused if it has the NUL character, which the database can't
-// store. `field` names it in the error when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when it
-// isn't a string, or when it's empty unless it `canBeEmpty`. openapi.json would read as applying its lengths to what's
-// sent, so the description says they apply after the cleanup. Applications' text fields follow the same rules (see
-// applications/fields.ts). The client has its own copy (see checkText and checkLine in client/src/checks.ts), and they
-// must be changed together.
+// For a refinement of a field, e.g. an email address's format: it only runs on a value that passed the checks before it,
+// so that a field that's too long only gets that error, without its other checks being run (see "Profiles" in
+// docs/design/server/artists.md). zod runs a refinement even after an earlier check failed, unless that check aborts,
+// which isn't used here: a union would then take the value for another kind of value, and say so instead, e.g. for a
+// collective's member whose name is too long (see collectives/profile.ts).
+const ONCE_VALID = { when: (payload: z.core.ParsePayload) => payload.issues.length === 0 }
+
+// A text, checked in this order: it's cleaned up (trimmed), then it must be up to `maxLength` characters, then it must not
+// have the NUL character, which the database can't store, then pass the refinements added to it, e.g. an email address's
+// format, which must use `ONCE_VALID`, so that they don't run on a text that's too long. `field` names it in the error
+// when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when it isn't a string, or when it's empty
+// unless it `canBeEmpty`. openapi.json would read as applying its lengths to what's sent, so the description says they
+// apply after the cleanup. Applications' text fields follow the same rules (see applications/fields.ts). The client has
+// its own copy (see checkText and checkLine in client/src/checks.ts), and they must be changed together.
 export function text(field: string, maxLength: number, missing: string, { canBeEmpty = false, singleLine = false } = {}) {
   let schema = z.string({ error: missing })
   // Each run of spaces, tabs or line breaks in a single line, e.g. a name, becomes a single space.
   if (singleLine) schema = schema.overwrite((value) => value.replace(/\s+/g, ' '))
   schema = schema.trim()
   if (!canBeEmpty) schema = schema.min(1, missing)
-  schema = schema.refine((value) => !value.includes('\0'), `${field} contient un caractère invalide.`)
+  schema = schema.max(maxLength, `${field} dépasse ${maxLength} caractères.`)
+  schema = schema.refine((value) => !value.includes('\0'), { error: `${field} contient un caractère invalide.`, ...ONCE_VALID })
   const cleaned = singleLine ? 'Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed' : 'Trimmed'
   const length = canBeEmpty ? `up to ${maxLength}` : `between 1 and ${maxLength}`
-  return schema.max(maxLength, `${field} dépasse ${maxLength} caractères.`).meta({ description: `${cleaned}, then ${length} characters` })
+  return schema.meta({ description: `${cleaned}, then ${length} characters` })
 }
 
 // Like `text`, for a field that's a single line, e.g. a name.
@@ -365,7 +376,7 @@ export function city({ canLeaveOut }: { canLeaveOut: boolean }) {
 export function phone({ canLeaveOut }: { canLeaveOut: boolean }) {
   const phone = line('Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indiquez votre numéro de téléphone.', { canBeEmpty: canLeaveOut }).refine(
     (phone) => !phone || isPhoneNumber(phone),
-    'Indiquez un numéro de téléphone valide.',
+    { error: 'Indiquez un numéro de téléphone valide.', ...ONCE_VALID },
   )
   return canLeaveOut ? orLeftOut(phone, '') : phone
 }
@@ -374,7 +385,7 @@ export function phone({ canLeaveOut }: { canLeaveOut: boolean }) {
 export function emailAddress({ canBeEmpty = false } = {}) {
   return line("L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.', { canBeEmpty }).refine(
     (value) => !value || isEmailAddress(value),
-    'Indiquez une adresse e-mail valide.',
+    { error: 'Indiquez une adresse e-mail valide.', ...ONCE_VALID },
   )
 }
 

@@ -10,10 +10,11 @@ import sharp from 'sharp'
 import { privateBucket } from '../core/private-bucket.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import type { Queryable } from '../db/connection.js'
-import { AdminArtistProfile, ArtistProfile, PHOTO_MAX_BYTES, linkSite, parseLink } from './profile.js'
+import { AdminArtistProfile, ArtistProfile, PHOTO_MAX_BYTES, isEmailAddress, linkSite, parseLink } from './profile.js'
 import type { LinkSiteId, Profile } from './profile.js'
 import { sizeKey } from './sizes.js'
 import { InvalidProfile, privatePhotos, validatePhoto, validateProfile, withSizes } from './store.js'
+import { LONG_EMAIL } from './test-emails.js'
 import { UNREADABLE_JPEG, testImage } from './test-photos.js'
 
 // The rules in artists/profile.ts, which every artist's profile has to follow. The server answers with the first error.
@@ -196,9 +197,25 @@ describe('validateProfile', () => {
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')
   })
 
-  it("refuses text with the NUL character, which the database can't store, before checking its length", () => {
+  it("refuses text with the NUL character, which the database can't store, once its length is checked", () => {
     expect(error({ name: 'A\0' })).toBe("Le nom d'artiste contient un caractère invalide.")
-    expect(error({ bio: `\0${'x'.repeat(5001)}` })).toBe('La bio contient un caractère invalide.')
+    expect(error({ bio: `\0${'x'.repeat(5001)}` })).toBe('La bio dépasse 5000 caractères.')
+  })
+
+  it('refuses an email address over 200 characters before checking its format', () => {
+    const address = `${'a'.repeat(188)}@example.com`
+    expect(isEmailAddress(address)).toBe(true)
+    expect(isEmailAddress(`a${address}`)).toBe(false)
+  })
+
+  it("doesn't run a field's other checks once it's too long, which only gets that error", () => {
+    const sent = { name: 'A', email: LONG_EMAIL, phone: 'x'.repeat(41), bio: `\0${'x'.repeat(5001)}` }
+    // Every issue, rather than only the first, which is what the server answers.
+    expect(AdminArtistProfile.safeParse(sent).error?.issues.map((issue) => issue.message)).toEqual([
+      'La bio dépasse 5000 caractères.',
+      "L'adresse e-mail dépasse 200 caractères.",
+      'Le numéro de téléphone dépasse 40 caractères.',
+    ])
   })
 
   describe('as admins send it', () => {
