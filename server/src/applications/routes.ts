@@ -119,7 +119,7 @@ const Recipients = z
       const recipient = sentRecipient.trim()
       if (!recipient) continue
       // Like an artist's email (see artists/profile.ts).
-      if (!isEmailAddress(recipient) || recipient.length > EMAIL_MAX_LENGTH) {
+      if (!isEmailAddress(recipient)) {
         context.addIssue({ code: 'custom', message: `Recipient ${index + 1} isn't an email address` })
         return z.NEVER
       }

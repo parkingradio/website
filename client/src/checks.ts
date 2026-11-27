@@ -22,13 +22,15 @@ export function fieldChecker<T>() {
   return { errors, check }
 }
 
-// The text in `value`, trimmed, and refused if it has the NUL character, like the server does. `field` names it in the
-// error when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when there's none, if it's required.
+// The text in `value`, checked in the server's order: it's trimmed, then it must be up to `maxLength` characters, then it
+// must not have the NUL character. A text that's too long only gets that error, and its own checks, e.g. an email
+// address's format, are only run on a text that passed these. `field` names it in the error when it's too long or has a
+// NUL, e.g. "La bio", and `missing` is the error when there's none, if it's required.
 export function checkText(value: unknown, field: string, maxLength: number, missing: string | null): Checked<string> {
   const trimmed = typeof value === 'string' ? value.trim() : ''
   if (!trimmed && missing) return { error: missing }
-  if (trimmed.includes('\0')) return { error: `${field} contient un caractère invalide.` }
   if (trimmed.length > maxLength) return { error: `${field} dépasse ${maxLength} caractères.` }
+  if (trimmed.includes('\0')) return { error: `${field} contient un caractère invalide.` }
   return { value: trimmed }
 }
 

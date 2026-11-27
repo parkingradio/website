@@ -112,9 +112,10 @@ export function countryOptions(first: string[] = []): ComboboxOption[] {
 
 // Whether `value` looks like an email address. Only the shape is checked, not that it exists. Besides spaces and @, it
 // can't have the characters that make it more than a single address, or an address with a name, e.g. "Name <address>"
-// or "address, address".
+// or "address, address". Anything over EMAIL_MAX_LENGTH characters is refused before its shape is checked, which takes
+// time that grows with the square of its length.
 export function isEmailAddress(value: string): boolean {
-  return /^[^\s@<>()[\],;:"\\]+@[^\s@<>()[\],;:"\\]+\.[^\s@<>()[\],;:"\\]+$/.test(value)
+  return value.length <= EMAIL_MAX_LENGTH && /^[^\s@<>()[\],;:"\\]+@[^\s@<>()[\],;:"\\]+\.[^\s@<>()[\],;:"\\]+$/.test(value)
 }
 
 // Whether `value` looks like a phone number: at least 7 digits, written however the artist likes.

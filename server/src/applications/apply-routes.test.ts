@@ -7,6 +7,7 @@ import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken, photoColumns } from '../artists/store.js'
 import type { StoredArtist } from '../artists/store.js'
 import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
+import { LONG_EMAIL } from '../artists/test-emails.js'
 import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
@@ -451,6 +452,16 @@ describe('POST /api/applications', () => {
     expect(verifyTurnstile).not.toHaveBeenCalled()
     expect(photos.store).not.toHaveBeenCalled()
     expect(store.apply).not.toHaveBeenCalled()
+  })
+
+  it('refuses a long email address right away, as too long, without checking its format, which would take seconds', async () => {
+    const app = await buildApp()
+    const start = performance.now()
+    const response = await apply(app, { artist: asArtist({ email: LONG_EMAIL }) })
+    expect(performance.now() - start).toBeLessThan(1000)
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ ok: false, error: "L'adresse e-mail dépasse 200 caractères." })
+    expect(verifyTurnstile).not.toHaveBeenCalled()
   })
 
   it('refuses photos over the size limit', async () => {

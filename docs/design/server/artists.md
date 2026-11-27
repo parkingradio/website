@@ -34,6 +34,9 @@ A profile has:
 | `email` | string or null | Up to 200 characters, or null when an admin left it out. Two artists can't have the same one, whatever its case |
 | `phone` | string | At least 7 digits. Up to 40 characters, or `""` when an admin left it out |
 
+A field's length is checked first: one that's too long gets only that error, e.g. not an email address's format (links
+aside, whose length is that of what's stored, so it's checked once they're read).
+
 Links are stored as profile names, which the server reduces what was typed or pasted to: e.g.
 `https://soundcloud.com/parkingdotradio/sets/x` is stored as `parkingdotradio`. For `web`, it's the address itself.
 Either is up to 200 characters. `linkSite(id).url(value)`, in `server/src/artists/profile.ts`, turns a profile name back

@@ -8,6 +8,7 @@ import type { ApplicationsStore, StoredApplication } from './store.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import type { SessionsStore, StoredSession, StoredSet } from '../sessions/store.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
+import { LONG_EMAIL } from '../artists/test-emails.js'
 import { applicationsRoutes } from './routes.js'
 import { inQuebecTime } from '../api/formats.js'
 
@@ -779,6 +780,17 @@ describe('applications routes', () => {
       expect(nothing.json()).toEqual({ ok: false, error: 'The recipients must be a list of email addresses' })
       expect(settings.save).not.toHaveBeenCalled()
       expect(savedSettings?.recipients).toEqual(['equipe@example.com'])
+    })
+
+    it('refuses a long recipient right away, without checking its format, which would take seconds', async () => {
+      const app = await buildApp()
+      const cookies = await sessionCookies()
+      const start = performance.now()
+      const response = await app.inject({ method: 'PUT', url: URL, payload: { recipients: [LONG_EMAIL] }, cookies })
+      expect(performance.now() - start).toBeLessThan(1000)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: "Recipient 1 isn't an email address" })
+      expect(settings.save).not.toHaveBeenCalled()
     })
 
     it('counts recipients once blank entries and duplicates are dropped', async () => {
