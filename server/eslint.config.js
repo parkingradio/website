@@ -12,4 +12,18 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  // Images are only read by src/artists/images.ts, one at a time, which nothing else may bypass, but tests.
+  {
+    files: ['**/*.ts'],
+    ignores: ['src/artists/images.ts', '**/*.test.ts', '**/test-*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: 'sharp', message: 'Images are read by src/artists/images.ts, one at a time.' }],
+          patterns: [{ group: ['sharp/*'], message: 'Images are read by src/artists/images.ts, one at a time.' }],
+        },
+      ],
+    },
+  },
 ])

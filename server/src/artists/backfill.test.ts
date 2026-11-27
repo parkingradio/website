@@ -9,9 +9,10 @@ import { privateBucket } from '../core/private-bucket.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { sizesBackfill } from './backfill.js'
 import type { StoredImage } from './backfill.js'
+import { makeSizes } from './images.js'
 import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import type { Photos } from './store.js'
-import { keptFiles, testImage } from './test-photos.js'
+import { keptFiles, testImage, watchDecoding } from './test-photos.js'
 
 // Making the sizes that the photos and flyers the server keeps don't have, when it starts (see "Photos" in
 // docs/design/server/artists.md).
@@ -166,5 +167,38 @@ describe('sizesBackfill', () => {
     await run.stopped()
     expect(await kept()).toEqual(['artists/a.jpg', sizeKey('artists/a.jpg', 1280), sizeKey('artists/a.jpg', 320), 'artists/b.jpg', 'artists/c.jpg'])
     expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ made: 1 }), 'Stopped making the missing sizes of photos and flyers')
+  })
+
+  it('makes the sizes of one photo at a time, so that a photo sent meanwhile waits for one of them at most', async () => {
+    const keys = ['a', 'b', 'c', 'd', 'e'].map((name) => `artists/${name}.jpg`)
+    for (const key of keys) await files.put(key, await testImage('jpeg', 2000, 1000), 'image/jpeg')
+    const sent = await testImage('png', 2000, 1000)
+    // The keys that the backfill stores, as it starts storing them: the photo is sent once it has made the sizes of its
+    // first photo.
+    const stored: string[] = []
+    let storing!: () => void
+    const firstMade = new Promise<void>((resolve) => (storing = resolve))
+    const through: PrivateFiles = {
+      ...files,
+      put: async (key, ...rest) => {
+        stored.push(key)
+        storing()
+        return files.put(key, ...rest)
+      },
+    }
+    const decoding = watchDecoding()
+    const run = sizesBackfill(async () => keys.map((key) => ({ of: 'artist' as const, id: key, key })), through, unused(), logger)
+    run.start()
+    await firstMade
+
+    // How many of the backfill's photos it has made the sizes of.
+    const made = () => keys.filter((key) => stored.includes(sizeKey(key, 1280))).length
+    const before = made()
+    await makeSizes(sent)
+    expect(made() - before).toBeLessThanOrEqual(1)
+
+    await run.stopped()
+    expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ made: keys.length }), 'Made the missing sizes of photos and flyers')
+    expect(decoding.most()).toBe(1)
   })
 })

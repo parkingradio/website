@@ -71,7 +71,10 @@ e.g. where it was taken, but keep its colours, as far as Display P3 has them: th
 in Display P3, with a Display P3 profile of the server's own, and those of a photo without one are as they are, without
 a profile. They're deleted with it.
 When it starts, the server makes, in the background, the sizes that the photos it keeps don't have: until then, and for
-good for a photo it can't read, the endpoints fail with 404 for a size that isn't there.
+good for a photo it can't read, the endpoints fail with 404 for a size that isn't there. The server reads one photo or
+flyer at a time, whatever it's for, e.g. making its sizes, in the background too, or
+[the flyer it gives RA](ra-publication.md#the-flyer): a request with one to read meanwhile waits for its turn, and isn't
+refused.
 
 The public only ever gets the sizes of a public artist's photo, never the photo itself, so that it and its metadata stay
 private. Anyone can keep those sizes for good, browsers and Cloudflare's cache included: so a size that was already

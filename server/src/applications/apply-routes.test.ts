@@ -6,7 +6,7 @@ import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken, photoColumns } from '../artists/store.js'
 import type { StoredArtist } from '../artists/store.js'
-import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
+import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos, testImage, watchDecoding } from '../artists/test-photos.js'
 import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
@@ -298,6 +298,24 @@ describe('POST /api/applications', () => {
     expect(collectives[0].members).toEqual(artists.map((artist) => artist.id))
     expect(applications).toEqual([expect.objectContaining({ artistId: null, collectiveId: collectives[0].id, createdBy: null })])
     expect(photos.photos()).toEqual(['collectives/photo-1.jpg', 'artists/photo-2.png'])
+  })
+
+  it('reads the photos of applications sent at the same time one at a time, and adds every one of them', async () => {
+    const app = await buildApp()
+    const decoding = watchDecoding()
+    const photo = await testImage('jpeg', 2000, 1000)
+    const other = await testImage('png', 1000, 2000)
+    const responses = await Promise.all([
+      apply(app, { artist: asArtist({ name: 'Une', email: 'une@example.com' }), photo }),
+      apply(app, { artist: asArtist({ name: 'Deux', email: 'deux@example.com' }), photo: other }),
+      apply(app, { artist: asCollective(), photo, memberPhotos: [other, photo] }),
+      apply(app, { artist: asArtist({ name: 'Trois', email: 'trois@example.com' }), photo: other }),
+    ])
+
+    for (const response of responses) expect(response.statusCode).toBe(200)
+    expect(decoding.most()).toBe(1)
+    expect(applications).toHaveLength(4)
+    expect(photos.photos()).toHaveLength(6)
   })
 
   it('takes any number of artists, but at least one', async () => {

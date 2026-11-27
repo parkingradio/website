@@ -3,7 +3,7 @@ import type { FastifyBaseLogger } from 'fastify'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectives, sessions } from '../db/schema.js'
-import { UnreadablePhoto } from './sizes.js'
+import { UnreadablePhoto } from './images.js'
 import { completeSizes } from './store.js'
 import type { Photos } from './store.js'
 
