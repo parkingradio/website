@@ -11,7 +11,7 @@ on their own, from their start. The radio can be paused and played again from th
 controls (e.g. its media keys, or AirPods taken out and put back in), which show the artist: playing it again joins
 the radio where it's at by then, rather than where it was paused. When the set it plays ends, it goes on with the one
 on air by then. It sticks with the set it's playing until it ends, even if another one is on air by then, e.g. because
-another playlist was chosen (see [The rotation](../server/radio.md#the-rotation)).
+another playlist was chosen (see [The playlist](../server/radio.md#the-playlist)).
 
 The sets are streamed from SoundCloud, in HLS. Browsers that can't play HLS themselves (e.g. Firefox) play it through a
 library, which only they load. When a stream stops working, e.g. because its address expired, the player asks for it

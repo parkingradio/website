@@ -40,6 +40,7 @@ export const isArea = (name: unknown): name is Area => (AREAS as readonly unknow
 export function areaOf(url: string): Area | undefined {
   const name = /^\/api\/(?:admin\/)?([a-z-]+)/.exec(url)?.[1]
   if (name === 'sets') return 'sessions'
+  if (name === 'on-air') return 'radio'
   return isArea(name) ? name : undefined
 }
 

@@ -321,7 +321,102 @@ describe('soundCloudClient', () => {
     })
   })
 
+  describe('readTrack', () => {
+    const TRACK_URL = 'https://api.soundcloud.com/tracks/soundcloud:tracks:42'
+    const LINK = 'https://soundcloud.com/parkingdotradio/3tons'
+    const PRIVATE_LINK = `${LINK}/s-AbC123`
+    // SoundCloud redirects `/resolve` to the track, with the secret of a private link, then gives the track there.
+    const readable = (location: string | null, answer: Route = () => Response.json(track), status = 302) =>
+      fakeSoundCloud({
+        [RESOLVE_URL]: () => new Response(null, { status, headers: location ? { location } : {} }),
+        [TRACK_URL]: answer,
+      })
+
+    it('resolves the link, then reads the track where SoundCloud redirects', async () => {
+      readable(TRACK_URL)
+
+      expect(await client().readTrack(LINK, '42')).toEqual({ state: 'playable', durationMs: track.duration, secretToken: null })
+      const urls = fetchMock.mock.calls.map(([url]) => url as string).filter((url) => url !== TOKEN_URL)
+      expect(urls).toEqual([`${RESOLVE_URL}?url=${encodeURIComponent(LINK)}`, TRACK_URL])
+      expect(authorization()).toBe('OAuth token-1')
+    })
+
+    it("keeps a private track's own secret, which its streams take, or else that of its private link", async () => {
+      const location = `${TRACK_URL}?secret_token=s-AbC123`
+      readable(location, () => Response.json(privateTrack))
+
+      expect(await client().readTrack(PRIVATE_LINK, '42')).toEqual({ state: 'playable', durationMs: track.duration, secretToken: 's-XyZ789' })
+      expect(fetchMock.mock.calls.at(-1)![0]).toBe(location)
+
+      readable(location, () => Response.json({ ...privateTrack, secret_uri: undefined }))
+      expect((await client().readTrack(PRIVATE_LINK, '42')).secretToken).toBe('s-AbC123')
+    })
+
+    it.each([
+      ['preview', { access: 'preview' }],
+      ['blocked', { access: 'blocked' }],
+      ['not-streamable', { streamable: false }],
+    ])('says when only a preview can be played, or none, or it cannot be streamed: %s', async (state, fields) => {
+      readable(TRACK_URL, () => Response.json({ ...track, ...fields }))
+
+      expect(await client().readTrack(LINK, '42')).toMatchObject({ state, durationMs: track.duration })
+    })
+
+    it.each([
+      ['SoundCloud shows nothing at the link', null, 404],
+      ['the link leads to another track now', 'https://api.soundcloud.com/tracks/soundcloud:tracks:43', 302],
+      ['the link leads to a playlist', PLAYLIST_URL, 302],
+    ])('says the track is missing when %s', async (_, location, status) => {
+      readable(location, undefined, status)
+
+      expect(await client().readTrack(LINK, '42')).toEqual({ state: 'missing', durationMs: null, secretToken: null })
+    })
+
+    it('says the track is missing when SoundCloud shows no track where it redirects', async () => {
+      readable(TRACK_URL, () => new Response(null, { status: 404 }))
+
+      expect((await client().readTrack(LINK, '42')).state).toBe('missing')
+    })
+
+    it("says what's unexpected without quoting SoundCloud's answer, which can have a private track's secret", async () => {
+      const secret = 's-SeCrEt42'
+      readable(`${TRACK_URL}?secret_token=${secret}`, () =>
+        Response.json({ ...track, access: 'everything', secret_uri: `${TRACK_URL}?secret_token=${secret}` }),
+      )
+      const read = await client().readTrack(PRIVATE_LINK, '42')
+      expect(read).toMatchObject({ state: 'unexpected', durationMs: null })
+      expect(read.problem).toContain('access')
+      expect(read.problem).not.toContain(secret)
+
+      readable(TRACK_URL, () => new Response(`{"secret_uri": "${secret}"`))
+      const truncated = await client().readTrack(LINK, '42')
+      expect(truncated.state).toBe('unexpected')
+      expect(JSON.stringify(truncated)).not.toContain(secret)
+    })
+
+    it("fails with the server's own message, without the link or the secret, when SoundCloud answers with an error", async () => {
+      readable(`${TRACK_URL}?secret_token=s-SeCrEt42`, () => new Response('s-SeCrEt42', { status: 503 }))
+
+      const failure = client().readTrack(PRIVATE_LINK, '42')
+      await expect(failure).rejects.toThrow('SoundCloud responded to /tracks/soundcloud:tracks:42 with 503')
+      await expect(failure).rejects.not.toThrow('SeCrEt')
+    })
+  })
+
   describe('playlist', () => {
+    it("fails with what's unexpected, without quoting SoundCloud's answer, which can have secrets", async () => {
+      const secret = 's-SeCrEt42'
+      fakeSoundCloud({
+        [PLAYLIST_URL]: () => Response.json({ ...playlist, title: 42, permalink_url: `https://soundcloud.com/parkingdotradio/sets/rotation/${secret}` }),
+      })
+      const failure = client().playlist('1', secret)
+      await expect(failure).rejects.toThrow('Unexpected SoundCloud /playlists/soundcloud:playlists:1')
+      await expect(failure).rejects.not.toThrow(secret)
+
+      fakeSoundCloud({ [PLAYLIST_URL]: () => new Response(`{"permalink_url": "${secret}"`) })
+      await expect(client().playlist('1', secret)).rejects.toThrow("SoundCloud's answer to /playlists/soundcloud:playlists:1 is not JSON")
+    })
+
     it('returns the playlist and its tracks, in a simpler shape', async () => {
       const result = await client().playlist('1', null)
 
