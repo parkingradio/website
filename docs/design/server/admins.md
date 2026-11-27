@@ -20,9 +20,12 @@ can't be sent when `MAIL_DOMAIN` isn't set (see [Conventions](README.md#conventi
 
 Logging in sets a `session` cookie (`session-<port>` in development, with the server's port, see "Several checkouts" in
 the [README](../../../README.md#several-checkouts)): a JWT signed by the server, HTTP-only, `SameSite=Lax`, `Secure` in
-production, which lasts 7 days. A session also ends when its admin is revoked, or chooses a new password. Since
-`SameSite=Lax` still lets pages on other subdomains send the cookie, admin requests other than `GET` that come from
-another origin are refused (see [Conventions](README.md#conventions)).
+production. A session lasts 7 days from when its cookie was last set, and 30 days from logging in at most. Any admin
+request that isn't refused, whatever its response, gets a new cookie for the same session once its own is more than a
+day old, e.g. [`GET /api/admin/me`](#get-apiadminme-admin) when an admin page opens. The new cookie lasts 7 days from
+then, or until those 30 days are up if that's sooner. A session also ends when its admin is revoked, or chooses a new
+password. Since `SameSite=Lax` still lets pages on other subdomains send the cookie, admin requests other than `GET`
+that come from another origin are refused (see [Conventions](README.md#conventions)).
 
 Admins can also connect apps, e.g. Claude, which then act as them through the MCP server, with tokens rather than the
 cookie (see [OAuth](oauth.md)). Their connections end along with their sessions, when they're revoked or choose a new
