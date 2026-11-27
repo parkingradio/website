@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { Readable } from 'node:stream'
-import { expect, vi } from 'vitest'
+import { expect, onTestFinished, vi } from 'vitest'
 import sharp from 'sharp'
 import { PHOTO_WIDTHS, sizeKey, sizeName } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
@@ -78,8 +78,30 @@ export async function testImage(
   return (rotated ? image.withMetadata({ orientation: 6 }) : image)[format]().toBuffer()
 }
 
+// Watches sharp read images until the test ends, through `toBuffer` and `metadata`, the only calls of its that read them
+// (see images.ts): `most()` is how many it has read at once, at most.
+export function watchDecoding() {
+  type Reading = (...args: unknown[]) => Promise<unknown>
+  const prototype = Object.getPrototypeOf(sharp()) as Record<'toBuffer' | 'metadata', Reading>
+  let reading = 0
+  let most = 0
+  for (const method of ['toBuffer', 'metadata'] as const) {
+    const read = prototype[method]
+    const spy = vi.spyOn(prototype, method).mockImplementation(async function (this: unknown, ...args) {
+      most = Math.max(most, ++reading)
+      try {
+        return await read.apply(this, args)
+      } finally {
+        reading--
+      }
+    })
+    onTestFinished(() => spy.mockRestore())
+  }
+  return { most: () => most }
+}
+
 // Images with and without a profile, 8-bit and 16-bit, by name, with the colour each one is, in sRGB, to check that
-// what's made from them keeps it (see `readPhoto` in sizes.ts): `testImage`'s colour, which `testImage` makes in
+// what's made from them keeps it (see `openPhoto` in images.ts): `testImage`'s colour, which `testImage` makes in
 // Display P3, where it's about (212, 96, 59), and a grey whose profile has a gamma of 1.8, far enough from sRGB's that
 // it's another grey when the profile is ignored.
 export async function colourTestImages(): Promise<Record<string, { image: Buffer; colour: number[] }>> {

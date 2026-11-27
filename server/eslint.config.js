@@ -12,4 +12,18 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  // Only src/artists/images.ts reads images, one at a time: nothing else imports sharp, except tests and their helpers.
+  {
+    files: ['**/*.ts'],
+    ignores: ['src/artists/images.ts', '**/*.test.ts', '**/test-*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: 'sharp', message: 'Images are read by src/artists/images.ts, one at a time.' }],
+          patterns: [{ group: ['sharp/*'], message: 'Images are read by src/artists/images.ts, one at a time.' }],
+        },
+      ],
+    },
+  },
 ])

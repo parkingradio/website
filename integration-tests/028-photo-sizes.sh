@@ -3,7 +3,7 @@
 # The sizes of photos and flyers, made in the server's Docker image, i.e. by sharp as it's installed there (see "Photos"
 # in docs/design/server/artists.md): JPEG, PNG and WebP images are served as WebP, 320 and 1280 pixels wide, upright,
 # without their metadata, made when they're sent, kept next to the image they're made from, and deleted with it. What
-# they look like is tested by server/src/artists/sizes.test.ts, and who sees them by server/src/events/public.db.test.ts.
+# they look like is tested by server/src/artists/images.test.ts, and who sees them by server/src/events/public.db.test.ts.
 # Those that are missing are made when the server starts (see 998-photo-sizes-backfill.sh).
 
 source "$(dirname "$0")/lib.sh"
