@@ -18,8 +18,6 @@
 
 source "$(dirname "$0")/lib.sh"
 
-readonly TOKEN='XXXX.DUMMY.TOKEN.XXXX'
-
 readonly PHOTO="$(mktemp)"
 readonly EMPTY="$(mktemp)"
 readonly CUT="$(mktemp)"
@@ -62,7 +60,7 @@ apply() {
     if [ -n "${4-$PHOTO}" ]; then photo=(--form "photo=@${4-$PHOTO}"); fi
     for file in "${@:5}"; do photo+=(--form "memberPhoto=@${file:-$EMPTY}"); done
     request --header "CF-Connecting-IP: $1" --form-string "artist=$2" --form-string "application=${APPLICATION}" \
-        --form-string "turnstileToken=${3-$TOKEN}" ${photo[@]+"${photo[@]}"} "${BASE_URL}/api/applications"
+        --form-string "turnstileToken=${3-$TURNSTILE_TOKEN}" ${photo[@]+"${photo[@]}"} "${BASE_URL}/api/applications"
 }
 
 echo "  an artist applies, and is added, as having added themselves"
@@ -92,10 +90,10 @@ expect_body_contains '"createdBy":null'
 echo "  a photo that can't be read is refused, in French, saying whose it is, and nothing is stored"
 photos="$(photos_on_disk)"
 collective_photos="$(photos_on_disk collectives)"
-apply 198.51.100.27 "$(profile Unreadable unreadable@integration.test)" "$TOKEN" "$CUT"
+apply 198.51.100.27 "$(profile Unreadable unreadable@integration.test)" "$TURNSTILE_TOKEN" "$CUT"
 expect_status 400
 expect_body_contains '"error":"La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels."'
-apply 198.51.100.27 "$(collective 'Illisible' illisible@integration.test "$(member Une),$(member Deux)")" "$TOKEN" "$PHOTO" "$PHOTO" "$CUT"
+apply 198.51.100.27 "$(collective 'Illisible' illisible@integration.test "$(member Une),$(member Deux)")" "$TURNSTILE_TOKEN" "$PHOTO" "$PHOTO" "$CUT"
 expect_status 400
 expect_body_contains '"error":"Artiste 2 : La photo ne peut pas être lue'
 [ "$(photos_on_disk)" = "$photos" ] && [ "$(photos_on_disk collectives)" = "$collective_photos" ] || fail "expected nothing to be stored"
@@ -104,7 +102,7 @@ if printf '%s' "$BODY" | grep -Fq '"name":"Unreadable"'; then _show_body; fail "
 
 echo "  an artist applies without a photo, and is added without one"
 photos="$(photos_on_disk)"
-apply 198.51.100.22 "$(profile Photoless photoless@integration.test)" "$TOKEN" ''
+apply 198.51.100.22 "$(profile Photoless photoless@integration.test)" "$TURNSTILE_TOKEN" ''
 expect_status 200
 [ "$(photos_on_disk)" = "$photos" ] || fail "expected no photo to be stored"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists"
@@ -113,7 +111,7 @@ expect_body '"name":"Photoless"[^{]*\{[^}]*\}[^}]*"hasPhoto":false'
 
 echo "  an artist who already exists, whatever the case of their email, can't apply again"
 photos="$(photos_on_disk)"
-apply 198.51.100.15 "$(profile 'Someone Else' Applicant@Integration.Test)" "$TOKEN" "$OTHER"
+apply 198.51.100.15 "$(profile 'Someone Else' Applicant@Integration.Test)" "$TURNSTILE_TOKEN" "$OTHER"
 expect_status 409
 expect_body_contains 'Un artiste est déjà inscrit avec cette adresse e-mail.'
 [ "$(photos_on_disk)" = "$photos" ] || fail "expected the photo sent with the refused application to be deleted"
@@ -125,7 +123,7 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/applications?artist=
 echo "  a collective applies, and is added, with its artists, their profiles and photos, as having added itself"
 photos="$(photos_on_disk)"
 # Only the second artist has a photo.
-apply 198.51.100.23 "$(collective 'Le Collectif' collectif@integration.test "$(member Une),$(member Deux)")" "$TOKEN" "$PHOTO" '' "$OTHER"
+apply 198.51.100.23 "$(collective 'Le Collectif' collectif@integration.test "$(member Une),$(member Deux)")" "$TURNSTILE_TOKEN" "$PHOTO" '' "$OTHER"
 expect_status 200
 [ "$(photos_on_disk)" = "$((photos + 1))" ] || fail "expected the photo of the collective's second artist to be stored"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/collectives"
@@ -157,7 +155,7 @@ expect_body_contains '"error":"Artiste 2 : Indiquez la ville."'
 echo "  a collective that already exists, whatever the case of its email, can't apply again, and nothing it sent is kept"
 artist_photos="$(photos_on_disk)"
 photos="$(photos_on_disk collectives)"
-apply 198.51.100.24 "$(collective 'Un Autre' Collectif@Integration.Test "$(member Trois)")" "$TOKEN" "$OTHER" "$THIRD"
+apply 198.51.100.24 "$(collective 'Un Autre' Collectif@Integration.Test "$(member Trois)")" "$TURNSTILE_TOKEN" "$OTHER" "$THIRD"
 expect_status 409
 expect_body_contains 'Un collectif est déjà inscrit avec cette adresse e-mail.'
 [ "$(photos_on_disk collectives)" = "$photos" ] && [ "$(photos_on_disk)" = "$artist_photos" ] ||
@@ -166,7 +164,7 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists"
 if printf '%s' "$BODY" | grep -Fq '"name":"Trois"'; then _show_body; fail "the refused collective's artists were added"; fi
 
 echo "  but a collective can have an artist's email"
-apply 198.51.100.25 "$(collective 'Les Applicants' applicant@integration.test "$(member Quatre)")" "$TOKEN" ''
+apply 198.51.100.25 "$(collective 'Les Applicants' applicant@integration.test "$(member Quatre)")" "$TURNSTILE_TOKEN" ''
 expect_status 200
 
 # Like the other checks, this one leaves no collectives behind, which the collectives check counts.
@@ -182,7 +180,7 @@ photos="$(photos_on_disk)"
 statuses="$(for address in 198.51.100.18 198.51.100.19; do
     curl --silent --output /dev/null --write-out '%{http_code}\n' --header "CF-Connecting-IP: ${address}" \
         --form-string "artist=$(profile Simultaneous simultaneous@integration.test)" --form-string "application=${APPLICATION}" \
-        --form-string "turnstileToken=${TOKEN}" --form "photo=@${THIRD}" "${BASE_URL}/api/applications" &
+        --form-string "turnstileToken=${TURNSTILE_TOKEN}" --form "photo=@${THIRD}" "${BASE_URL}/api/applications" &
 done | sort | tr '\n' ' ')"
 [ "$statuses" = '200 409 ' ] || fail "expected one application to be accepted and the other refused, got: ${statuses}"
 [ "$(photos_on_disk)" = "$((photos + 1))" ] || fail "expected only the photo of the artist who was added to be kept"

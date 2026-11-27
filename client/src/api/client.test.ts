@@ -101,7 +101,7 @@ describe('api', () => {
     try {
       await api.GET('/api/admin/features')
       // A wrong password.
-      await api.POST('/api/auth/login', { body: { email: 'admin@example.com', password: 'wrong' } })
+      await api.POST('/api/auth/login', { body: { email: 'admin@example.com', password: 'wrong', turnstileToken: 'token' } })
       expect(listener).not.toHaveBeenCalled()
     } finally {
       unsubscribe()

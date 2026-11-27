@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import rateLimit from '@fastify/rate-limit'
@@ -10,6 +11,8 @@ import { hashPassword, verifyPassword, setSessionCookie, clearSessionCookie } fr
 import { hashToken } from '../core/tokens.js'
 import { endConnections } from '../oauth/store.js'
 import { clientAddress } from '../api/client-address.js'
+import { checkTurnstile } from '../api/turnstile.js'
+import type { TurnstileVerifier } from '../api/turnstile.js'
 
 // Logging in and out, and choosing a password from an invite. Admins themselves are seen and invited through
 // admins/routes.ts.
@@ -20,10 +23,19 @@ const MIN_PASSWORD_LENGTH = 8
 export const LOGIN_ATTEMPTS_PER_WINDOW = 10
 const LOGIN_WINDOW = '15 minutes'
 
+const TURNSTILE_REFUSED = { ok: false as const, error: 'The anti-bot check failed, try again' }
+const TURNSTILE_UNAVAILABLE = { ok: false as const, error: "The anti-bot check couldn't be done, try again in a few minutes" }
+
+// What a password is checked against when there's none to check it against: no admin has the email, or they haven't
+// chosen their password yet. That way, logging in takes as long either way, so how long a 401 takes doesn't tell which
+// emails are admins'. Made by hashPassword, so that checking it takes as long as checking an admin's. No password
+// matches it, and it's never taken as a match anyway.
+const dummyHash = hashPassword(randomBytes(32).toString('hex'))
+
 // The logged-in admin.
 const LoggedIn = z.object({ ok: z.literal(true), email: z.string() }).meta({ id: 'LoggedIn' })
 
-export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }) {
+export async function authRoutes(app: FastifyInstance, { db, verifyTurnstile }: { db: Queryable; verifyTurnstile: TurnstileVerifier }) {
   const api = zodRoutes(app)
   // Only routes that opt in through `config.rateLimit` are limited.
   await app.register(rateLimit, { global: false, keyGenerator: clientAddress })
@@ -43,18 +55,29 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }
       schema: {
         summary: 'Logs in as an admin',
         tags: ['Admins'],
-        body: z.object({ email: z.string().min(1), password: z.string().min(1) }),
-        response: { 200: LoggedIn, 401: ApiError, 429: ApiError },
+        // An empty token is a refused one rather than a missing field, as Turnstile refuses it.
+        body: z.object({
+          email: z.string().min(1),
+          password: z.string().min(1),
+          turnstileToken: z.string().meta({ description: 'The token the Turnstile widget gave the page' }),
+        }),
+        response: { 200: LoggedIn, 400: ApiError, 401: ApiError, 429: ApiError, 502: ApiError },
       },
     },
     async (request, reply) => {
-      const { email, password } = request.body
+      const { email, password, turnstileToken } = request.body
+      // Before anything about the email or the password, so that guessing passwords takes passing Turnstile each time.
+      const turnstile = await checkTurnstile(request, verifyTurnstile, turnstileToken)
+      if (turnstile === 'unavailable') return reply.status(502).send(TURNSTILE_UNAVAILABLE)
+      if (turnstile === 'refused') return reply.status(400).send(TURNSTILE_REFUSED)
+
       const [user] = await db
         .select({ id: users.id, email: users.email, passwordHash: users.passwordHash, sessionVersion: users.sessionVersion })
         .from(users)
         .where(sql`lower(${users.email}) = lower(${email})`)
 
-      if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+      const matches = await verifyPassword(password, user?.passwordHash ?? (await dummyHash))
+      if (!user?.passwordHash || !matches) {
         return reply.status(401).send({ ok: false, error: 'Invalid email or password' })
       }
 

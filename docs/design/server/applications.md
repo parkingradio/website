@@ -186,9 +186,8 @@ creates has a null `createdBy`, since nobody on the team created it.
 
 Anyone can call this endpoint, so it has two protections against bots and floods:
 
-- **Cloudflare Turnstile.** The page shows Turnstile's widget, using the site key from `GET /api/config`. Once the
-  visitor passes Turnstile's check, the widget gives the page a token, which the page sends with the application. The
-  server then asks Cloudflare whether the token is valid.
+- **Cloudflare Turnstile.** The page sends a token from Turnstile with the application, which the server checks with
+  Cloudflare (see [Conventions](README.md#conventions)).
 - **A rate limit.** Each client can send 5 requests per hour. Requests that fail count too.
 
 **Only new artists and collectives can apply this way.** If an artist applying alone has the email of an artist who

@@ -14,7 +14,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     api.GET('/api/config').then((result) => {
-      if (!result.ok) console.error('Failed to load /api/config: asset URLs will not resolve, every feature is off, the "Appliquer" form cannot be sent, and pages do not show their environment')
+      if (!result.ok) console.error('Failed to load /api/config: asset URLs will not resolve, every feature is off, the "Appliquer" form cannot be sent, admins cannot log in, and pages do not show their environment')
       if (!cancelled) setState(result.ok ? { kind: 'loaded', config: result } : { kind: 'failed' })
     })
     return () => {

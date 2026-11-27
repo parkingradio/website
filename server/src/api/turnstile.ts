@@ -1,6 +1,10 @@
-// Cloudflare Turnstile keeps bots from sending applications. Once a visitor passes Turnstile's check on a page, the
-// page gets a token from Cloudflare. Before accepting the application, the server asks Cloudflare whether that token is
-// valid. Each token can only be checked once, and only within 5 minutes.
+import type { FastifyRequest } from 'fastify'
+import { visitorAddress } from './client-address.js'
+
+// Cloudflare Turnstile keeps bots from sending applications and from guessing admins' passwords (see Turnstile, in
+// Conventions in docs/design/server/README.md). Once a visitor passes Turnstile's check on a page, the page gets a
+// token from Cloudflare. Before going on, the server asks Cloudflare whether that token is valid. Each token can only
+// be checked once, and only within 5 minutes.
 //
 // https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
 
@@ -32,4 +36,23 @@ export function turnstileVerifier(secretKey: string): TurnstileVerifier {
     if (errorCodes.includes('internal-error')) throw new Error('Turnstile had an internal error')
     return { success: false, errorCodes }
   }
+}
+
+// Whether Turnstile accepts the token that `request` sent: `refused`, or `unavailable` when Cloudflare couldn't be asked,
+// or couldn't check it. Either way, it's logged.
+export async function checkTurnstile(
+  request: FastifyRequest,
+  verify: TurnstileVerifier,
+  token: string,
+): Promise<'passed' | 'refused' | 'unavailable'> {
+  const verified = await verify(token, visitorAddress(request)).catch((error: unknown) => {
+    request.log.error({ err: error }, 'Failed to check a Turnstile token with Cloudflare')
+    return null
+  })
+  if (!verified) return 'unavailable'
+  if (verified.success) return 'passed'
+  // With a wrong secret key, every token is refused, so it's logged as an error to get noticed.
+  const misconfigured = verified.errorCodes.some((code) => code.includes('secret'))
+  request.log[misconfigured ? 'error' : 'info']({ errorCodes: verified.errorCodes }, 'Turnstile refused a token')
+  return 'refused'
 }

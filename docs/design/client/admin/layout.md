@@ -12,6 +12,15 @@ a notice saying that the session ended. Logging in then shows the page again, lo
 whether there's a session, e.g. because the server can't be reached, they say so in place of the page, rather than
 showing the login form.
 
+The login form asks for the admin's email and password. Above « se connecter », a Cloudflare Turnstile checks that the
+admin is a person, as on [Appliquer](../appliquer.md): its checkbox is only shown when Cloudflare needs the admin to
+click it, and no room is kept for it until then. The form can't be sent until Turnstile has vouched for the admin, and
+says so if they try: « La vérification anti-robot n'est pas terminée. Attendez quelques secondes, ou rechargez la page si
+elle n'apparaît pas. » Nor can it be sent when the configuration, which has Turnstile's site key, can't be fetched (see
+[Configuration](../architecture.md#configuration)): it then says « La connexion n'est pas possible pour le moment.
+Rechargez la page. » After any failed attempt, it shows why, and gets a new token, since Cloudflare only accepts each one
+once (see [`POST /api/auth/login`](../../server/admins.md#post-apiauthlogin)).
+
 The public pages don't load the admin pages, nor the pages at `/accept-invite` and `/autoriser`, which load together the
 first time one of them opens. When they can't be loaded, they say so in their place: « La page n'a pas pu être chargée.
 Rechargez la page pour réessayer. »

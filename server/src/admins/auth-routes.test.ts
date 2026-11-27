@@ -7,6 +7,7 @@ const { selectResult, dbState } = vi.hoisted(() => ({
   // `failure`, when set, is what selecting fails with.
   selectResult: { rows: [] as Record<string, unknown>[], failure: null as Error | null },
   dbState: {
+    selects: 0,
     updatedPasswordHashes: [] as string[],
     updatedSessionVersions: [] as unknown[],
     deleteWhereArgs: [] as unknown[],
@@ -17,7 +18,10 @@ vi.mock('../db/connection.js', () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => (selectResult.failure ? Promise.reject(selectResult.failure) : Promise.resolve(selectResult.rows)),
+        where: () => {
+          dbState.selects++
+          return selectResult.failure ? Promise.reject(selectResult.failure) : Promise.resolve(selectResult.rows)
+        },
       }),
     }),
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -45,11 +49,18 @@ vi.mock('../db/connection.js', () => ({
   },
 }))
 
+// Spied on, to check that logging in checks a password whoever the email is.
+vi.mock('./auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./auth.js')>()
+  return { ...actual, verifyPassword: vi.fn(actual.verifyPassword) }
+})
+
 import { DrizzleQueryError, eq } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import { db } from '../db/connection.js'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth-routes.js'
-import { hashPassword, nowSeconds, signSessionToken, verifySessionToken, SESSION_IDLE_SECONDS } from './auth.js'
+import { hashPassword, nowSeconds, signSessionToken, verifyPassword, verifySessionToken, SESSION_IDLE_SECONDS } from './auth.js'
+import type { TurnstileVerifier } from '../api/turnstile.js'
 import { generateToken, hashToken } from '../core/tokens.js'
 import { config } from '../core/config.js'
 import { acceptSessions, sessionCookies } from './test-sessions.js'
@@ -57,16 +68,23 @@ import { invites, oauthCodes, oauthConnections } from '../db/schema.js'
 
 const DAY = 24 * 60 * 60
 
+// Vouches for "the-token" only.
+const verifyTurnstile = vi.fn<TurnstileVerifier>(async (token) =>
+  token === 'the-token' ? { success: true } : { success: false, errorCodes: ['invalid-input-response'] },
+)
+
 describe('auth routes', () => {
   const originalEnv = { ...process.env }
 
   beforeEach(() => {
     selectResult.rows = []
     selectResult.failure = null
+    dbState.selects = 0
     dbState.updatedPasswordHashes = []
     dbState.updatedSessionVersions = []
     dbState.deleteWhereArgs = []
     process.env.JWT_SECRET = 'test-secret'
+    vi.clearAllMocks()
   })
 
   afterEach(() => {
@@ -80,25 +98,33 @@ describe('auth routes', () => {
     useZodSchemas(app)
     await app.register(fastifyCookie)
     acceptSessions(app)
-    await app.register(authRoutes, { db })
+    await app.register(authRoutes, { db, verifyTurnstile })
     return app
   }
 
   describe('POST /api/auth/login', () => {
+    // Logs in with the token Turnstile vouches for, unless `body` has another one.
+    function login(app: FastifyInstance, body: object, { clientAddress, cookies }: { clientAddress?: string; cookies?: Record<string, string> } = {}) {
+      return app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: clientAddress ? { 'cf-connecting-ip': clientAddress } : {},
+        cookies,
+        payload: { turnstileToken: 'the-token', ...body },
+      })
+    }
+
     it('logs in and sets a session cookie, of the current version of their sessions, when the password matches', async () => {
       selectResult.rows = [
         { id: 'user-1', email: 'admin@example.com', passwordHash: await hashPassword('correct-password'), sessionVersion: 2 },
       ]
       const app = await buildApp()
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'admin@example.com', password: 'correct-password' },
-      })
+      const response = await login(app, { email: 'admin@example.com', password: 'correct-password' }, { clientAddress: '198.51.100.7' })
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })
+      expect(verifyTurnstile).toHaveBeenCalledExactlyOnceWith('the-token', '198.51.100.7')
       const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
       const session = await verifySessionToken(cookie!.value)
       expect(session?.admin).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 2 })
@@ -114,67 +140,70 @@ describe('auth routes', () => {
       selectResult.rows = [{ ...user, passwordHash: await hashPassword('correct-password') }]
       const app = await buildApp()
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'admin@example.com', password: 'correct-password' },
-        cookies: { [config.sessionCookie]: before },
-      })
+      const response = await login(app, { email: 'admin@example.com', password: 'correct-password' }, { cookies: { [config.sessionCookie]: before } })
 
       const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
       expect((await verifySessionToken(cookie!.value))?.loggedInAt).toBe(nowSeconds())
       expect(cookie!.maxAge).toBe(SESSION_IDLE_SECONDS)
     })
 
-    it('returns 401 when the password does not match', async () => {
-      selectResult.rows = [
+    // A password is checked, once, whoever the email is, so that how long a 401 takes doesn't tell whether the email is an
+    // admin's, nor whether that admin has chosen a password yet.
+    it('returns 401, having checked the password once, for a wrong password, an unknown email, or an admin who has not chosen a password yet', async () => {
+      const app = await buildApp()
+      const users = [
         { id: 'user-1', email: 'admin@example.com', passwordHash: await hashPassword('correct-password') },
+        null,
+        { id: 'user-2', email: 'pending@example.com', passwordHash: null },
       ]
-      const app = await buildApp()
+      for (const user of users) {
+        selectResult.rows = user ? [user] : []
+        vi.mocked(verifyPassword).mockClear()
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'admin@example.com', password: 'wrong-password' },
-      })
+        const response = await login(app, { email: user?.email ?? 'nobody@example.com', password: 'wrong-password' })
 
-      expect(response.statusCode).toBe(401)
-      expect(response.json()).toEqual({ ok: false, error: 'Invalid email or password' })
+        expect(response.statusCode).toBe(401)
+        expect(response.json()).toEqual({ ok: false, error: 'Invalid email or password' })
+        expect(verifyPassword).toHaveBeenCalledExactlyOnceWith('wrong-password', expect.any(String))
+      }
     })
 
-    it('returns 401 when the email is unknown', async () => {
+    it('returns 400, without looking up the email or checking the password, when Turnstile refuses the token, even an empty one', async () => {
+      selectResult.rows = [{ id: 'user-1', email: 'admin@example.com', passwordHash: await hashPassword('correct-password') }]
       const app = await buildApp()
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'nobody@example.com', password: 'whatever' },
-      })
+      for (const turnstileToken of ['refused', '']) {
+        const response = await login(app, { email: 'admin@example.com', password: 'correct-password', turnstileToken })
 
-      expect(response.statusCode).toBe(401)
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'The anti-bot check failed, try again' })
+        expect(response.cookies).toEqual([])
+      }
+      expect(dbState.selects).toBe(0)
+      expect(verifyPassword).not.toHaveBeenCalled()
     })
 
-    it('returns 401 for a pending user who has not set a password yet', async () => {
-      selectResult.rows = [{ id: 'user-1', email: 'pending@example.com', passwordHash: null }]
+    it('returns 502, without looking up the email or checking the password, when Turnstile cannot be reached', async () => {
+      verifyTurnstile.mockRejectedValueOnce(new Error('fetch failed'))
       const app = await buildApp()
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'pending@example.com', password: 'whatever' },
-      })
+      const response = await login(app, { email: 'admin@example.com', password: 'correct-password' })
 
-      expect(response.statusCode).toBe(401)
+      expect(response.statusCode).toBe(502)
+      expect(response.json()).toEqual({ ok: false, error: "The anti-bot check couldn't be done, try again in a few minutes" })
+      expect(dbState.selects).toBe(0)
+      expect(verifyPassword).not.toHaveBeenCalled()
     })
 
-    it('returns 400, saying why, when email or password is missing or not a string', async () => {
+    it('returns 400, saying why, without checking the token, when a field is missing or not a string', async () => {
       const app = await buildApp()
       const refused: [unknown, string][] = [
-        [{ email: 'admin@example.com' }, '`password`: Invalid input: expected string, received undefined'],
-        [{ email: '', password: 'whatever' }, '`email`: Too small: expected string to have >=1 characters'],
-        [{ email: 'admin@example.com', password: '' }, '`password`: Too small: expected string to have >=1 characters'],
+        [{ email: 'admin@example.com', turnstileToken: 'the-token' }, '`password`: Invalid input: expected string, received undefined'],
+        [{ email: '', password: 'whatever', turnstileToken: 'the-token' }, '`email`: Too small: expected string to have >=1 characters'],
+        [{ email: 'admin@example.com', password: '', turnstileToken: 'the-token' }, '`password`: Too small: expected string to have >=1 characters'],
         // Rather than failing with 500 once it gets to checking the password.
-        [{ email: 'admin@example.com', password: 12345678 }, '`password`: Invalid input: expected string, received number'],
+        [{ email: 'admin@example.com', password: 12345678, turnstileToken: 'the-token' }, '`password`: Invalid input: expected string, received number'],
+        [{ email: 'admin@example.com', password: 'whatever' }, '`turnstileToken`: Invalid input: expected string, received undefined'],
         [null, 'body: Invalid input: expected object, received null'],
       ]
       for (const [body, error] of refused) {
@@ -187,6 +216,7 @@ describe('auth routes', () => {
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error })
       }
+      expect(verifyTurnstile).not.toHaveBeenCalled()
     })
 
     it('keeps the email out of the logs and the response when the database fails', async () => {
@@ -195,11 +225,7 @@ describe('auth routes', () => {
       const logs: string[] = []
       const app = await buildApp(logs)
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'admin@example.com', password: 'whatever' },
-      })
+      const response = await login(app, { email: 'admin@example.com', password: 'whatever' })
 
       expect(response.statusCode).toBe(500)
       expect(response.json()).toEqual({ ok: false, error: 'Internal server error' })
@@ -209,12 +235,7 @@ describe('auth routes', () => {
 
     describe('rate limiting', () => {
       async function attemptLogin(app: FastifyInstance, clientAddress?: string) {
-        return app.inject({
-          method: 'POST',
-          url: '/api/auth/login',
-          headers: clientAddress ? { 'cf-connecting-ip': clientAddress } : {},
-          payload: { email: 'nobody@example.com', password: 'guess' },
-        })
+        return login(app, { email: 'nobody@example.com', password: 'guess' }, { clientAddress })
       }
 
       async function exhaustLoginAttempts(app: FastifyInstance, clientAddress?: string) {
@@ -235,15 +256,17 @@ describe('auth routes', () => {
         expect(response.json()).toEqual({ ok: false, error: 'Too many login attempts, try again in 15 minutes' })
       })
 
-      it('counts attempts that fail with 400 too', async () => {
+      it('counts attempts that fail with 400 too, for their fields or their token', async () => {
         const app = await buildApp()
 
         for (let i = 0; i < LOGIN_ATTEMPTS_PER_WINDOW; ++i) {
-          const response = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'nobody@example.com' } })
-          expect(response.statusCode).toBe(400)
+          const body = i % 2 ? { email: 'nobody@example.com' } : { email: 'nobody@example.com', password: 'guess', turnstileToken: 'refused' }
+          expect((await login(app, body)).statusCode).toBe(400)
         }
 
         expect((await attemptLogin(app)).statusCode).toBe(429)
+        // Not even for the attempt that went over the limit.
+        expect(verifyTurnstile).toHaveBeenCalledTimes(LOGIN_ATTEMPTS_PER_WINDOW / 2)
       })
 
       it('limits each client address reported by Cloudflare separately', async () => {

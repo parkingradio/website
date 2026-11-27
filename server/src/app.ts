@@ -9,7 +9,7 @@ import type { ApplyStore } from './applications/apply-store.js'
 import { applicationsRoutes } from './applications/routes.js'
 import type { ApplicationsSettingsStore } from './applications/settings.js'
 import type { ApplicationsStore } from './applications/store.js'
-import type { TurnstileVerifier } from './applications/turnstile.js'
+import type { TurnstileVerifier } from './api/turnstile.js'
 import { artistsRoutes } from './artists/routes.js'
 import type { ArtistsStore, Photos } from './artists/store.js'
 import type { CalendarFeedsStore } from './calendar/feeds.js'
@@ -102,7 +102,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(fastifyCookie)
   await app.register(healthRoutes, { db: deps.db })
   await app.register(configRoutes, { store: deps.features, environment: deps.environment })
-  await app.register(authRoutes, { db: deps.db })
+  await app.register(authRoutes, { db: deps.db, verifyTurnstile: deps.verifyTurnstile })
   await app.register(adminRoutes, { store: deps.admins, sendEmail: deps.sendEmail, origin: deps.siteOrigin })
   await app.register(raEventsRoutes)
   // The radio and sessions share it (see radio/soundcloud-app.ts).

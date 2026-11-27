@@ -72,8 +72,8 @@ export const config = {
   get assetsDomain() {
     return required('ASSETS_DOMAIN')
   },
-  // The keys of the Cloudflare Turnstile widget that keeps bots from sending applications (see
-  // applications/turnstile.ts). Required, so that applications are never accepted without it.
+  // The keys of the Cloudflare Turnstile widget that keeps bots from sending applications and from logging in (see
+  // api/turnstile.ts). Required, so that neither is ever accepted without it.
   get turnstileSiteKey() {
     return required('TURNSTILE_SITE_KEY')
   },

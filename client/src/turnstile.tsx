@@ -1,7 +1,8 @@
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 
-// Cloudflare Turnstile's widget, which gets the token that `POST /api/applications` needs to tell people from
-// bots. https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
+// Cloudflare Turnstile's widget, which gets the token that the forms send to tell people from bots, e.g. applying and
+// logging in (see Turnstile, in Conventions in docs/design/server/README.md).
+// https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 
 type RenderOptions = {
@@ -11,9 +12,10 @@ type RenderOptions = {
   callback: (token: string) => void
   'expired-callback': () => void
   'error-callback': () => void
+  'before-interactive-callback': () => void
 }
 
-// The parts of Turnstile's API that the form uses.
+// The parts of Turnstile's API that the forms use.
 export type TurnstileApi = {
   render(container: HTMLElement, options: RenderOptions): string
   remove(widgetId: string): void
@@ -36,7 +38,7 @@ function loadTurnstile(): TurnstileApi | Promise<TurnstileApi> {
     script.async = true
     script.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(new Error('Turnstile did not load')))
     script.onerror = () => {
-      // Tried again the next time the form is shown.
+      // Tried again the next time a form is shown.
       loading = null
       reject(new Error('Turnstile could not be loaded'))
     }
@@ -48,15 +50,18 @@ function loadTurnstile(): TurnstileApi | Promise<TurnstileApi> {
 type Props = {
   siteKey: string
   // Called with each token the widget gets, and with null once the last one can't be used anymore. Turnstile gets a new
-  // token on its own before one expires, so this is only null for a while, e.g. when Turnstile is unreachable. A token
-  // can only be checked once, so getting another one takes another widget, e.g. by changing the component's `key`.
+  // token on its own before one expires, so this is only null for a while, e.g. when Turnstile is unreachable.
   onToken: (token: string | null) => void
 }
 
+// Forms use it through `useTurnstile` (see use-turnstile.tsx).
 export function Turnstile({ siteKey, onToken }: Props) {
   const container = useRef<HTMLDivElement>(null)
   // The latest `onToken`, without rendering the widget again when it changes.
   const token = useEffectEvent((value: string | null) => onToken(value))
+  // Whether the widget is shown, which it only is once Cloudflare needs the visitor to click it, and from then on. Until
+  // then, it takes no room, and the page keeps none for it either (see the `shown` class).
+  const [shown, setShown] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -66,16 +71,17 @@ export function Turnstile({ siteKey, onToken }: Props) {
       widget = turnstile.render(container.current, {
         sitekey: siteKey,
         language: 'fr',
-        // Only shown when Cloudflare needs the artist to click it.
+        // Only shown when Cloudflare needs the visitor to click it.
         appearance: 'interaction-only',
         callback: (value) => token(value),
         'expired-callback': () => token(null),
         'error-callback': () => token(null),
+        'before-interactive-callback': () => setShown(true),
       })
     }
     const turnstile = loadTurnstile()
     if (turnstile instanceof Promise) {
-      // Without the script, there's no token: the form says so when the artist tries to send it.
+      // Without the script, there's no token: the form says so when it's sent.
       turnstile.then(render, () => {})
     } else {
       render(turnstile)
@@ -86,5 +92,5 @@ export function Turnstile({ siteKey, onToken }: Props) {
     }
   }, [siteKey])
 
-  return <div ref={container} className="turnstile" />
+  return <div ref={container} className={shown ? 'turnstile shown' : 'turnstile'} />
 }

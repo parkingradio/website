@@ -71,6 +71,8 @@ export interface paths {
                     "application/json": {
                         email: string;
                         password: string;
+                        /** @description The token the Turnstile widget gave the page */
+                        turnstileToken: string;
                     };
                 };
             };
@@ -113,6 +115,15 @@ export interface paths {
                 };
                 /** @description Default Response */
                 500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                502: {
                     headers: {
                         [name: string]: unknown;
                     };

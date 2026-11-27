@@ -143,7 +143,7 @@ type Server = {
 }
 
 async function logIn(url: string, { email, password }: Credentials): Promise<Server> {
-  const response = await request(url, 'POST', '/api/auth/login', { email, password }, { 'CF-Connecting-IP': LOGIN_ADDRESS })
+  const response = await request(url, 'POST', '/api/auth/login', { email, password, turnstileToken: TURNSTILE_TOKEN }, { 'CF-Connecting-IP': LOGIN_ADDRESS })
   // Only the cookie's name and value: the rest is for browsers. Its name depends on how the server runs, e.g. it has
   // the port in it in development.
   const cookie = response.headers.getSetCookie()[0]?.split(';')[0]

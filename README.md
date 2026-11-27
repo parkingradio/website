@@ -61,7 +61,9 @@ database's tables when it starts). This prints a link where you choose your pass
 npm run create-admin -w server -- you@example.com
 ```
 
-Running it again for an existing admin gives a link that resets their password.
+Running it again for an existing admin gives a link that resets their password. Logging in, like applying through the
+"Appliquer" form, takes a Cloudflare Turnstile token, which the browser gets from Cloudflare, and the server checks with
+it: both need Cloudflare to be reachable, and use the Turnstile test keys from `.env.example`, which let everyone through.
 
 ### Seed data
 
@@ -79,8 +81,8 @@ collectives that aren't there, by their email, or by their name for those withou
 collective again, delete them first. It only seeds the sessions while there are none, so to seed them again, delete them
 all first. It doesn't change any setting, e.g. feature flags.
 
-A few artists and collectives apply through the "Appliquer" form, which needs Cloudflare to be reachable, and the
-Turnstile test keys from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send
+It logs in, and a few artists and collectives apply through the "Appliquer" form, with the token that the Turnstile test
+keys from `.env.example` accept, which needs Cloudflare to be reachable. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send
 emails.
 
 ### The chat
@@ -137,8 +139,8 @@ e.g. `FC_SEED=... FC_PATH=... npm run test:db`, and `FC_NUM_RUNS` sets how many 
 Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
 use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need
 `npm run db:up`. The browser tests then seed it, as `npm run seed` does, and run against that data, while the
-integration tests start from an empty database. Seeding has some of its artists and collectives apply through the
-"Appliquer" form, so the browser tests need Cloudflare to be reachable.
+integration tests start from an empty database. Both log in, and apply through the "Appliquer" form, with Turnstile
+tokens that the server checks with Cloudflare, so they need Cloudflare to be reachable.
 
 Stop the local database with `npm run db:down` when you're done.
 

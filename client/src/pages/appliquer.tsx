@@ -7,7 +7,6 @@ import { checkApplicant } from '../applicant'
 import type { ApplicantErrors, ApplicantKind } from '../applicant'
 import { EMAIL_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, PHONE_MAX_LENGTH, parseLink, pickedPhotoError } from '../artist-profile'
 import type { LinkSiteId } from '../artist-profile'
-import { useTurnstileSiteKey } from '../config-context'
 import { TIME_SLOTS } from '../time-slots'
 import type { TimeSlotId } from '../time-slots'
 import { MAX_MEMBERS, SLOT_HOURS, performanceTypesError, selectableDates } from './appliquer/choices'
@@ -18,7 +17,7 @@ import { MembersField } from './appliquer/members-field'
 import { fieldId, shownErrors } from './appliquer/profile'
 import type { Profile } from './appliquer/profile'
 import { FieldError, IdentityFields, PlaceFields, PresentationFields } from './appliquer/profile-fields'
-import { Turnstile } from './appliquer/turnstile'
+import { TURNSTILE_PENDING, useTurnstile } from '../use-turnstile'
 import './appliquer.css'
 
 // The "Appliquer" page: the form artists fill in to apply for a set, which sends their profile, or their collective's and
@@ -177,11 +176,7 @@ export function Appliquer() {
   // Computed once: the range shouldn't move under the artist's feet if the page stays open past midnight.
   const [{ first, last }] = useState(() => selectableDates(new Date()))
   const formRef = useRef<HTMLFormElement>(null)
-  // The token Turnstile gives once it vouches for the artist, which the server checks. Null until then.
-  const turnstileSiteKey = useTurnstileSiteKey()
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-  // Incremented to get a new token, once one was sent, which shows a new widget.
-  const [turnstileWidget, setTurnstileWidget] = useState(0)
+  const turnstile = useTurnstile()
   // The collective's artist whose profile is shown.
   const [memberTab, setMemberTab] = useState(0)
   const collective = form.kind === 'collective'
@@ -224,15 +219,13 @@ export function Appliquer() {
     const { applicant, application } = result
     if (!applicant || !application) return
     // Without the configuration, there's no Turnstile, so no token is coming.
-    if (!turnstileSiteKey) {
+    if (!turnstile.configured) {
       setStatus({ state: 'failed', error: 'Le formulaire ne peut pas être envoyé pour le moment. Rechargez la page.' })
       return
     }
+    const turnstileToken = turnstile.token
     if (!turnstileToken) {
-      setStatus({
-        state: 'failed',
-        error: "La vérification anti-robot n'est pas terminée. Attendez quelques secondes, ou rechargez la page si elle n'apparaît pas.",
-      })
+      setStatus({ state: 'failed', error: TURNSTILE_PENDING })
       return
     }
 
@@ -248,9 +241,8 @@ export function Appliquer() {
     // The server explains what's wrong in French, e.g. that an artist already has that email address. Otherwise, the
     // network failed, or the answer wasn't the server's, e.g. a photo too large for the proxy in front of it.
     const error = (sent.fromServer !== false && sent.error) || SEND_FAILED
-    // The server may have checked the token, which can only be checked once.
-    setTurnstileToken(null)
-    setTurnstileWidget((count) => count + 1)
+    // The server may have checked the token.
+    turnstile.renew()
     setStatus({ state: 'failed', error })
   }
 
@@ -498,7 +490,7 @@ export function Appliquer() {
                   {status.error}
                 </p>
               )}
-              {turnstileSiteKey && <Turnstile key={turnstileWidget} siteKey={turnstileSiteKey} onToken={setTurnstileToken} />}
+              {turnstile.widget}
               <button className="submit" type="submit" disabled={status.state === 'sending'}>
                 {status.state === 'sending' ? 'envoi…' : 'envoyer ma candidature'}
               </button>

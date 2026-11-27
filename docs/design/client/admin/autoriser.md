@@ -3,8 +3,8 @@
 At `/autoriser`: where an admin allows an app, e.g. Claude, to act as them (see
 [Authorizing an app](../../server/oauth.md#authorizing-an-app)). Apps send the admin's browser there, with what they ask
 for in the page's address. Like `/accept-invite`, the page is outside `/admin`, and isn't linked from the site. It
-requires being logged in like the admin pages: logged out, it shows their login form, without their menu, saying that
-logging in is to allow the app (see [Admin](layout.md)).
+requires being logged in like the admin pages: logged out, it shows their login form, Turnstile included, without their
+menu, saying that logging in is to allow the app (see [Admin](layout.md)).
 
 The page shows:
 

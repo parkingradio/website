@@ -41,12 +41,17 @@ request() {
     rm -f "$body_file" "$header_file"
 }
 
-# login <client address> <email> <password> -- attempt a login, as a client at that address.
+# The token Cloudflare's test site key gives, which its test secret key, the server's in these checks (see .env.example),
+# accepts, as it does any token but an empty one.
+readonly TURNSTILE_TOKEN='XXXX.DUMMY.TOKEN.XXXX'
+
+# login <client address> <email> <password> [<token>] -- attempt a login, as a client at that address, with that Turnstile
+# token, or else TURNSTILE_TOKEN.
 #
 # Logins are rate limited per CF-Connecting-IP, so checks that log in use addresses of their own.
 login() {
     request --header "CF-Connecting-IP: $1" --header 'Content-Type: application/json' \
-        --data "{\"email\":\"$2\",\"password\":\"$3\"}" "${BASE_URL}/api/auth/login"
+        --data "{\"email\":\"$2\",\"password\":\"$3\",\"turnstileToken\":\"${4-$TURNSTILE_TOKEN}\"}" "${BASE_URL}/api/auth/login"
 }
 
 # session_of <email> <password> -- log in, as a client at the check's address (IP), and print the session cookie.

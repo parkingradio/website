@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { afterAll, afterEach, beforeEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
-import { mockFetch } from './test-utils'
+import { mockFetch, stubTurnstile } from './test-utils'
 
 // Requests sent outside of a test's mocks fail the test file (see `afterAll`), rather than reaching whatever answers at
 // jsdom's address, http://localhost:3000, e.g. a dev server, whose 401 would end the session of the test running then.
@@ -32,6 +32,8 @@ beforeEach(() => {
   // ConfigProvider fetches /api/config on mount, so every test that renders it needs that request
   // answered. Tests stubbing fetch themselves override this.
   mockFetch()
+  // Turnstile's script can't be loaded, e.g. for the login form, which every admin page shows while logged out.
+  stubTurnstile()
   // jsdom doesn't implement media: without these, an audio element that's paused or emptied, e.g. when
   // the page it's on goes away, logs that it isn't implemented.
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})

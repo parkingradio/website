@@ -1,6 +1,7 @@
 import { act, fireEvent, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { AppConfig, ConfigState } from './config-context'
+import type { TurnstileApi } from './turnstile'
 
 export type Body = Record<string, unknown>
 
@@ -10,6 +11,35 @@ export const CONFIG: AppConfig = {
   turnstileSiteKey: '1x00000000000000000000AA',
   environment: 'production',
   features: {},
+}
+
+// The token the first Turnstile widget gives, with Cloudflare's test site key, which `CONFIG` has, then the one the widgets
+// after it give (see `stubTurnstile`).
+export const TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
+export const NEXT_TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX.2'
+
+/**
+ * Stands in for Turnstile's script once `stubTurnstile` has been called: each widget vouches right away, unless `vouches`
+ * is false, and `callbacks` are the last widget's, e.g. to vouch later, or have its token expire.
+ */
+export const turnstile = {
+  vouches: true,
+  callbacks: null as Parameters<TurnstileApi['render']>[1] | null,
+  render: vi.fn<TurnstileApi['render']>(),
+  remove: vi.fn<TurnstileApi['remove']>(),
+}
+
+/** Has the pages use `turnstile` in place of Turnstile's script, which jsdom doesn't load, as it is for a new test. setupTests.ts calls it before each test. */
+export function stubTurnstile() {
+  turnstile.vouches = true
+  turnstile.callbacks = null
+  turnstile.render.mockReset().mockImplementation((_container, options) => {
+    turnstile.callbacks = options
+    if (turnstile.vouches) options.callback(turnstile.render.mock.calls.length === 1 ? TURNSTILE_TOKEN : NEXT_TURNSTILE_TOKEN)
+    return 'widget'
+  })
+  turnstile.remove.mockReset()
+  window.turnstile = turnstile
 }
 
 // The configuration once it's been fetched, as `CONFIG` with these feature flags, e.g. to render a page with a flag on.
