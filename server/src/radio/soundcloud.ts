@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { EARLIEST_INSTANT, LATEST_INSTANT } from '../api/formats.js'
 import { cached } from '../core/cache.js'
+import type { TrackState } from './track-states.js'
 
 // A minimal client for SoundCloud's API (https://developers.soundcloud.com/docs/api/guide), authenticated
 // as the SoundCloud app whose credentials it's given. It uses app-only tokens obtained with the app's own
@@ -39,6 +40,12 @@ type Token = z.infer<typeof TokenResponse> & { obtainedAt: number }
 
 // Tracks are turned into a simpler shape, so that SoundCloud's formats don't leak out of this file.
 const TRACK_URN = /^soundcloud:tracks:(\d+)$/
+// For a private track, its address on the API, with its secret, which is what's kept: the secret its streams take.
+const SecretUri = z
+  .string()
+  .startsWith(`${API_ORIGIN}/`)
+  .nullish()
+  .transform((uri) => (uri && new URL(uri).searchParams.get('secret_token')) || null)
 const Track = z
   .object({
     urn: z.string().regex(TRACK_URN),
@@ -50,12 +57,7 @@ const Track = z
     access: z.enum(['playable', 'preview', 'blocked']),
     streamable: z.boolean(),
     sharing: z.string(),
-    // For a private track, its address on the API, with its secret, which is what's kept.
-    secret_uri: z
-      .string()
-      .startsWith(`${API_ORIGIN}/`)
-      .nullish()
-      .transform((uri) => (uri && new URL(uri).searchParams.get('secret_token')) || null),
+    secret_uri: SecretUri,
   })
   // A private track can't be streamed without its secret.
   .refine((track) => track.sharing === 'public' || track.secret_uri !== null, {
@@ -72,6 +74,20 @@ const Track = z
     secretToken: track.secret_uri,
   }))
 export type SoundCloudTrack = z.output<typeof Track>
+
+// What `readTrack` reads of a track: its state, its length in milliseconds, when it's known, and what it takes to stream it
+// when it's private, which mustn't be handed out. `problem` is what was unexpected, for the logs, when it's "unexpected".
+export type TrackRead = { state: TrackState; durationMs: number | null; secretToken: string | null; problem?: string }
+
+// A track, as `readTrack` reads it, which only needs what says whether it can be played, and its secret. Unlike `Track`,
+// it doesn't require a private track's `secret_uri`, since the link it's read through has a secret too.
+const ReadTrack = z.object({
+  urn: z.string().regex(TRACK_URN),
+  duration: z.number().int().positive(),
+  access: z.enum(['playable', 'preview', 'blocked']),
+  streamable: z.boolean(),
+  secret_uri: SecretUri,
+})
 
 const Playlist = z
   .object({
@@ -169,12 +185,13 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
     return { ...parsed.data, obtainedAt: Date.now() }
   }
 
-  async function get(url: string, redirect: 'follow' | 'manual' = 'follow'): Promise<Response> {
+  // `signal` cuts the request short, besides its timeout.
+  async function get(url: string, redirect: 'follow' | 'manual' = 'follow', signal?: AbortSignal): Promise<Response> {
     const send = async (accessToken: Promise<Token>) =>
       fetch(url, {
         headers: { Authorization: `OAuth ${(await accessToken).access_token}`, Accept: 'application/json; charset=utf-8' },
         redirect,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]) : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
 
     // Tokens are renewed before they expire, so SoundCloud only rejects one if it revoked it early, e.g.
@@ -188,21 +205,28 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
     return send(token())
   }
 
-  async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
-    const response = await get(url)
+  async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
+    const response = await get(url, 'follow', signal)
     const { pathname } = new URL(url)
     if (!response.ok) {
       await response.body?.cancel()
       throw new SoundCloudStatusError(`SoundCloud responded to ${pathname} with ${response.status}`, response.status)
     }
-    return parse(schema, await response.json(), pathname)
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      // Not the error itself, whose message can quote the answer.
+      throw new UnexpectedAnswer(`SoundCloud's answer to ${pathname} is not JSON`)
+    }
+    return parse(schema, body, pathname)
   }
 
   // What a link on soundcloud.com leads to on the API, or null when SoundCloud shows nothing there. SoundCloud redirects
   // to it, with the secret of a private playlist or track. Following the redirect would download what's there, e.g. a
   // playlist with every track in it.
-  async function resolve(link: string): Promise<URL | null> {
-    const response = await get(`${API_ORIGIN}/resolve?url=${encodeURIComponent(link)}`, 'manual')
+  async function resolve(link: string, signal?: AbortSignal): Promise<URL | null> {
+    const response = await get(`${API_ORIGIN}/resolve?url=${encodeURIComponent(link)}`, 'manual', signal)
     await response.body?.cancel()
     if (response.status === 404) return null
     const location = response.headers.get('location')
@@ -249,6 +273,31 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
     async resolveTrack(link: string): Promise<string | null> {
       const resolved = await resolve(link)
       return (resolved && TRACK_PATH.exec(resolved.pathname)?.[1]) ?? null
+    },
+
+    /**
+     * Reads the track with SoundCloud's id `trackId` through `link`, a link to it on soundcloud.com, or a private track's
+     * private link, as the set it's the track of has it. It's resolved, as when the set was saved, then read where SoundCloud
+     * redirects, which has the secret of a private link, as for a private playlist (see `resolvePlaylist`). A private
+     * track's secret is that of its `secret_uri`, which its streams take, as for a playlist's tracks, or else, without one,
+     * that of the redirect. Throws when
+     * SoundCloud can't be reached, or answers with an error other than a 404, or `signal` aborts.
+     */
+    async readTrack(link: string, trackId: string, signal?: AbortSignal): Promise<TrackRead> {
+      const missing: TrackRead = { state: 'missing', durationMs: null, secretToken: null }
+      const resolved = await resolve(link, signal)
+      // A link that leads to another track now is as if the set's track were gone.
+      if (!resolved || TRACK_PATH.exec(resolved.pathname)?.[1] !== trackId) return missing
+      const secretToken = resolved.searchParams.get('secret_token')
+      try {
+        const { duration, access, streamable, secret_uri } = await getJson(resolved.href, ReadTrack, signal)
+        const state = access !== 'playable' ? access : streamable ? 'playable' : 'not-streamable'
+        return { state, durationMs: duration, secretToken: secret_uri ?? secretToken }
+      } catch (error) {
+        if (error instanceof SoundCloudStatusError && error.status === 404) return missing
+        if (error instanceof UnexpectedAnswer) return { state: 'unexpected', durationMs: null, secretToken, problem: error.message }
+        throw error
+      }
     },
 
     /** A playlist, and the tracks in it that the app can see, in the playlist's order. */
@@ -309,8 +358,13 @@ function signedUrlExpiry(url: string): number {
   return Math.min(...policy.Statement.map((statement) => statement.Condition.DateLessThan['AWS:EpochTime'])) * 1000
 }
 
-// SoundCloud responded with an error status.
-class SoundCloudStatusError extends Error {
+// SoundCloud answered with something unexpected. Its message says what was wrong, but never quotes the answer, which can
+// have secrets, e.g. a private track's.
+class UnexpectedAnswer extends Error {}
+
+// SoundCloud responded with an error status. Its message is the server's own, with the path it requested, but not its
+// query, which can have a secret.
+export class SoundCloudStatusError extends Error {
   status: number
 
   constructor(message: string, status: number) {
@@ -336,7 +390,7 @@ function withoutParameters(url: string): string {
 function parse<T>(schema: z.ZodType<T>, value: unknown, what: string): T {
   const parsed = schema.safeParse(value)
   if (!parsed.success) {
-    throw new Error(`Unexpected SoundCloud ${what}: ${z.prettifyError(parsed.error)}\n${JSON.stringify(value).slice(0, 500)}`)
+    throw new UnexpectedAnswer(`Unexpected SoundCloud ${what}: ${z.prettifyError(parsed.error)}`)
   }
   return parsed.data
 }

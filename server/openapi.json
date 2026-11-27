@@ -2593,6 +2593,260 @@
         ],
         "additionalProperties": false
       },
+      "OnAirNow": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "set": {
+                    "$ref": "#/components/schemas/OnAirSet"
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "durationMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "How long it lasts, in milliseconds: its track's length"
+                  }
+                },
+                "required": [
+                  "set",
+                  "startedAt",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The set on air, or null when the radio is off air"
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "set": {
+                  "$ref": "#/components/schemas/OnAirSet"
+                },
+                "startsAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "durationMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "How long it lasts, in milliseconds: its track's length"
+                }
+              },
+              "required": [
+                "set",
+                "startsAt",
+                "durationMs"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The sets that come next, each with when it goes on air if nothing changes until then. Empty when the radio is off air"
+          }
+        },
+        "required": [
+          "ok",
+          "current",
+          "upcoming"
+        ],
+        "additionalProperties": false
+      },
+      "OnAirSet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "performers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "The artists who played, in order"
+          },
+          "durationMinutes": {
+            "description": "Null while it isn't known",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "performanceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dj",
+                "vinyl",
+                "live-performance",
+                "rap",
+                "full-band"
+              ]
+            }
+          },
+          "otherPerformanceType": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "house",
+                "deep-house",
+                "tech-house",
+                "afro-house",
+                "amapiano",
+                "disco",
+                "nu-disco",
+                "italo",
+                "techno",
+                "hard-techno",
+                "minimal",
+                "acid",
+                "electro",
+                "trance",
+                "ebm-industrial",
+                "drum-and-bass",
+                "jungle",
+                "breakbeat",
+                "uk-garage",
+                "dubstep",
+                "bass",
+                "footwork-juke",
+                "baile-funk",
+                "hip-hop",
+                "rap",
+                "trap",
+                "rnb",
+                "funk-soul",
+                "jazz",
+                "reggae-dub",
+                "dancehall",
+                "reggaeton-latin",
+                "afrobeat",
+                "cumbia",
+                "ambient",
+                "downtempo",
+                "experimental",
+                "noise",
+                "leftfield",
+                "pop",
+                "indie-rock",
+                "punk",
+                "synthwave",
+                "hardcore-gabber"
+              ]
+            }
+          },
+          "youtubeVideo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "soundcloudTrack": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "description": "Null when the link is a private link, which is a secret",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string",
+                "description": "What the session is called: its name, or else the one its type gives it. Never empty"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The session's start"
+              },
+              "takeover": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Reference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The collective whose takeover the session is, which only takeovers have"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "start",
+              "takeover"
+            ],
+            "additionalProperties": false,
+            "description": "Its session's id, title, start and takeover, as its event gives them"
+          }
+        },
+        "required": [
+          "id",
+          "performers",
+          "durationMinutes",
+          "performanceTypes",
+          "otherPerformanceType",
+          "genres",
+          "youtubeVideo",
+          "cancelled",
+          "soundcloudTrack",
+          "session"
+        ],
+        "additionalProperties": false
+      },
       "PerformanceTypeId": {
         "type": "string",
         "enum": [
@@ -2887,6 +3141,72 @@
             "$ref": "#/components/schemas/UnexpectedTrack"
           }
         ]
+      },
+      "RadioRotation": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "setId": {
+                    "type": "string"
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "setId",
+                  "startedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The set on air, or null when the radio is off air"
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RotationSet"
+            },
+            "description": "In order"
+          }
+        },
+        "required": [
+          "ok",
+          "updatedBy",
+          "updatedAt",
+          "current",
+          "sets"
+        ],
+        "additionalProperties": false
       },
       "RadioStream": {
         "type": "object",
@@ -3200,6 +3520,238 @@
           "name"
         ],
         "additionalProperties": false
+      },
+      "RotationCandidate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "performers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "The artists who played, in order"
+          },
+          "soundcloudTrack": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public"
+          },
+          "youtubeVideo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "start"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "performers",
+          "soundcloudTrack",
+          "youtubeVideo",
+          "session"
+        ],
+        "additionalProperties": false
+      },
+      "RotationError": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "string"
+          },
+          "setIndex": {
+            "description": "The place in `sets` of the set the error is about, from 0",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reasons": {
+            "description": "Why the set can't be added to the rotation",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RotationSkipReason"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "RotationSet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "performers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "The artists who played, in order"
+          },
+          "soundcloudTrack": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public"
+          },
+          "youtubeVideo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "start"
+            ],
+            "additionalProperties": false
+          },
+          "durationMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its track's length, in milliseconds, as last read, or null when it hasn't been read"
+          },
+          "readError": {
+            "description": "Why the last read of its track failed, or null",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RotationSkipReason"
+            },
+            "description": "Why it's skipped, or empty when it isn't"
+          },
+          "startsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it goes on air next, if nothing changes until then, or, for the set on air, when it went on air. Null when it is skipped, or the radio is off air"
+          }
+        },
+        "required": [
+          "id",
+          "performers",
+          "soundcloudTrack",
+          "youtubeVideo",
+          "session",
+          "durationMs",
+          "readError",
+          "skipped",
+          "startsAt"
+        ],
+        "additionalProperties": false
+      },
+      "RotationSkipReason": {
+        "type": "string",
+        "enum": [
+          "cancelled",
+          "no-soundcloud-track",
+          "no-youtube-video",
+          "not-announced",
+          "unread",
+          "missing",
+          "unexpected",
+          "preview",
+          "blocked",
+          "not-streamable"
+        ]
       },
       "RotationTrack": {
         "type": "object",
@@ -3791,6 +4343,28 @@
         },
         "required": [
           "session"
+        ],
+        "additionalProperties": false
+      },
+      "SetStream": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ok",
+          "url",
+          "expiresAt"
         ],
         "additionalProperties": false
       },
@@ -4512,8 +5086,8 @@
     },
     "/api/radio": {
       "get": {
-        "operationId": "get_on_air",
-        "summary": "What's on the radio, and what comes next",
+        "operationId": "get_playlist_on_air",
+        "summary": "What's on the radio's playlist, which it plays for now, and what comes next",
         "tags": [
           "Radio"
         ],
@@ -5177,6 +5751,329 @@
             }
           },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/on-air": {
+      "get": {
+        "operationId": "get_on_air",
+        "summary": "What's on air on the radio's rotation of sets, and what comes next",
+        "tags": [
+          "Radio"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "in": "query",
+            "name": "upcoming",
+            "required": false,
+            "description": "How many of the sets that come next to give, from 0 to 1000, around the rotation as many times as it takes. Without it, one round"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnAirNow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/radio/sets/{id}/stream": {
+      "get": {
+        "summary": "Where to stream a set of the rotation of sets from",
+        "tags": [
+          "Radio"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetStream"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/radio/rotation": {
+      "get": {
+        "operationId": "get_rotation",
+        "summary": "The radio's rotation of sets, in order, with the set on air, when each set goes on air next, and the sets that are skipped, and why",
+        "tags": [
+          "Radio"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RadioRotation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "update_rotation_sets",
+        "summary": "Makes the radio's rotation of sets these sets, in this order, which changes what's on air right away, then reads the tracks of the sets it adds, and returns the rotation",
+        "tags": [
+          "Radio"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The ids of the sets, in order"
+                  }
+                },
+                "required": [
+                  "sets"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RadioRotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotationError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/radio/rotation/candidates": {
+      "get": {
+        "operationId": "list_rotation_candidates",
+        "summary": "The sets that can be added to the radio's rotation of sets, and aren't in it, the most recent session first",
+        "tags": [
+          "Radio"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "How many items the list has"
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RotationCandidate"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "total",
+                    "sets"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -9110,7 +10007,7 @@
       },
       "delete": {
         "operationId": "delete_session",
-        "summary": "Deletes a session, its flyer and its sets, but not their performers",
+        "summary": "Deletes a session, its flyer and its sets, which leave the radio's rotation, but not their performers",
         "tags": [
           "Sessions"
         ],
@@ -10121,7 +11018,7 @@
       },
       "delete": {
         "operationId": "delete_set",
-        "summary": "Deletes a set, but not its performers, and returns its session, which this can make done",
+        "summary": "Deletes a set, which leaves the radio's rotation, but not its performers, and returns its session, which this can make done",
         "tags": [
           "Sessions"
         ],

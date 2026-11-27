@@ -27,6 +27,8 @@ export type SoundCloudApp = {
   // every server picks up a change. Credentials loaded before newer ones were saved, by a request that was already under
   // way, are ignored.
   current(): Promise<EnteredApp | null>
+  // The client of the credentials that were entered. Throws a NoSoundCloudCredentials until they are.
+  client(): Promise<SoundCloudClient>
   // The id of the track a link to it on soundcloud.com leads to, or null when SoundCloud shows no track there. Throws a
   // NoSoundCloudCredentials until the credentials are entered, or SoundCloud's error.
   resolveTrack(link: string): Promise<string | null>
@@ -58,11 +60,13 @@ export function soundCloudApp(newClient: SoundCloudApp['newClient'], credentials
       return last
     },
 
-    async resolveTrack(link) {
+    async client() {
       const entered = await app.current()
       if (!entered) throw new NoSoundCloudCredentials()
-      return entered.client.resolveTrack(link)
+      return entered.client
     },
+
+    resolveTrack: async (link) => (await app.client()).resolveTrack(link),
   }
   return app
 }

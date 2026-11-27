@@ -16,7 +16,7 @@ import type { EventsStore } from './store.js'
 // docs/design/server/events.md). Their calendar feed is in calendar.ts.
 
 // A set of an event, as the public sees it.
-const EventSet = SetBody.pick({ id: true, performers: true, durationMinutes: true, performanceTypes: true, otherPerformanceType: true, genres: true, youtubeVideo: true })
+export const EventSet = SetBody.pick({ id: true, performers: true, durationMinutes: true, performanceTypes: true, otherPerformanceType: true, genres: true, youtubeVideo: true })
   .extend({
     cancelled: z.boolean(),
     soundcloudTrack: z
@@ -27,7 +27,7 @@ const EventSet = SetBody.pick({ id: true, performers: true, durationMinutes: tru
 type EventSet = z.infer<typeof EventSet>
 
 // An event, as the public sees it: an announced session.
-const Event = SessionBody.pick({ id: true, title: true, type: true, takeover: true })
+export const Event = SessionBody.pick({ id: true, title: true, type: true, takeover: true })
   .extend({
     start: Timestamp.meta({ description: "The session's start" }),
     end: Timestamp.meta({ description: 'Its start plus its duration' }),
@@ -57,7 +57,7 @@ const Events = z
 const FLYERS = '/api/events/flyers'
 
 // The fields are listed one by one, so that nothing the admin endpoints give ends up public unless it's added here.
-function eventSet(row: StoredSet): EventSet {
+export function eventSet(row: StoredSet): EventSet {
   return {
     id: row.id,
     performers: row.performers,

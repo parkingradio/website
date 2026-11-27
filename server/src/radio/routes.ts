@@ -5,7 +5,8 @@ import { ApiError, Credential, Day, Ok, Timestamp, zodRoutes } from '../api/sche
 import { cached } from '../core/cache.js'
 import type { OnAir, OnAirStore } from './on-air.js'
 import type { RadioSettings, RadioSettingsStore } from './settings.js'
-import type { HlsStream, InvalidTrack, PlaylistLink, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from './soundcloud.js'
+import type { InvalidTrack, PlaylistLink, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from './soundcloud.js'
+import type { TrackStreams } from './streams.js'
 import { NO_CREDENTIALS } from './soundcloud-app.js'
 import type { EnteredApp, SoundCloudApp } from './soundcloud-app.js'
 import type { StoredSoundCloudCredentials } from './soundcloud-credentials.js'
@@ -113,16 +114,6 @@ const RADIO_UNAVAILABLE: z.infer<typeof ApiError> = { ok: false, error: 'The rad
 const NO_PLAYLIST: z.infer<typeof ApiError> = { ok: false, error: 'No playlist has been chosen for the radio yet' }
 const NOT_IN_ROTATION: z.infer<typeof ApiError> = { ok: false, error: 'Not a track of the radio rotation' }
 
-// A track's stream URL is shared by the listeners who start it around the same time, which in a radio is
-// most of them. A URL's playlist has to be loaded before it expires, about 2 minutes later than the
-// length of the track, while the audio the playlist lists is available for 2 hours longer than that.
-// Reusing a URL only while it's recent leaves plenty of that time to play the track through.
-const STREAM_URL_MAX_AGE_MS = 30 * 60 * 1000
-const STREAM_URL_MIN_REMAINING_MS = 2 * 60 * 1000
-// A failure to get a track's stream is kept for this long, so that a track SoundCloud keeps failing to stream
-// isn't asked for again by every listener who retries, which would run into SoundCloud's limits on requests.
-const STREAM_FAILURE_BACKOFF_MS = 30 * 1000
-
 // The titles Parking Radio gives its sets on SoundCloud, e.g. "3TONS | parking.radio | 2026.09.27" or
 // "ZEFRA | HAUTE RIVE TAKEOVER @ parking.radio | 2026.09.13".
 const TITLE = /^(?<artist>.+?)\s*\|\s*(?:(?<event>.+?)\s*@\s*)?parking\.radio\s*\|\s*(?<year>\d{4})\.(?<month>\d{2})\.(?<day>\d{2})$/i
@@ -189,6 +180,8 @@ type RadioOptions = {
   soundcloud: SoundCloudApp
   onAir: OnAirStore
   settings: RadioSettingsStore
+  // Shared with the rotation of sets.
+  streams: TrackStreams
 }
 
 function samePlaylist(a: RadioSettings, b: RadioSettings): boolean {
@@ -220,7 +213,7 @@ function currentPlaylist({ settings, rotation, error }: Chosen): ChosenPlaylist 
 
 export async function radioRoutes(
   app: FastifyInstance,
-  { soundcloud: soundcloudApp, onAir, settings: settingsStore }: RadioOptions,
+  { soundcloud: soundcloudApp, onAir, settings: settingsStore, streams }: RadioOptions,
 ) {
   // The credentials, and a private playlist's secret, are values of the queries that save them, which the app's error
   // handler keeps out of the logs and responses (see `useApiErrors`).
@@ -288,10 +281,6 @@ export async function radioRoutes(
     }
     lastTracks = tracks
   }
-
-  // Where to stream each track from, by track id, through each client for SoundCloud, so that they're forgotten along
-  // with the client when other credentials are entered.
-  const streamsByClient = new WeakMap<SoundCloudClient, Map<string, () => Promise<HlsStream>>>()
 
   // The source the rotation is read from, replaced whenever another playlist is chosen, or other credentials are
   // entered.
@@ -362,32 +351,13 @@ export async function radioRoutes(
     return readRotation(settings, entered)
   }
 
-  // Where to stream a track from, through `soundcloud`.
-  function stream(soundcloud: SoundCloudClient, trackId: string): Promise<HlsStream> {
-    let streams = streamsByClient.get(soundcloud)
-    if (!streams) streamsByClient.set(soundcloud, (streams = new Map()))
-    let trackStream = streams.get(trackId)
-    if (!trackStream) {
-      // The secret is looked up whenever a stream is asked for, since it changes if the track's private link is reset.
-      trackStream = cached(
-        () => soundcloud.hlsStream(trackId, trackSecrets.get(trackId) ?? null),
-        (outcome, startedAt) =>
-          outcome.status === 'fulfilled'
-            ? Math.min(startedAt + STREAM_URL_MAX_AGE_MS, outcome.value.expiresAt - STREAM_URL_MIN_REMAINING_MS)
-            : startedAt + STREAM_FAILURE_BACKOFF_MS,
-      )
-      streams.set(trackId, trackStream)
-    }
-    return trackStream()
-  }
-
   api.get(
     '/api/radio',
     {
-      config: { tool: { title: 'Voir ce qui joue à la radio' } },
+      config: { tool: { title: 'Voir ce qui joue sur la playlist de la radio' } },
       schema: {
-        operationId: 'get_on_air',
-        summary: "What's on the radio, and what comes next",
+        operationId: 'get_playlist_on_air',
+        summary: "What's on the radio's playlist, which it plays for now, and what comes next",
         tags: ['Radio'],
         querystring: z.object({ upcoming: z.string().regex(/^\d+$/, 'Invalid input: expected a whole number').optional() }),
         response: { 200: Radio, 502: ApiError, 503: ApiError },
@@ -466,7 +436,8 @@ export async function radioRoutes(
       }
       try {
         // Tracks only get in the rotation once credentials have been entered, so there's a client by then.
-        const { url, expiresAt } = await stream(entered!.client, id)
+        // The secret is looked up whenever a stream is asked for, since it changes if the track's private link is reset.
+        const { url, expiresAt } = await streams(entered!.client, id, trackSecrets.get(id) ?? null)
         return { url, expiresAt: new Date(expiresAt).toISOString() }
       } catch (error) {
         request.log.error(error, 'Failed to get a stream from SoundCloud')

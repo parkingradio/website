@@ -11,9 +11,12 @@ import { logger } from './core/logger.js'
 import { spaRoutes } from './site/spa.js'
 import { notFoundRoutes } from './site/not-found.js'
 import { soundCloudClient } from './radio/soundcloud.js'
+import { soundCloudApp } from './radio/soundcloud-app.js'
 import { soundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
 import { onAirStore } from './radio/on-air.js'
+import { rotationStore } from './radio/rotation-store.js'
 import { radioSettingsStore } from './radio/settings.js'
+import { trackReads } from './radio/track-reads.js'
 import { youTubeCredentialsStore } from './video/credentials.js'
 import { youtube } from './video/youtube.js'
 import { artistsStore, privatePhotos } from './artists/store.js'
@@ -51,7 +54,12 @@ const backfill = sizesBackfill(() => storedImages(db), privateFiles, photos, app
 // their requests end.
 const calendarFeeds = calendarFeedsStore(db)
 const calendarFeedReads = calendarReads({ feeds: calendarFeeds, log: app.log })
-const backgroundTasks = [backfill, calendarFeedReads]
+// And for the reads of the tracks of the radio's rotation of sets, through the SoundCloud app, which the radio and
+// sessions share (see radio/soundcloud-app.ts).
+const soundcloud = soundCloudApp(soundCloudClient, soundCloudCredentialsStore(db))
+const rotation = rotationStore(db)
+const rotationTrackReads = trackReads({ store: rotation, soundcloud, log: app.log })
+const backgroundTasks = [backfill, calendarFeedReads, rotationTrackReads]
 app.addHook('preClose', async () => backgroundTasks.forEach((task) => task.stop()))
 app.addHook('onClose', () => db.$client.end())
 // After the database's hook, since Fastify runs the onClose hooks of the root instance from the last one added: the
@@ -77,10 +85,11 @@ await registerRoutes(app, {
   sendEmail: config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null,
   siteOrigin: config.siteOrigin,
   environment: config.environment,
-  soundcloud: soundCloudClient,
-  soundCloudCredentials: soundCloudCredentialsStore(db),
+  soundcloud,
   onAir: onAirStore(db),
   radioSettings: radioSettingsStore(db),
+  rotation,
+  trackReads: rotationTrackReads,
   youtube,
   youtubeCredentials: youTubeCredentialsStore(db),
   artists: artistsStore(db),

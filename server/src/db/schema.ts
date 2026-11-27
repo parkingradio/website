@@ -10,6 +10,8 @@ import type { PhotoFolder } from '../artists/keys.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
 import { SESSION_TYPES, STATUSES } from '../sessions/fields.js'
 import type { SessionType, Status } from '../sessions/fields.js'
+import { TRACK_STATES } from '../radio/track-states.js'
+import type { TrackState } from '../radio/track-states.js'
 
 // A check that `column` is one of `values`.
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
@@ -378,6 +380,75 @@ export const setPerformers = pgTable(
     primaryKey({ columns: [table.setId, table.position] }),
     // With the artist first, so that it also finds an artist's sets.
     uniqueIndex('set_performers_artist_id_set_id_idx').on(table.artistId, table.setId),
+  ],
+)
+
+// The radio's rotation of sets: its sets, in the order of their positions (see "The rotation of sets" in
+// docs/design/server/radio.md). Each set is there at most once, and deleting it takes it out. Changing the rotation
+// rewrites every row, with positions from 0, but deleting sets can leave gaps, which don't change the order.
+export const rotationSets = pgTable(
+  'rotation_sets',
+  {
+    setId: uuid('set_id')
+      .primaryKey()
+      .references(() => sets.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (table) => [uniqueIndex('rotation_sets_position_idx').on(table.position), check('rotation_sets_position', sql`${table.position} >= 0`)],
+)
+
+// Who last changed the radio's rotation of sets, and the set on air on it. There is only ever one row, which the
+// migration that adds it inserts, so that changing what's on air can always lock it (see radio/rotation-store.ts).
+export const radioRotation = pgTable(
+  'radio_rotation',
+  {
+    id: smallint('id').primaryKey().default(1),
+    // The email of the admin who last changed the rotation, and when, null until then.
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+    // The set on air, with the track it went on air with, when it went on air, and its place in the rotation, from which
+    // the radio goes on when the set isn't in the rotation anymore, or is skipped (see `Saved` in radio/rotation.ts). Once
+    // the radio goes off air, the set that was on air last, without when it went on air. All null until a set has been on
+    // air. The set has no foreign key, since it stays here once it's deleted, and so that deleting it never waits for this
+    // row.
+    onAirSetId: uuid('on_air_set_id'),
+    onAirTrackId: text('on_air_track_id'),
+    onAirStartedAt: timestamp('on_air_started_at', { withTimezone: true }),
+    onAirPosition: integer('on_air_position'),
+  },
+  (table) => [
+    check('radio_rotation_single_row', sql`${table.id} = 1`),
+    check(
+      'radio_rotation_on_air',
+      sql`(${table.onAirSetId} is null) = (${table.onAirTrackId} is null) and (${table.onAirSetId} is null) = (${table.onAirPosition} is null) and (${table.onAirSetId} is not null or ${table.onAirStartedAt} is null)`,
+    ),
+  ],
+)
+
+// What was read from SoundCloud of the tracks of the rotation's sets, by SoundCloud's id for the track, through the link
+// of the set that has it (see "Reading the tracks" in docs/design/server/radio.md). A read only counts for a set that
+// still has that link.
+export const soundcloudTrackReads = pgTable(
+  'soundcloud_track_reads',
+  {
+    trackId: text('track_id').primaryKey(),
+    // The set's link it was read through, as sets.soundcloud_track_url has it.
+    link: text('link').notNull(),
+    // What SoundCloud said of the track, as of the last read that got an answer: "playable", or why it isn't (see
+    // radio/track-states.ts), and its length in milliseconds, if it's known. Null until a read gets one.
+    state: text('state').$type<TrackState>(),
+    durationMs: integer('duration_ms'),
+    // What it takes to stream a private track, null for a public one. Never handed out.
+    secretToken: text('secret_token'),
+    // When SoundCloud last answered, and when it was last asked.
+    readAt: timestamp('read_at', { withTimezone: true }),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull(),
+    // Why the last read failed, the server's own message, or null when it didn't.
+    error: text('error'),
+  },
+  (table) => [
+    check('soundcloud_track_reads_state', oneOf(table.state, TRACK_STATES)),
+    check('soundcloud_track_reads_duration', sql`${table.durationMs} > 0`),
   ],
 )
 

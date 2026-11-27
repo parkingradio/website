@@ -31,11 +31,13 @@ import { raPublicationRoutes } from './ra-publication/routes.js'
 import { featuresRoutes } from './features/routes.js'
 import type { FeaturesStore } from './features/store.js'
 import type { OnAirStore } from './radio/on-air.js'
+import { rotationRoutes } from './radio/rotation-routes.js'
+import type { RotationStore } from './radio/rotation-store.js'
 import { radioRoutes } from './radio/routes.js'
 import type { RadioSettingsStore } from './radio/settings.js'
-import { soundCloudApp } from './radio/soundcloud-app.js'
-import type { SoundCloudClient, SoundCloudCredentials } from './radio/soundcloud.js'
-import type { SoundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
+import type { SoundCloudApp } from './radio/soundcloud-app.js'
+import { trackStreams } from './radio/streams.js'
+import type { TrackReads } from './radio/track-reads.js'
 import { sessionsRoutes } from './sessions/routes.js'
 import type { YouTubeCredentialsStore } from './video/credentials.js'
 import { videoRoutes } from './video/routes.js'
@@ -63,11 +65,13 @@ export type Dependencies = {
   siteOrigin: string
   // Which deployment the server is, e.g. "production" (see config.environment).
   environment: string
-  // Builds a client for SoundCloud that uses the credentials it's given.
-  soundcloud: (credentials: SoundCloudCredentials) => SoundCloudClient
-  soundCloudCredentials: SoundCloudCredentialsStore
+  // The SoundCloud app, which the radio and sessions share (see radio/soundcloud-app.ts).
+  soundcloud: SoundCloudApp
   onAir: OnAirStore
   radioSettings: RadioSettingsStore
+  // The radio's rotation of sets, and the reads of its tracks.
+  rotation: RotationStore
+  trackReads: TrackReads
   youtube: YouTube
   youtubeCredentials: YouTubeCredentialsStore
   artists: ArtistsStore
@@ -105,9 +109,10 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(authRoutes, { db: deps.db, verifyTurnstile: deps.verifyTurnstile })
   await app.register(adminRoutes, { store: deps.admins, sendEmail: deps.sendEmail, origin: deps.siteOrigin })
   await app.register(raEventsRoutes)
-  // The radio and sessions share it (see radio/soundcloud-app.ts).
-  const soundcloud = soundCloudApp(deps.soundcloud, deps.soundCloudCredentials)
-  await app.register(radioRoutes, { soundcloud, onAir: deps.onAir, settings: deps.radioSettings })
+  // Both rotations share the streams of their tracks.
+  const streams = trackStreams()
+  await app.register(radioRoutes, { soundcloud: deps.soundcloud, onAir: deps.onAir, settings: deps.radioSettings, streams })
+  await app.register(rotationRoutes, { soundcloud: deps.soundcloud, store: deps.rotation, reads: deps.trackReads, streams })
   await app.register(videoRoutes, { youtube: deps.youtube, credentials: deps.youtubeCredentials })
   await app.register(artistsRoutes, { store: deps.artists, photos: deps.photos })
   await app.register(collectivesRoutes, { store: deps.collectives, photos: deps.photos })
@@ -119,7 +124,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
     settings: deps.applicationsSettings,
     sendEmail: deps.sendEmail,
   })
-  await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: soundcloud.resolveTrack })
+  await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: (link) => deps.soundcloud.resolveTrack(link) })
   await app.register(raPublicationRoutes, { store: deps.sessions, admins: deps.admins, photos: deps.photos, environment: deps.environment })
   await app.register(eventsRoutes, { store: deps.events, photos: deps.photos })
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })

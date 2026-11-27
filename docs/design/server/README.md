@@ -85,12 +85,12 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
   in responses as in requests. So removing a value from a list, or renaming one, has to change the stored data that
   still uses it, in the same change: until then, every response that would include the old value fails.
-- **Unknown fields.** The admin endpoints of artists, collectives, applications, sessions, sets and calendar feeds
-  refuse the fields they don't take in the JSON they're sent: its body, or the part of a `multipart/form-data` request
-  that has an item's fields, e.g. an artist's profile. Such a request fails with 400, and the error names the field:
-  otherwise, a misspelled field would go unnoticed. That's only the top-level fields of that JSON: the objects in it
-  follow their own rules, e.g. the other fields of a collective's members are ignored. The parts of a
-  `multipart/form-data` request that the endpoint doesn't read are ignored too, e.g. a form's submit button.
+- **Unknown fields.** The admin endpoints of artists, collectives, applications, sessions, sets, calendar feeds and the
+  radio's rotation refuse the fields they don't take in the JSON they're sent: its body, or the part of a
+  `multipart/form-data` request that has an item's fields, e.g. an artist's profile. Such a request fails with 400, and
+  the error names the field: otherwise, a misspelled field would go unnoticed. That's only the top-level fields of that
+  JSON: the objects in it follow their own rules, e.g. the other fields of a collective's members are ignored. The parts
+  of a `multipart/form-data` request that the endpoint doesn't read are ignored too, e.g. a form's submit button.
 - **Changes.** An artist, a collective, an application, a session, a set or a calendar feed is changed with `PATCH`,
   which only changes the fields it's sent, and leaves the others as they are. It takes JSON, never
   `multipart/form-data`, with any of the fields its endpoint lists, at least one, each following the rules it follows
@@ -178,6 +178,11 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`POST /mcp`](mcp.md#the-endpoint) | app | The MCP server, for connected apps |
 | [`GET /api/radio`](radio.md#get-apiradioupcomingn) | public | What's on the radio, and what comes next |
 | [`GET /api/radio/tracks/:id/stream`](radio.md#get-apiradiotracksidstream) | public | Where to stream a track of the rotation from |
+| [`GET /api/on-air`](radio.md#get-apion-airupcomingn) | public | What's on air on the rotation of sets, and what comes next |
+| [`GET /api/radio/sets/:id/stream`](radio.md#get-apiradiosetsidstream) | public | Where to stream a set of the rotation of sets from |
+| [`GET /api/admin/radio/rotation`](radio.md#get-apiadminradiorotation-admin) | admin | The rotation of sets, with the set on air, and the sets that are skipped, and why |
+| [`PUT /api/admin/radio/rotation`](radio.md#put-apiadminradiorotation-admin) | admin | Changing the rotation of sets, which changes what's on air right away |
+| [`GET /api/admin/radio/rotation/candidates`](radio.md#get-apiadminradiorotationcandidates-admin) | admin | The sets that can be added to the rotation of sets |
 | [`GET /api/admin/radio`](radio.md#get-apiadminradio-admin) | admin | The playlist the radio's rotation is read from |
 | [`POST /api/admin/radio/preview`](radio.md#post-apiadminradiopreview-admin) | admin | What the radio would read from a playlist |
 | [`POST /api/admin/radio/playlist`](radio.md#post-apiadminradioplaylist-admin) | admin | Choosing the playlist the rotation is read from |
@@ -226,13 +231,13 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent |
 | [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled, which can mark its sets too |
 | [`PUT /api/admin/sessions/:id/announced`](sessions.md#put-apiadminsessionsidannounced-admin) | admin | Announcing a session, or un-announcing it |
-| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer if no other session has it, and its sets |
+| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer if no other session has it, and its sets, which leave the radio's rotation |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session, which can make it planned again |
 | [`PATCH /api/admin/sets/:id`](sessions.md#patch-apiadminsetsid-admin) | admin | Changing a set, only the fields it's sent |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled, which can make its session done, or planned again |
 | [`PUT /api/admin/sets/:id/position`](sessions.md#put-apiadminsetsidposition-admin) | admin | Moving a set to another place among its session's sets |
 | [`PUT /api/admin/sets/:id/session`](sessions.md#put-apiadminsetsidsession-admin) | admin | Moving a set to another session, which can change both sessions' statuses |
-| [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
+| [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done, and takes it out of the radio's rotation |
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, from a year back, however far ahead, in iCalendar, for calendar apps |

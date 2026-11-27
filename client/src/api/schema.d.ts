@@ -563,8 +563,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What's on the radio, and what comes next */
-        get: operations["get_on_air"];
+        /** What's on the radio's playlist, which it plays for now, and what comes next */
+        get: operations["get_playlist_on_air"];
         put?: never;
         post?: never;
         delete?: never;
@@ -873,6 +873,132 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/on-air": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What's on air on the radio's rotation of sets, and what comes next */
+        get: operations["get_on_air"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/radio/sets/{id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where to stream a set of the rotation of sets from */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SetStream"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/radio/rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The radio's rotation of sets, in order, with the set on air, when each set goes on air next, and the sets that are skipped, and why */
+        get: operations["get_rotation"];
+        /** Makes the radio's rotation of sets these sets, in this order, which changes what's on air right away, then reads the tracks of the sets it adds, and returns the rotation */
+        put: operations["update_rotation_sets"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/radio/rotation/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sets that can be added to the radio's rotation of sets, and aren't in it, the most recent session first */
+        get: operations["list_rotation_candidates"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1981,7 +2107,7 @@ export interface paths {
         get: operations["get_session"];
         put?: never;
         post?: never;
-        /** Deletes a session, its flyer and its sets, but not their performers */
+        /** Deletes a session, its flyer and its sets, which leave the radio's rotation, but not their performers */
         delete: operations["delete_session"];
         options?: never;
         head?: never;
@@ -2227,7 +2353,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Deletes a set, but not its performers, and returns its session, which this can make done */
+        /** Deletes a set, which leaves the radio's rotation, but not its performers, and returns its session, which this can make done */
         delete: operations["delete_set"];
         options?: never;
         head?: never;
@@ -4333,6 +4459,56 @@ export interface components {
             /** @constant */
             ok: true;
         };
+        OnAirNow: {
+            /** @constant */
+            ok: true;
+            /** @description The set on air, or null when the radio is off air */
+            current: {
+                set: components["schemas"]["OnAirSet"];
+                /** Format: date-time */
+                startedAt: string;
+                /** @description How long it lasts, in milliseconds: its track's length */
+                durationMs: number;
+            } | null;
+            /** @description The sets that come next, each with when it goes on air if nothing changes until then. Empty when the radio is off air */
+            upcoming: {
+                set: components["schemas"]["OnAirSet"];
+                /** Format: date-time */
+                startsAt: string;
+                /** @description How long it lasts, in milliseconds: its track's length */
+                durationMs: number;
+            }[];
+        };
+        OnAirSet: {
+            id: string;
+            /** @description The artists who played, in order */
+            performers: components["schemas"]["Reference"][];
+            /** @description Null while it isn't known */
+            durationMinutes: number | null;
+            performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
+            otherPerformanceType: string;
+            genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
+            youtubeVideo: components["schemas"]["SessionLink"] | null;
+            cancelled: boolean;
+            soundcloudTrack: {
+                id: string;
+                /** @description Null when the link is a private link, which is a secret */
+                url: string | null;
+            } | null;
+            /** @description Its session's id, title, start and takeover, as its event gives them */
+            session: {
+                id: string;
+                /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+                title: string;
+                /**
+                 * Format: date-time
+                 * @description The session's start
+                 */
+                start: string;
+                /** @description The collective whose takeover the session is, which only takeovers have */
+                takeover: components["schemas"]["Reference"] | null;
+            };
+        };
         /** @enum {string} */
         PerformanceTypeId: "dj" | "vinyl" | "live-performance" | "rap" | "full-band";
         PublicArtist: {
@@ -4395,6 +4571,20 @@ export interface components {
             tracks: components["schemas"]["RadioPlaylistTrack"][];
         };
         RadioPlaylistTrack: components["schemas"]["RotationTrack"] | components["schemas"]["LeftOutTrack"] | components["schemas"]["UnexpectedTrack"];
+        RadioRotation: {
+            /** @constant */
+            ok: true;
+            updatedBy: string | null;
+            updatedAt: string | null;
+            /** @description The set on air, or null when the radio is off air */
+            current: {
+                setId: string;
+                /** Format: date-time */
+                startedAt: string;
+            } | null;
+            /** @description In order */
+            sets: components["schemas"]["RotationSet"][];
+        };
         RadioStream: {
             url: string;
             /** Format: date-time */
@@ -4475,6 +4665,51 @@ export interface components {
             id: string;
             name: string;
         };
+        RotationCandidate: {
+            id: string;
+            /** @description The artists who played, in order */
+            performers: components["schemas"]["Reference"][];
+            /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
+            soundcloudTrack: components["schemas"]["SessionLink"] | null;
+            youtubeVideo: components["schemas"]["SessionLink"] | null;
+            session: {
+                id: string;
+                title: string;
+                start: string | null;
+            };
+        };
+        RotationError: {
+            /** @constant */
+            ok: false;
+            error: string;
+            /** @description The place in `sets` of the set the error is about, from 0 */
+            setIndex?: number;
+            /** @description Why the set can't be added to the rotation */
+            reasons?: components["schemas"]["RotationSkipReason"][];
+        };
+        RotationSet: {
+            id: string;
+            /** @description The artists who played, in order */
+            performers: components["schemas"]["Reference"][];
+            /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
+            soundcloudTrack: components["schemas"]["SessionLink"] | null;
+            youtubeVideo: components["schemas"]["SessionLink"] | null;
+            session: {
+                id: string;
+                title: string;
+                start: string | null;
+            };
+            /** @description Its track's length, in milliseconds, as last read, or null when it hasn't been read */
+            durationMs: number | null;
+            /** @description Why the last read of its track failed, or null */
+            readError: string | null;
+            /** @description Why it's skipped, or empty when it isn't */
+            skipped: components["schemas"]["RotationSkipReason"][];
+            /** @description When it goes on air next, if nothing changes until then, or, for the set on air, when it went on air. Null when it is skipped, or the radio is off air */
+            startsAt: string | null;
+        };
+        /** @enum {string} */
+        RotationSkipReason: "cancelled" | "no-soundcloud-track" | "no-youtube-video" | "not-announced" | "unread" | "missing" | "unexpected" | "preview" | "blocked" | "not-streamable";
         RotationTrack: {
             /** @constant */
             kind: "rotation";
@@ -4581,6 +4816,13 @@ export interface components {
             /** @description The id of the session to move the set to, after that session's sets */
             session: string;
         };
+        SetStream: {
+            /** @constant */
+            ok: true;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
         /** @description In Québec time, ending later the same day */
         TimeSlot: {
             start: string;
@@ -4675,7 +4917,7 @@ export interface operations {
             };
         };
     };
-    get_on_air: {
+    get_playlist_on_air: {
         parameters: {
             query?: {
                 upcoming?: string;
@@ -4974,6 +5216,201 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RadioCredentials"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_on_air: {
+        parameters: {
+            query?: {
+                /** @description How many of the sets that come next to give, from 0 to 1000, around the rotation as many times as it takes. Without it, one round */
+                upcoming?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnAirNow"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_rotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RadioRotation"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    update_rotation_sets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The ids of the sets, in order */
+                    sets: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RadioRotation"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_rotation_candidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        /** @description How many items the list has */
+                        total: number;
+                        sets: components["schemas"]["RotationCandidate"][];
+                    };
                 };
             };
             /** @description Default Response */

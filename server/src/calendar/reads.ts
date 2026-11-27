@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify'
 import { withoutValues } from '../api/errors.js'
+import { pause } from '../core/pause.js'
 import { keptTime } from './events.js'
 import type { CalendarEvent } from './events.js'
 import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
@@ -61,21 +62,6 @@ type Options = {
   // Reads a link, as readLink does, and goes through its text, as parseFeed does, but for tests.
   readText?: (link: string, signal: AbortSignal) => Promise<string>
   parse?: typeof parseFeed
-}
-
-// Waits `ms`, or until `signal` aborts, without keeping the process alive.
-function pause(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const done = () => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', done)
-      resolve()
-    }
-    const timer = setTimeout(done, ms)
-    timer.unref?.()
-    signal.addEventListener('abort', done, { once: true })
-    if (signal.aborted) done()
-  })
 }
 
 export function calendarReads({ feeds, log, readText = (link, signal) => readLink(link, { signal }), parse = parseFeed }: Options): CalendarReads {

@@ -190,6 +190,11 @@ export function link(id: string | null, url: (id: string) => string): z.infer<ty
   return id === null ? null : { id, url: url(id) }
 }
 
+// A set's track on SoundCloud, as the admin endpoints give it, with the link it was resolved from, which can be private.
+export function soundcloudTrackLink(row: Pick<StoredSet, 'soundcloudTrackId' | 'soundcloudTrackUrl'>): z.infer<typeof Link> | null {
+  return row.soundcloudTrackId === null ? null : { id: row.soundcloudTrackId, url: row.soundcloudTrackUrl! }
+}
+
 function applicationLink(row: StoredSession | StoredSet): z.infer<typeof ApplicationLink> | null {
   return row.application && { id: row.application.id, receivedAt: row.application.receivedAt.toISOString() }
 }
@@ -216,7 +221,7 @@ function setBody(row: StoredSet): SetBody {
     performanceTypes: row.performanceTypes,
     otherPerformanceType: row.otherPerformanceType,
     genres: row.genres,
-    soundcloudTrack: row.soundcloudTrackId === null ? null : { id: row.soundcloudTrackId, url: row.soundcloudTrackUrl! },
+    soundcloudTrack: soundcloudTrackLink(row),
     youtubeVideo: link(row.youtubeVideoId, youtubeVideoUrl),
     application: applicationLink(row),
     ...tracked(row),
@@ -599,7 +604,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Supprimer une session' } },
       schema: {
         operationId: 'delete_session',
-        summary: 'Deletes a session, its flyer and its sets, but not their performers',
+        summary: "Deletes a session, its flyer and its sets, which leave the radio's rotation, but not their performers",
         tags: ['Sessions'],
         params: ById,
         response: { 200: Ok, 404: ApiError },
@@ -729,7 +734,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Supprimer un set' } },
       schema: {
         operationId: 'delete_set',
-        summary: 'Deletes a set, but not its performers, and returns its session, which this can make done',
+        summary: "Deletes a set, which leaves the radio's rotation, but not its performers, and returns its session, which this can make done",
         tags: ['Sessions'],
         params: ById,
         response: { 200: SessionResponse, 404: ApiError },

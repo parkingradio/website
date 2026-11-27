@@ -33,7 +33,8 @@ describe('the tools of the API', () => {
     const { tools } = await apiTools()
     expect(tools.map(({ name }) => name).sort()).toEqual(
       [
-        ...['list_ra_events', 'get_on_air', 'get_radio_playlist', 'preview_playlist', 'choose_playlist', 'get_soundcloud_app'],
+        ...['list_ra_events', 'get_playlist_on_air', 'get_radio_playlist', 'preview_playlist', 'choose_playlist', 'get_soundcloud_app'],
+        ...['get_on_air', 'get_rotation', 'update_rotation_sets', 'list_rotation_candidates'],
         'get_youtube_credentials',
         ...['list_artists', 'get_artist', 'create_artist', 'update_artist', 'delete_artist_photo', 'delete_artist'],
         ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective_photo', 'delete_collective'],
@@ -66,7 +67,7 @@ describe('the tools of the API', () => {
     }
     const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `([\w-]+)`/.exec(description)![1]]))
     expect(areas).toMatchObject({
-      ...{ get_on_air: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
+      ...{ get_on_air: 'radio', get_playlist_on_air: 'radio', update_rotation_sets: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
       ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar', refresh_calendar_feeds: 'calendar' },
       get_calendar: 'calendar',
     })
@@ -210,6 +211,15 @@ describe('rules', () => {
     expect(calendar).toContain('Sessions are meant to be within protected time (see Rules, in Sessions (read_documentation, area `sessions`)): the calendar gives')
     expect(calendar).toMatch(/apps\s+ask\s+for\s+the\s+calendar\s+of\s+the\s+days\s+it\s+would\s+take/)
     expect(calendar).not.toContain('## `')
+  })
+
+  it("give the rotation of sets: which sets, why they're skipped, what's on air, and reading their tracks", async () => {
+    const { radio, sessions } = await loadRules()
+    for (const heading of ['## The rotation of sets', '### Which sets', '### On air', '### Reading the tracks', '## The playlist']) expect(radio).toContain(heading)
+    expect(radio).toContain('`not-announced`')
+    expect(radio).toContain("What's public, in Events (read_documentation, area `events`)")
+    expect(radio).not.toContain('## `')
+    expect(sessions).toContain('A set can be in the radio\'s rotation (see The rotation of sets, in Radio (read_documentation, area `radio`))')
   })
 
   it('leave no link in what the areas give', async () => {

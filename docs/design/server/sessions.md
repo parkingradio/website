@@ -35,7 +35,7 @@ A session, as the endpoints below return it, also has:
 | Field | Type | |
 |---|---|---|
 | `id` | string | |
-| `title` | string | What the session is called: its `name`, or else the name its type gives it, e.g. `"HAUTE RIVE TAKEOVER"`, like the event of a track's title (see [The rotation](radio.md#the-rotation)). Never empty: see [Types and names](#types-and-names) |
+| `title` | string | What the session is called: its `name`, or else the name its type gives it, e.g. `"HAUTE RIVE TAKEOVER"`, like the event of a track's title (see [The playlist](radio.md#the-playlist)). Never empty: see [Types and names](#types-and-names) |
 | `end` | string or null | When the session ends: its `start` plus its `durationMinutes`, or null when it has no `start` |
 | `effectiveDescription` | string | The session's description: its `description`, or else the one its type gives it, or `""` when neither has one: see [Descriptions](#descriptions) |
 | `hasFlyer` | boolean | Whether the session has a flyer: see [Flyers](#flyers) |
@@ -77,6 +77,11 @@ A set, as the endpoints below return it, also has:
 | `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Moving it to another session counts. Status changes don't, nor do changes to its session (e.g. its start changing, or moving the set or another one among the session's sets), a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when (see [Status](#status)) |
+
+A set can be in the radio's rotation (see [The rotation of sets, in Radio](radio.md#the-rotation-of-sets)). Deleting it,
+or its session, takes it out. Cancelling it, removing its track or its video, or un-announcing its session gets it
+skipped while that lasts, and giving it another track, or another link to it, gets it skipped until it's read through
+that link.
 
 ## Times
 
@@ -515,7 +520,8 @@ session.
 
 ## `DELETE /api/admin/sessions/:id` (admin)
 
-Deletes a session, its flyer if no other session has it, and its sets, and responds `{"ok": true}`. Their performers
+Deletes a session, its flyer if no other session has it, and its sets, which leave the radio's rotation (see
+[The rotation of sets, in Radio](radio.md#the-rotation-of-sets)), and responds `{"ok": true}`. Their performers
 stay, and so do their applications. Fails with 404 when there's no such session.
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
@@ -597,6 +603,7 @@ session in `session` (see [Rules](#rules)).
 
 ## `DELETE /api/admin/sets/:id` (admin)
 
-Deletes a set, which can make its session done (see [Status](#status)), and responds like
+Deletes a set, which can make its session done (see [Status](#status)), and takes it out of the radio's rotation (see
+[The rotation of sets, in Radio](radio.md#the-rotation-of-sets)), and responds like
 `POST /api/admin/sessions/:id/sets`, with the session as it is then, without the set. The session's other sets keep their
 order. Its performers stay, and so does its application. Fails with 404 when there's no such set.

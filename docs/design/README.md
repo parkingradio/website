@@ -33,7 +33,7 @@ design: when they disagree, these documents still win.
 | Document | What it covers |
 |---|---|
 | [README](server/README.md) | Conventions every endpoint follows, how the server serves the client, `/healthz`, `/api/config`, emails, and the index of every endpoint |
-| [Radio](server/radio.md) | The radio's rotation, read from a SoundCloud playlist, and the SoundCloud app it's read through |
+| [Radio](server/radio.md) | The radio's rotation of sets, which admins choose and order, the SoundCloud playlist the radio plays until it switches to it, and the SoundCloud app they're read through |
 | [Video](server/video.md) | The video the site shows, read from YouTube, and the credentials it's read with |
 | [Artists](server/artists.md) | Artists, their photos, and their public profiles |
 | [Collectives](server/collectives.md) | Collectives, their members, their photos, and their public profiles |
