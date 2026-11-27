@@ -22,12 +22,12 @@ post_json /api/auth/login --data '{"email": "admin@integration.test", '
 expect_status 400
 expect_body "$API_ERROR"
 
-post_json /api/auth/login --data '{"email": "admin@integration.test", "password": 12345678}'
+post_json /api/auth/login --data '{"email": "admin@integration.test", "password": 12345678, "turnstileToken": "x"}'
 expect_status 400
 expect_body '^\{"ok":false,"error":"`password`: [^"]+"\}$'
 
 # Which the database can't store, rather than a 500 for the query that fails.
-post_json /api/auth/login --data '{"email": "admin\u0000@integration.test", "password": "x"}'
+post_json /api/auth/login --data '{"email": "admin\u0000@integration.test", "password": "x", "turnstileToken": "x"}'
 expect_status 400
 expect_body '^\{"ok":false,"error":"`email`: Text can'"'"'t contain the NUL character"\}$'
 

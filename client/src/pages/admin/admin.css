@@ -167,6 +167,18 @@
   margin-top: 1.5rem;
 }
 
+/* The login form's button, with Turnstile's widget above it, as one item of the form, so that the widget, which is usually
+   not shown, doesn't add a gap of the form's. */
+.admin-login-send {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.admin-login-send .turnstile.shown {
+  margin-bottom: 1rem;
+}
+
 .admin-form label,
 .admin-form .admin-time {
   display: flex;

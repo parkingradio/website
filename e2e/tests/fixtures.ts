@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import { test as base, expect } from '@playwright/test'
-import type { Locator, Page, TestInfo } from '@playwright/test'
+import type { BrowserContext, Locator, Page, TestInfo } from '@playwright/test'
 import type { components } from '../../client/src/api/schema.d.ts'
 import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
 import { admin } from '../env.ts'
+import { TURNSTILE_TOKEN } from '../seed.ts'
 
 // What every test is written with: Playwright's `test`, where the browser only reaches the server under test, under an
 // address of its own, and where a page that throws fails the test.
@@ -35,6 +36,8 @@ export const test = base.extend<Options>({
     // through the form, whose Turnstile tokens it checks with Cloudflare.
     const origin = new URL(baseURL!).origin
     await context.route((url) => url.origin !== origin, (route) => route.abort('blockedbyclient'))
+    // Except Turnstile's script, which is stubbed, since later routes take precedence (see `stubTurnstile`).
+    await stubTurnstile(context)
 
     // The server tells clients apart by CF-Connecting-IP, which Cloudflare sets in production (see
     // server/src/api/client-address.ts). Each test gets an address of its own, so that tests don't share rate limits,
@@ -53,6 +56,34 @@ export const test = base.extend<Options>({
 })
 
 export { expect, admin }
+
+// Stands in for Turnstile's script, which the browser can't load from Cloudflare in these tests: each widget vouches for
+// the visitor right away, with Cloudflare's test token, then marks its element (see `turnstileVouched`). The server still
+// checks the token with Cloudflare, whose test secret key, the server's in these tests, accepts it.
+async function stubTurnstile(context: BrowserContext) {
+  await context.route('https://challenges.cloudflare.com/turnstile/**', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: `window.turnstile = {
+        render: (element, options) => {
+          setTimeout(() => {
+            options.callback('${TURNSTILE_TOKEN}')
+            element.dataset.vouched = ''
+          })
+          return 'widget'
+        },
+        remove: () => {},
+      }`,
+    }),
+  )
+}
+
+// Waits for the page's Turnstile widget to have handed the page its token, e.g. before sending a form that needs it,
+// which can't be sent without one. That's once the token was handed over, not once the page has rendered with it, which
+// follows right away.
+export async function turnstileVouched(page: Page) {
+  await page.locator('.turnstile[data-vouched]').waitFor({ state: 'attached' })
+}
 
 // The smallest PNG there is: one transparent pixel. The server tells a photo's type from its first bytes.
 export const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64')
@@ -105,6 +136,7 @@ export async function logIn(page: Page, { at = '/admin', email = admin.email, pa
 export async function submitLogin(page: Page, { email = admin.email, password = admin.password } = {}) {
   await page.getByLabel('Courriel').fill(email)
   await page.getByLabel('Mot de passe').fill(password)
+  await turnstileVouched(page)
   await page.getByRole('button', { name: 'se connecter' }).click()
 }
 

@@ -16,7 +16,7 @@ import type { ApplyStore } from './apply-store.js'
 import type { ApplicationFields } from './fields.js'
 import type { ApplicationsSettingsStore } from './settings.js'
 import type { StoredApplication } from './store.js'
-import type { TurnstileVerifier } from './turnstile.js'
+import type { TurnstileVerifier } from '../api/turnstile.js'
 
 // The artists, collectives and applications, as the database would keep them, with each collective's artists, and the
 // photos, as the bucket would.
@@ -588,7 +588,7 @@ describe('POST /api/applications', () => {
     const logs: string[] = []
     const app = await buildApp(logs)
     expect((await apply(app)).statusCode).toBe(400)
-    const line = JSON.parse(logs.find((line) => line.includes('Turnstile refused an application'))!)
+    const line = JSON.parse(logs.find((line) => line.includes('Turnstile refused a token'))!)
     expect(line.level).toBe(50)
   })
 

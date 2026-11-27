@@ -44,14 +44,21 @@ sessions, when they're revoked or choose a new password, but not when they log o
 |---|---|---|
 | `email` | string | Matched whatever its case |
 | `password` | string | |
+| `turnstileToken` | string | The token Turnstile gave the page (see Turnstile, in [Conventions](README.md#conventions)) |
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
 | `email` | string | The admin's email, as it was invited |
 
-Sets the session cookie. Fails with 400 (missing fields), 401 (wrong email or password, or an invite that wasn't
-accepted yet) or 429: each client gets 10 attempts per 15 minutes.
+Sets the session cookie. Each client gets 10 attempts per 15 minutes, whatever they fail with. The server only sends the
+token to Cloudflare once the fields are valid, and only looks at the email and the password once Cloudflare has
+accepted the token. So the token may be used up after any failure other than a 400 for the fields, a 413 or a 429: the
+caller gets a new one after any failure. How long a 401 takes doesn't tell whether the email is an admin's, nor whether
+that admin has chosen a password yet.
+
+Fails with 400 (missing fields, or Turnstile refused the token), 401 (wrong email or password, or an invite that wasn't
+accepted yet), 429 (too many attempts) or 502 (Cloudflare couldn't be reached, or couldn't check the token).
 
 ## `POST /api/auth/logout`
 

@@ -2,12 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import type { BoundFunctions, queries } from '@testing-library/react'
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { GENRES, PHOTO_MAX_BYTES } from '../artist-profile'
-import { CONFIG, requestsTo } from '../test-utils'
+import { CONFIG, NEXT_TURNSTILE_TOKEN, TURNSTILE_TOKEN, configWith, requestsTo, turnstile } from '../test-utils'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
 import { Appliquer } from './appliquer'
 import { GENRE_GROUPS } from './appliquer/choices'
-import type { TurnstileApi } from './appliquer/turnstile'
 
 const fetchMock = vi.fn()
 
@@ -21,20 +20,7 @@ const geonamesResults = {
   ],
 }
 
-// Cloudflare's test site key, and the token its first widget gives, then the one the widgets after it give.
-const SITE_KEY = '1x00000000000000000000AA'
-const TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
-const NEXT_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX.2'
-
-// Stands in for Turnstile's script, which vouches for the artist right away unless told otherwise.
-const turnstile = {
-  vouches: true,
-  callbacks: null as Parameters<TurnstileApi['render']>[1] | null,
-  render: vi.fn<TurnstileApi['render']>(),
-  remove: vi.fn<TurnstileApi['remove']>(),
-}
-
-const LOADED: ConfigState = { kind: 'loaded', config: { ...CONFIG, turnstileSiteKey: SITE_KEY } }
+const LOADED = configWith({})
 
 function page(state: ConfigState) {
   return (
@@ -88,14 +74,6 @@ async function send() {
 }
 
 beforeEach(() => {
-  turnstile.vouches = true
-  turnstile.render.mockReset().mockImplementation((_container, options) => {
-    turnstile.callbacks = options
-    if (turnstile.vouches) options.callback(turnstile.render.mock.calls.length === 1 ? TOKEN : NEXT_TOKEN)
-    return 'widget'
-  })
-  turnstile.remove.mockReset()
-  window.turnstile = turnstile
   // Rather than mockFetch's, which setupTests.ts calls, but whose `Request` still keeps the FormData each request is made
   // with (see requestsTo).
   fetchMock.mockReset()
@@ -228,7 +206,7 @@ describe('Appliquer', () => {
 
     rerender(page(LOADED))
     expect(turnstile.render).toHaveBeenCalledOnce()
-    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: SITE_KEY })
+    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: CONFIG.turnstileSiteKey })
   })
 
   it("can't send the application when the configuration can't be fetched, since Turnstile needs it", async () => {
@@ -284,7 +262,7 @@ describe('Appliquer', () => {
 
     const { artist, application, photo, turnstileToken } = sentParts()
     expect(photo?.name).toBe('presse.jpg')
-    expect(turnstileToken).toBe(TOKEN)
+    expect(turnstileToken).toBe(TURNSTILE_TOKEN)
     expect(artist).toEqual({
       kind: 'artist',
       name: 'DJ Test',
@@ -341,7 +319,7 @@ describe('Appliquer', () => {
   it("renders Turnstile with the site key from the server's configuration, in French, only shown when it's needed", () => {
     renderForm()
     expect(turnstile.render).toHaveBeenCalledOnce()
-    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: SITE_KEY, language: 'fr', appearance: 'interaction-only' })
+    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: CONFIG.turnstileSiteKey, language: 'fr', appearance: 'interaction-only' })
   })
 
   it("doesn't send the application until Turnstile vouches for the artist", async () => {
@@ -353,7 +331,7 @@ describe('Appliquer', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("La vérification anti-robot n'est pas terminée.")
     expect(applications()).toEqual([])
 
-    act(() => turnstile.callbacks!.callback(TOKEN))
+    act(() => turnstile.callbacks!.callback(TURNSTILE_TOKEN))
     await send()
     expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
   })
@@ -380,8 +358,8 @@ describe('Appliquer', () => {
     await send()
     expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
     expect(applications().map((init) => (init.body as FormData).get('turnstileToken'))).toEqual([
-      TOKEN,
-      NEXT_TOKEN,
+      TURNSTILE_TOKEN,
+      NEXT_TURNSTILE_TOKEN,
     ])
   })
 

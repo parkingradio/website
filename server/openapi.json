@@ -3981,11 +3981,16 @@
                   "password": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "turnstileToken": {
+                    "type": "string",
+                    "description": "The token the Turnstile widget gave the page"
                   }
                 },
                 "required": [
                   "email",
-                  "password"
+                  "password",
+                  "turnstileToken"
                 ]
               }
             }
@@ -4033,6 +4038,16 @@
             }
           },
           "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
             "description": "Default Response",
             "content": {
               "application/json": {

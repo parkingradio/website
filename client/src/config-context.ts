@@ -33,8 +33,8 @@ export function useFeature(id: FeatureId): boolean | undefined {
 }
 
 /**
- * Cloudflare Turnstile's site key, for the "Appliquer" form: undefined until the configuration is fetched, or if it
- * can't be.
+ * Cloudflare Turnstile's site key, for the "Appliquer" form and the login form: undefined until the configuration is
+ * fetched, or if it can't be.
  */
 export function useTurnstileSiteKey(): string | undefined {
   const state = use(ConfigContext)

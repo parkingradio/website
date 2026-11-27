@@ -5,9 +5,9 @@
 # 2. Point the domain at the instance: an A record, proxied through Cloudflare so TLS terminates
 #    at their edge.
 # 3. Redirect `www.<domain>` to `<domain>`, when the site is served at the zone apex.
-# 4. Create the Turnstile widget that keeps bots from sending artist applications. Its site key
-#    is public, and handed to the client through /api/config. Its secret key goes to the server
-#    through Secrets Manager.
+# 4. Create the Turnstile widget that keeps bots from sending artist applications, and from
+#    guessing admins' passwords (its name predates that). Its site key is public, and handed to the
+#    client through /api/config. Its secret key goes to the server through Secrets Manager.
 data "cloudflare_zone" "this" {
   zone_id = var.cloudflare_zone_id
 }

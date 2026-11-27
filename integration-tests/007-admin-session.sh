@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# The admin can log in, use the session and log out, end to end against a real database. The
-# server's unit tests mock the database, so this is what covers the migrations, password hashing
-# and the session cookie together.
+# The admin can log in, use the session and log out, end to end against a real database and
+# Cloudflare's real Turnstile endpoint. The server's unit tests mock the database and Turnstile, so
+# this is what covers the migrations, password hashing, the session cookie and checking the token
+# together.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -12,6 +13,12 @@ upper_email="$(printf '%s' "$ADMIN_EMAIL" | tr '[:lower:]' '[:upper:]')"
 echo "  a wrong password is rejected"
 login "$IP" "$ADMIN_EMAIL" not-the-password
 expect_status 401
+
+echo "  the right password is rejected without a Turnstile token"
+login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD" ''
+expect_status 400
+expect_body '^\{"ok":false,"error":"The anti-bot check failed, try again"\}$'
+expect_no_header Set-Cookie
 
 echo "  the admin logs in, whatever the case of the email"
 login "$IP" "$upper_email" "$ADMIN_PASSWORD"

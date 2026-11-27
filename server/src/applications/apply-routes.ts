@@ -2,9 +2,11 @@ import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import { z } from 'zod'
-import { clientAddress, visitorAddress } from '../api/client-address.js'
+import { clientAddress } from '../api/client-address.js'
 import { useApiErrors } from '../api/errors.js'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
+import { checkTurnstile } from '../api/turnstile.js'
+import type { TurnstileVerifier } from '../api/turnstile.js'
 import { jsonField, readPhotoForm } from '../artists/photo-form.js'
 import type { FormLimits, PhotoForm } from '../artists/photo-form.js'
 import { PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PhotoFile } from '../artists/profile.js'
@@ -19,7 +21,6 @@ import { applicationEmails } from './emails.js'
 import { ApplicationFields } from './fields.js'
 import type { ApplicationsSettingsStore } from './settings.js'
 import { InvalidApplication, validateApplication } from './store.js'
-import type { TurnstileVerifier } from './turnstile.js'
 
 // The public endpoint where new artists and collectives apply for a set (see docs/design/server/applications.md). Artists see its
 // errors, so they're in French.
@@ -216,17 +217,9 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
       // application or a photo's type isn't valid, the artist can fix it and send it again with the same token. A photo
       // that can't be read is only found after it, though (see `sized`).
       const token = typeof form.fields.turnstileToken === 'string' ? form.fields.turnstileToken : ''
-      const verified = await verifyTurnstile(token, visitorAddress(request)).catch((error: unknown) => {
-        request.log.error({ err: error }, 'Failed to check a Turnstile token with Cloudflare')
-        return null
-      })
-      if (!verified) return reply.status(502).send(TURNSTILE_UNAVAILABLE)
-      if (!verified.success) {
-        // With a wrong secret key, every application is refused, so it's logged as an error to get noticed.
-        const misconfigured = verified.errorCodes.some((code) => code.includes('secret'))
-        request.log[misconfigured ? 'error' : 'info']({ errorCodes: verified.errorCodes }, 'Turnstile refused an application')
-        return reply.status(400).send(TURNSTILE_REFUSED)
-      }
+      const turnstile = await checkTurnstile(request, verifyTurnstile, token)
+      if (turnstile === 'unavailable') return reply.status(502).send(TURNSTILE_UNAVAILABLE)
+      if (turnstile === 'refused') return reply.status(400).send(TURNSTILE_REFUSED)
       const sizedPhotos = await sized(sent)
       if ('error' in sizedPhotos) return reply.status(400).send(sizedPhotos)
 

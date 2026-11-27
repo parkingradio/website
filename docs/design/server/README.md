@@ -73,6 +73,13 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   [Admins' calendars](admin-calendars.md)), for the same reasons: calendar apps like Google's read them from their own
   servers too. Nor do the endpoints that take a token for publishing on RA (see [Publishing on RA](ra-publication.md)),
   whose tokens can't be guessed either.
+- **Turnstile.** [`POST /api/applications`](applications.md#post-apiapplications) and
+  [`POST /api/auth/login`](admins.md#post-apiauthlogin), which bots could flood, or guess passwords with, take a token
+  from Cloudflare Turnstile: pages show its widget, with the site key from [`GET /api/config`](#get-apiconfig), which
+  gives them a token once it has checked that the visitor is a person, and the server asks Cloudflare whether the token
+  is valid. Cloudflare only accepts each token once, so each endpoint says after which errors a new one is needed. A
+  token that Cloudflare refuses, or an empty one, fails with 400, and when Cloudflare can't be reached, or can't check
+  the token, the request fails with 502.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -134,7 +141,7 @@ a session.
 | Response field | Type | |
 |---|---|---|
 | `assetsDomain` | string | The domain serving the static assets, e.g. `"assets.parking.radio"` |
-| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token `POST /api/applications` asks for (see [Applying](applications.md#applying)) |
+| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token that `POST /api/applications` and `POST /api/auth/login` ask for (see [Conventions](#conventions)) |
 | `environment` | string | The server's environment: the deployment it's part of, e.g. `production` or `test`, or `development` when it isn't told one (see [deployment.md](../../deployment.md#deploying-the-web-app)) |
 | `features` | object | Whether each feature flag is on (`true`) or off (`false`), by id, e.g. `{"some-flag": true}`. A flag that isn't there is off (see [Features](features.md)) |
 
