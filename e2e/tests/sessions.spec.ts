@@ -41,7 +41,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(row.getByRole('link', { name: 'Takeover', exact: true })).toBeVisible()
   await expect(row).toContainText('20 h – 23 h')
   await expect(row).toContainText('Clémentine Brûlée · Fréquence Boréale · Kwame Asante')
-  await expect(row).toContainText('jouée')
+  await expect(row.getByRole('combobox', { name: /^Statut : / })).toHaveValue('done')
 
   // The one whose date isn't known yet.
   await search.fill('ondine')
@@ -74,14 +74,14 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   // The cancelled one.
   await search.fill('sable mouvant')
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^annulées/ }).click()
-  await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annulée')
+  await expect(rowsOf(page, 'Les Nuits Basses').getByRole('combobox', { name: /^Statut : / })).toHaveValue('cancelled')
   // Which stays announced.
   await expect(rowsOf(page, 'Les Nuits Basses').getByRole('combobox', { name: /^Annonce : / })).toHaveValue('true')
 
   // Those of the other types, among which a synth meetup, which has no sets: the one that's been played.
-  await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
+  await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^jouées/ }).click()
   await search.fill('synth meetup')
-  const meetup = rowsOf(page, 'SYNTH MEETUPS').filter({ hasText: 'jouée' })
+  const meetup = rowsOf(page, 'SYNTH MEETUPS')
   await expect(meetup).toContainText('Synth meetup')
   // Which has the description its type gives it, and a flyer.
   await meetup.getByRole('link').first().click()
@@ -94,6 +94,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(page.getByLabel('Description', { exact: true })).toHaveAttribute('placeholder', described!)
   await page.getByRole('button', { name: 'annuler' }).click()
   await page.goBack()
+  await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
   await search.fill('live performance')
   await expect(rowsOf(page, 'LIVE PERFORMANCE')).toContainText('Ondine')
 
@@ -672,6 +673,25 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(row).toHaveCount(0)
   await announced.getByRole('button', { name: /^annoncées/ }).click()
   await expect(rowAnnounced).toHaveValue('true')
+  // Marked jouée from its row, once confirmed, since that marks its planned set joué: not confirmed, its row keeps its
+  // value. That takes it out of the planned sessions, then it's planned again from its row among the played ones, which
+  // leaves its second set joué.
+  const rowStatus = row.getByRole('combobox', { name: /^Statut : / })
+  const statuses = page.getByRole('group', { name: 'Statut' })
+  await expect(rowStatus).toHaveValue('planned')
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await rowStatus.selectOption('done')
+  await expect(rowStatus).toBeEnabled()
+  await expect(rowStatus).toHaveValue('planned')
+  page.once('dialog', (dialog) => dialog.accept())
+  await rowStatus.selectOption('done')
+  await expect(row).toHaveCount(0)
+  await statuses.getByRole('button', { name: /^jouées/ }).click()
+  await expect(rowStatus).toHaveValue('done')
+  await rowStatus.selectOption('planned')
+  await expect(row).toHaveCount(0)
+  await statuses.getByRole('button', { name: /^planifiées/ }).click()
+  await expect(rowStatus).toHaveValue('planned')
   await page.goto(`/admin/artistes/${mine.artist.id}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
 

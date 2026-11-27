@@ -9,7 +9,7 @@ import { Button } from './button'
 import { CollectiveForm } from './collective-form'
 import { failure, newSessionPath } from './session-errors'
 import { OwnSessions } from './sessions'
-import { useAnnouncing } from './use-announcing'
+import { useSessionChanges } from './use-session-changes'
 import type { CollectiveFormProps } from './collective-form'
 import { ArtistsFailure, BackToArtists, CollectiveDetails, LoadFailure } from './profile-details'
 import { addedBy, byWhom, deletedWith, entryPath } from './describe'
@@ -31,10 +31,12 @@ function CollectiveById({ id }: { id: string }) {
   // which can have created some, so that the form tells their names apart from new ones.
   const [artistsVersion, setArtistsVersion] = useState(0)
   const members = useApi('/api/admin/artists', { params: { query: { collective: id } }, version: membersVersion })
-  const applications = useApi('/api/admin/applications', { params: { query: { collective: id } } })
+  // Its applications, loaded again whenever one of its takeovers' status is changed, which can change theirs.
+  const [applicationsVersion, setApplicationsVersion] = useState(0)
+  const applications = useApi('/api/admin/applications', { params: { query: { collective: id } }, version: applicationsVersion })
   const sessions = useApi('/api/admin/sessions', { params: { query: { takeover: id } } })
-  // Its sessions as announcing them, or un-announcing them, left them, kept while its form is open.
-  const announcing = useAnnouncing()
+  // Its sessions as changing them from their rows left them, kept while its form is open.
+  const changes = useSessionChanges({ statusChanged: () => setApplicationsVersion((version) => version + 1) })
   // The collective as the last change left it, which replaces the one loaded.
   const [changed, setChanged] = useState<Collective | null>(null)
   const [editing, setEditing] = useState(false)
@@ -118,7 +120,7 @@ function CollectiveById({ id }: { id: string }) {
 
       <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?collective=${collective.id}`} />
 
-      <OwnSessions sessions={sessions} announcing={announcing} newPath={newSessionPath({ takeover: collective.id })} />
+      <OwnSessions sessions={sessions} changes={changes} newPath={newSessionPath({ takeover: collective.id })} />
 
       <h2>Supprimer</h2>
       <p>

@@ -783,6 +783,59 @@ describe('A collective’s page', () => {
     expect(announced).toHaveValue('false')
   })
 
+  it("changes the status of a session of its takeovers from its row, then loads its applications again, whose statuses that changes", async () => {
+    const planned: Session = { ...TAKEOVER, status: 'planned', application: { id: 'application-1', receivedAt: APPLICATION.receivedAt } }
+    const applications = (status: Application['status']) => ({ ok: true, applications: [{ ...APPLICATION, status }] })
+    mockFetch({ ...ONDES_PAGE, '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [planned] }, '/api/admin/applications?collective=collective-1': applications('planned') })
+    renderAt('/admin/artistes/collectifs/collective-1')
+    const application = async () => within(await screen.findByRole('table', { name: 'Candidatures' })).getAllByRole('row')[1]
+    await waitFor(async () => expect(await application()).toHaveTextContent(/planifiée/))
+
+    // The applications as cancelling the takeover leaves them.
+    mockFetch({
+      ...ONDES_PAGE,
+      '/api/admin/applications?collective=collective-1': applications('accepted'),
+      'PUT /api/admin/sessions/session-1/status': { ok: true, session: { ...planned, status: 'cancelled' } },
+    })
+    const status = screen.getByRole('combobox', { name: named('Statut : ONDES TAKEOVER, sam. 14 nov. 2026') })
+    fireEvent.change(status, { target: { value: 'cancelled' } })
+
+    await waitFor(async () => expect(await application()).toHaveTextContent(/retenue/))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'cancelled' })
+    expect(status).toHaveValue('cancelled')
+    expect(status.closest('tr')).toHaveClass('admin-status-cancelled')
+    expect(requestsTo('GET', '/api/admin/applications?collective=collective-1')).toHaveLength(1)
+    expect(requestsTo('GET', '/api/admin/sessions?takeover=collective-1')).toHaveLength(0)
+  })
+
+  it("doesn't load its applications again when a takeover's status isn't changed, saying why above its takeovers when it couldn't be", async () => {
+    const withEvent: Session = { ...TAKEOVER, raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' } }
+    mockFetch({
+      ...ONDES_PAGE,
+      '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [withEvent] },
+      'PUT /api/admin/sessions/session-1/status': { ok: false, error: 'No such session' },
+    })
+    renderAt('/admin/artistes/collectifs/collective-1')
+    const status = await screen.findByRole('combobox', { name: named('Statut : ONDES TAKEOVER, sam. 14 nov. 2026') })
+
+    // Not confirmed.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
+    fireEvent.change(status, { target: { value: 'cancelled' } })
+    expect(confirm).toHaveBeenLastCalledWith("L'événement sur RA ne sera pas modifié.\nAnnuler la session ?")
+    await waitFor(() => expect(status).toBeEnabled())
+    expect(status).toHaveValue('done')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
+
+    // Refused.
+    fireEvent.change(status, { target: { value: 'planned' } })
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Le statut de « ONDES TAKEOVER, sam. 14 nov. 2026 » n'a pas pu être changé : No such session")
+    expect(Boolean(alert.compareDocumentPosition(screen.getByRole('table', { name: 'Sessions' })) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await waitFor(() => expect(status).toBeEnabled())
+    expect(status).toHaveValue('done')
+    expect(requestsTo('GET', '/api/admin/applications?collective=collective-1')).toHaveLength(1)
+  })
+
   it("shows the server's refusal when its sessions could not be loaded and it has takeovers, linking to the one in the way", async () => {
     const takeover: Session = { ...TAKEOVER, status: 'planned' }
     const error = 'This collective has takeovers: give them another collective, or another type, first'

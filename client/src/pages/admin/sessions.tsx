@@ -69,12 +69,12 @@ import { Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet, TakeoverCollective } from './set-form'
 import { DragHandle, SortableList } from './sortable'
-import { confirmAnnouncing, useAnnouncing } from './use-announcing'
-import type { Announcing } from './use-announcing'
+import { confirmAnnouncing, confirmStatus, useSessionChanges } from './use-session-changes'
+import type { SessionChanges } from './use-session-changes'
 import { arrayMove, useSortableItem } from './use-sortable'
 
-// The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
-// are its sets, and adding one.
+// The sessions section: every session, whose status and announcement are changed from its row, each one's page, where
+// those and the session are changed, or it's deleted, and so are its sets, and adding one.
 
 function BackToSessions({ to = '/admin/sessions' }: { to?: string }) {
   return (
@@ -132,20 +132,20 @@ function SessionTypeName({ session }: { session: Session }) {
 }
 
 // Sessions, as listed in this section, or on a collective's page, under the heading whose id is `labelledBy`, where the
-// type is left out since they're all its takeovers. The columns sort the list when there's `sorting`, and whether
-// they're announced is a dropdown that changes it with `announce` (see `useAnnouncing`). The links to the sessions' pages
-// keep `linkQuery`, the list they go through, if any.
+// type is left out since they're all its takeovers. The columns sort the list when there's `sorting`, and their status,
+// and whether they're announced, are dropdowns that change them with `changes` (see `useSessionChanges`). The links to the
+// sessions' pages keep `linkQuery`, the list they go through, if any.
 function SessionsTable({
   sessions,
   sorting,
-  announce,
+  changes: { changeStatus, announce },
   linkQuery = '',
   labelledBy,
   withType = true,
 }: {
   sessions: Session[]
   sorting?: Sorting<SessionColumn>
-  announce: (session: Session, announced: Announced) => Promise<void>
+  changes: Pick<SessionChanges, 'changeStatus' | 'announce'>
   linkQuery?: string
   labelledBy?: string
   withType?: boolean
@@ -187,7 +187,15 @@ function SessionsTable({
             <td>
               <SessionArtists session={session} />
             </td>
-            <td>{SESSION_STATUS_LABELS[session.status]}</td>
+            <td>
+              <StatusSelect
+                label={`Statut : ${sessionName(session)}`}
+                statuses={STATUSES}
+                labels={SESSION_STATUS_LABELS}
+                status={session.status}
+                onChange={(status) => changeStatus(session, status)}
+              />
+            </td>
             <td>
               <StatusSelect
                 label={`Annonce : ${sessionName(session)}`}
@@ -206,14 +214,14 @@ function SessionsTable({
 }
 
 // The sessions of a collective's takeovers, on its page, with a link to `newPath`, which adds another one. They're
-// announced with `announcing`, which the page keeps, since this unmounts while the collective's form is open.
+// changed from their rows with `changes`, which the page keeps, since this unmounts while the collective's form is open.
 export function OwnSessions({
   sessions,
-  announcing: { current, error, announce },
+  changes,
   newPath,
 }: {
   sessions: Loaded<{ sessions: Session[] }>
-  announcing: Announcing
+  changes: SessionChanges
   newPath: string
 }) {
   const headingId = useId()
@@ -226,12 +234,12 @@ export function OwnSessions({
         </Link>
       </div>
       {sessions.kind === 'error' && <SessionsFailure message={sessions.message} />}
-      <ErrorMessage error={error} />
+      <ErrorMessage error={changes.error} />
       {sessions.kind === 'loaded' &&
         (sessions.value.sessions.length === 0 ? (
           <p className="admin-placeholder">Aucune session.</p>
         ) : (
-          <SessionsTable sessions={current(sessions.value.sessions)} announce={announce} labelledBy={headingId} withType={false} />
+          <SessionsTable sessions={changes.current(sessions.value.sessions)} changes={changes} labelledBy={headingId} withType={false} />
         ))}
     </>
   )
@@ -425,12 +433,12 @@ function useSessionList() {
 // filter's buttons count the sessions that the search and the other filter find.
 function SessionsList() {
   const { sessions, address, announced, setAnnounced, sorting, list } = useSessionList()
-  const { current, error, announce } = useAnnouncing()
+  const changes = useSessionChanges()
 
   if (sessions.kind === 'error') return <SessionsFailure message={sessions.message} />
   if (sessions.kind === 'loading') return null
 
-  const all = current(sessions.value.sessions)
+  const all = changes.current(sessions.value.sessions)
   const { found, listed } = list(all)
   // What the search finds with each filter, which the other one's buttons count.
   const foundAnnounced = withAnnounced(found, announced)
@@ -458,11 +466,11 @@ function SessionsList() {
         count={(announced) => withAnnounced(foundWithStatus, announced).length}
         onChange={setAnnounced}
       />
-      <ErrorMessage error={error} />
+      <ErrorMessage error={changes.error} />
       {listed.length === 0 ? (
         <p className="admin-placeholder">{empty}</p>
       ) : (
-        <SessionsTable sessions={listed} sorting={sorting} announce={announce} linkQuery={address.query} />
+        <SessionsTable sessions={listed} sorting={sorting} changes={changes} linkQuery={address.query} />
       )}
     </>
   )
@@ -588,22 +596,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   }
 
   const changeStatus = async (status: SessionStatus) => {
-    // Cancelling it cancels its sets that aren't cancelled, played ones included, so they're named, saying which were
-    // played, and leaves its event on RA as it is. A session that's already cancelled has nothing to say.
-    if (status === 'cancelled' && session.status !== 'cancelled') {
-      const uncancelled = session.sets.filter((set) => set.status !== 'cancelled')
-      const cancelled = uncancelled.length === 1 ? 'Ce set sera aussi annulé' : 'Ces sets seront aussi annulés'
-      const names = uncancelled.map((set) => `• ${setTitle(set)}${set.status === 'done' ? ` (${SET_STATUS_LABELS.done})` : ''}`).join('\n')
-      const said = (uncancelled.length > 0 ? `${cancelled}\u00a0:\n${names}\n` : '') + raEventKept(session)
-      if (said && !window.confirm(`${said}Annuler la session ?`)) return
-    }
-    // Marking it done marks its planned sets done, which could be a set that didn't happen, so they're named.
-    const planned = session.sets.filter((set) => set.status === 'planned')
-    if (status === 'done' && planned.length > 0) {
-      const marked = planned.length === 1 ? 'Le set planifié sera aussi marqué comme joué' : 'Les sets planifiés seront aussi marqués comme joués'
-      const names = planned.map((set) => `• ${setTitle(set)}`).join('\n')
-      if (!window.confirm(`${marked}\u00a0:\n${names}\nMarquer la session comme jouée ?`)) return
-    }
+    if (!confirmStatus(session, status)) return
     setBusy(true)
     setError(null)
     const result = await api.PUT('/api/admin/sessions/{id}/status', { params, body: { status } })
