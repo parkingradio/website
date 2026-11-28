@@ -18,6 +18,9 @@ type OrderedListProps<T> = {
   // What's shown before an item's label, from it and its index, if anything, e.g. when a set goes on air in the radio's
   // rotation.
   lead?: (item: T, index: number) => ReactNode
+  // What's shown above an item, outside its box, from it and its index, if anything, e.g. the day in the radio's
+  // rotation. It's part of the item, so that it moves with it while it's dragged.
+  above?: (item: T, index: number) => ReactNode
   onChange: (items: T[]) => void
   // The id of what gets the focus once the last item is removed, e.g. the field that adds one.
   nextFocus: string
@@ -27,7 +30,7 @@ type OrderedListProps<T> = {
   autoScroll?: boolean
 }
 
-export function OrderedList<T>({ items, keyOf, label, name = label, text, lead, onChange, nextFocus, disabled = false, autoScroll }: OrderedListProps<T>) {
+export function OrderedList<T>({ items, keyOf, label, name = label, text, lead, above, onChange, nextFocus, disabled = false, autoScroll }: OrderedListProps<T>) {
   const list = useRef<HTMLOListElement>(null)
   // What gets the focus once an item is removed, since its × is gone: the next item's ×, by its key, or else `nextFocus`.
   const focusNext = useRef<{ key: string } | 'next' | null>(null)
@@ -69,6 +72,7 @@ export function OrderedList<T>({ items, keyOf, label, name = label, text, lead, 
             name={name(item)}
             text={text?.(item)}
             lead={lead?.(item, index)}
+            above={above?.(item, index)}
             disabled={disabled}
             onRemove={() => remove(index)}
           />
@@ -85,21 +89,26 @@ type OrderedItemProps = {
   name: string
   text: ReactNode
   lead: ReactNode
+  above: ReactNode
   disabled: boolean
   onRemove: () => void
 }
 
-function OrderedItem({ id, number, label, name, text, lead, disabled, onRemove }: OrderedItemProps) {
+// The item is what's dragged and measured, so that what's above its box moves with it, and is part of its place.
+function OrderedItem({ id, number, label, name, text, lead, above, disabled, onRemove }: OrderedItemProps) {
   const { ref, style, dragging, handle } = useSortableItem(id)
   return (
     <li ref={ref} style={style} data-item={id} data-dragging={dragging || undefined}>
-      <DragHandle handle={handle} label={`réordonner ${name}`} />
-      <b>{number}</b>
-      {lead}
-      {text ? <div className="admin-ordered-text">{text}</div> : label}
-      <button type="button" data-action="remove" aria-label={`retirer ${name}`} disabled={disabled} onClick={onRemove}>
-        ×
-      </button>
+      {above}
+      <div className="admin-ordered-item">
+        <DragHandle handle={handle} label={`réordonner ${name}`} />
+        <b>{number}</b>
+        {lead}
+        {text ? <div className="admin-ordered-text">{text}</div> : label}
+        <button type="button" data-action="remove" aria-label={`retirer ${name}`} disabled={disabled} onClick={onRemove}>
+          ×
+        </button>
+      </div>
     </li>
   )
 }

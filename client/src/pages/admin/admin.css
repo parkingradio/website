@@ -552,24 +552,22 @@
 }
 
 /* Numbers as wide whatever their digits, so that the times after them line up. */
-.rotation-edit .admin-ordered > li > b {
+.rotation-edit .admin-ordered-item > b {
   min-width: 2ch;
 }
 
-/* When each set would go on air, aligned with its performers' line, and the day above it whenever it changes, which
-   never breaks: wide enough for the longest, e.g. « mer. 30 sept. », 13 characters of the admin pages' monospace font,
-   94px at 12px, with room to spare. */
+/* When each set would go on air, aligned with its performers' line, as wide as the list's column of times. */
 .rotation-edit .rotation-set-time {
   flex: none;
   align-self: flex-start;
-  width: 6.25rem;
+  width: 4.5rem;
   padding-block: 4px;
 }
 
-.rotation-edit-day {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
+/* The day above the first set of that day, outside its box, spaced as in the list (see `.rotation-sets > li`). */
+.rotation-edit .rotation-day {
+  padding: 0.6rem 0 0.5rem;
+  line-height: 1.6;
 }
 
 .rotation-add {
@@ -1165,7 +1163,8 @@ dl.admin-record {
   gap: 0.5rem;
 }
 
-/* Chosen genres, or a collective's artists or a set's performers, in order, each with the button that removes it. */
+/* Chosen genres, or a collective's artists or a set's performers, in order, each in a box with the button that removes
+   it. */
 .admin-chosen {
   display: flex;
   flex-wrap: wrap;
@@ -1175,12 +1174,16 @@ dl.admin-record {
   list-style: none;
 }
 
-.admin-chosen li {
+.admin-chosen:not(.admin-ordered) > li,
+.admin-ordered-item {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding-left: 10px;
   border: 1px solid #000;
+}
+
+.admin-chosen:not(.admin-ordered) > li {
+  padding-left: 10px;
 }
 
 .admin .admin-chosen button {
@@ -1188,15 +1191,11 @@ dl.admin-record {
   border: none;
 }
 
-/* Picks in order, e.g. a collective's artists, one per line, since they're moved up and down, each starting with its
-   handle. */
+/* Picks in order, e.g. a collective's artists, one per line, since they're moved up and down, each in a box starting with
+   its handle, under what's shown above it, if anything (see ordered-list.tsx). */
 .admin-ordered {
   flex-direction: column;
   align-items: flex-start;
-}
-
-.admin-ordered li {
-  padding-left: 0;
 }
 
 /* An item's text, when it's more than its label, e.g. a set of the radio's rotation, with its session. */
@@ -1255,7 +1254,7 @@ dl.admin-record {
   background: #fff;
 }
 
-.admin-ordered li[data-dragging] {
+.admin-ordered > li[data-dragging] > .admin-ordered-item {
   box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
 }
 

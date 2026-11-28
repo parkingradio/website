@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import type { Schema } from '../../api/client'
-import { held, jsonBody, mockFetch, moveWithKeyboard, named, requestsTo, spaced } from '../../test-utils'
+import { held, jsonBody, mockFetch, mockListLayout, moveWithKeyboard, named, pickUp, requestsTo, spaced } from '../../test-utils'
 import type { Body } from '../../test-utils'
 import { Rotation } from './rotation'
 
@@ -153,10 +153,12 @@ const loaded = () => screen.findByRole('button', { name: 'modifier' })
 // What's being changed: each set's number and performers, and its session's title and day.
 const draftOf = (item: Element) => `${item.querySelector('b')!.textContent} ${textOf(item.querySelector('.admin-ordered-text')!)}`
 const draft = () => Array.from(document.querySelectorAll('.admin-ordered > li')).map(draftOf)
-// When each set being changed would go on air, with the day before it whenever it changes, or '' when it has no time.
+// When each set being changed would go on air, with the day above its row whenever it changes, or '' when it has no time.
 const draftTimes = () =>
-  Array.from(document.querySelectorAll('.admin-ordered > li .rotation-set-time')).map((time) =>
-    spaced(Array.from(time.childNodes, (node) => node.textContent).join(' ')),
+  Array.from(document.querySelectorAll('.admin-ordered > li')).map((item) =>
+    spaced(
+      Array.from(item.querySelectorAll('.rotation-day, .rotation-set-time'), (part) => part.textContent).join(' '),
+    ),
   )
 
 async function modify(bodies?: Record<string, Body | Promise<Body>>) {
@@ -419,7 +421,7 @@ describe('Rotation', () => {
       fakeTime(ON_AIR_AT, { timers: false })
       await modify()
       fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Aurore/ }))
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', ''])
 
       await shownAgain(NEXT)
       await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1))
@@ -429,7 +431,7 @@ describe('Rotation', () => {
         `3 Kwame${SATURDAY} · 1 h 02Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`,
       ])
       // C is now the one on air: saving would put B back on air, from now, a minute later.
-      expect(draftTimes()).toEqual(['23 h 01', 'ven. 2 oct. 00 h 06', ''])
+      expect(draftTimes()).toEqual(['23 h 01', 'vendredi 2 octobre 00 h 06', ''])
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
       await waitFor(() => expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Le set de Brume et Cyan passera tout de suite en ondes, à la place du set de Écume.'))
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
@@ -451,7 +453,12 @@ describe('Rotation', () => {
         `4 Kwame${SATURDAY} · 1 h 02Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`,
       ])
       // As when it isn't being changed, the set on air going on.
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
+      // The day is a line of its own, above the box of the first set of that day, but in its row, which is what's dragged.
+      const day = screen.getByText('vendredi 2 octobre')
+      expect(draftOf(day.closest('li')!)).toBe(`2 Écume${SATURDAY} · 30 min`)
+      expect(day.closest('.admin-ordered-item')).toBeNull()
+      expect(day).toBeVisible()
       // Where « modifier » was.
       expect(document.activeElement).toBe(screen.getByRole('button', { name: named(`réordonner Set de Brume et Cyan, ${SATURDAY}`) }))
       expect(document.querySelector('.rotation-sets')).not.toBeInTheDocument()
@@ -494,17 +501,39 @@ describe('Rotation', () => {
     it('works out again when each set would go on air as sets are moved or taken out, skipped ones adding no time', async () => {
       await modify()
 
-      // The day goes with the times, rather than with the rows.
+      // The day is worked out again with the times once a set is dropped, above the row of the first set of that day.
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -1)
       expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Aurore', '3 Écume', '4 Kwame'])
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
 
       fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Aurore/ }))
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', ''])
 
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Kwame/ }), -1)
       expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Kwame', '3 Écume'])
-      expect(draftTimes()).toEqual(['23 h 00', '', 'ven. 2 oct. 00 h 05'])
+      expect(draftTimes()).toEqual(['23 h 00', '', 'vendredi 2 octobre 00 h 05'])
+    })
+
+    it('leaves the days blank while a set is being moved, until it is dropped or put back', async () => {
+      await modify()
+      const day = () => screen.getByText('vendredi 2 octobre')
+      const aurore = screen.getByRole('button', { name: /^réordonner Set de Aurore/ })
+      const laidOut = mockListLayout()
+
+      // Picked up, and moved, but not dropped yet: the day keeps its place, but isn't shown.
+      await pickUp(aurore)
+      fireEvent.keyDown(aurore, { key: 'ArrowUp', code: 'ArrowUp' })
+      expect(day()).not.toBeVisible()
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
+      // Put back.
+      fireEvent.keyDown(aurore, { key: 'Escape', code: 'Escape' })
+      await act(() => new Promise((resolve) => setTimeout(resolve)))
+      laidOut.mockRestore()
+      expect(day()).toBeVisible()
+
+      // Dropped (see the test above for where the day is then).
+      await moveWithKeyboard(aurore, -1)
+      expect(day()).toBeVisible()
     })
 
     it('starts the set under the play head now when it is another than the set on air, so that the times move on with the clock', async () => {
@@ -516,18 +545,18 @@ describe('Rotation', () => {
 
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -2)
       expect(draft().map(performersOf)).toEqual(['1 Aurore', '2 Brume, Cyan', '3 Écume', '4 Kwame'])
-      expect(draftTimes()).toEqual(['23 h 30', 'ven. 2 oct. 00 h 00', '01 h 05', ''])
+      expect(draftTimes()).toEqual(['23 h 30', 'vendredi 2 octobre 00 h 00', '01 h 05', ''])
       await act(() => vi.advanceTimersByTime(MINUTE))
-      expect(draftTimes()).toEqual(['23 h 31', 'ven. 2 oct. 00 h 01', '01 h 06', ''])
+      expect(draftTimes()).toEqual(['23 h 31', 'vendredi 2 octobre 00 h 01', '01 h 06', ''])
       // The page's clock, the only timer, since Aurore's bar stays at its start.
       expect(vi.getTimerCount()).toBe(1)
 
       // The set on air, back under the play head, goes on, and the page's clock stops: only its bar's goes on.
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), 2)
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
       expect(vi.getTimerCount()).toBe(1)
       await act(() => vi.advanceTimersByTime(MINUTE))
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
     })
 
     it('gives no time to the sets after one that was not in the rotation, until its track is read, unlike one taken out and added back', async () => {
@@ -535,19 +564,19 @@ describe('Rotation', () => {
 
       pick('Set de Fréquence')
       expect(draft()[4]).toBe(`5 Fréquence Boréale${SATURDAY}`)
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', '', '01 h 05'])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', '', '01 h 05'])
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Fréquence/ }), -2)
       expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Écume', '3 Fréquence Boréale', '4 Aurore', '5 Kwame'])
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', '', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', '', ''])
 
       // Écume's set, taken out and added back, keeps its length.
       fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Écume/ }))
       pick('Set de Écume')
       expect(draft()[4]).toBe(`5 Écume${SATURDAY} · 30 min`)
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '', '', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '', '', ''])
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Fréquence/ }), 3)
       expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Aurore', '3 Kwame', '4 Écume', '5 Fréquence Boréale'])
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '', '00 h 35', '01 h 05'])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '', '00 h 35', '01 h 05'])
     })
 
     it('starts a set that was not in the rotation now, under the play head, and gives the sets after it no time', async () => {
@@ -575,12 +604,12 @@ describe('Rotation', () => {
       await modify({ [candidateUrl(F)]: answer.body })
       pick('Set de Fréquence')
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Fréquence/ }), -2)
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', '', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', '', ''])
       expect(requestsTo('GET', candidateUrl(F))).toHaveLength(1)
 
       await answer.answer(withTrack(F, 45))
       expect(draft()[2]).toBe(`3 Fréquence Boréale${SATURDAY} · 45 min`)
-      expect(draftTimes()).toEqual(['23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', '01 h 20', ''])
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', '01 h 20', ''])
 
       // Taken out and added again, it's read again, and keeps its length meanwhile.
       fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Fréquence/ }))
@@ -630,7 +659,7 @@ describe('Rotation', () => {
         `2 Fréquence Boréale${SATURDAY} · 30 minPas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`,
       ])
       expect(underHead()).toBe(`3 Brume, Cyan${SATURDAY} · 1 h 05`)
-      expect(draftTimes()).toEqual(['', '', '23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35', ''])
+      expect(draftTimes()).toEqual(['', '', '23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
       expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent("Le set en cours continue : les changements s'appliquent dès le set suivant.")
     })
@@ -780,7 +809,7 @@ describe('Rotation', () => {
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Kwame/ }), -3)
       expect(draft().map(performersOf)).toEqual(['1 Kwame', '2 Brume, Cyan', '3 Écume', '4 Aurore'])
       expect(underHead()).toBe(`2 Brume, Cyan${SATURDAY} · 1 h 05`)
-      expect(draftTimes()).toEqual(['', '23 h 00', 'ven. 2 oct. 00 h 05', '00 h 35'])
+      expect(draftTimes()).toEqual(['', '23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35'])
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
       expect(confirmation()).toEqual(["Le set en cours continue : les changements s'appliquent dès le set suivant."])
     })

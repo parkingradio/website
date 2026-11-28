@@ -1,7 +1,8 @@
 import type { Locator, Page } from '@playwright/test'
 import { SEED_SESSIONS } from '../seed-data.ts'
 import { PREVIEW_SUFFIX } from '../../server/src/radio/stand-in-tracks.ts'
-import { drag } from './drag.ts'
+import { addDays, QUEBEC_TIME_ZONE, quebecDayAndTime, quebecInstant } from '../../client/src/quebec-time.ts'
+import { drag, pickUp } from './drag.ts'
 import { test, expect, adminMenu, logIn, NARROW, scrollsSideways } from './fixtures.ts'
 import type { Schemas } from './fixtures.ts'
 
@@ -154,16 +155,10 @@ test("on phones, a set's genres are under its session, in the list and while it'
 const performersOf = (item: Locator) => item.locator('.rotation-set-performers').evaluate((performers) => performers.textContent!)
 
 // For each of the rows `rows`, when its set goes on air, or would once the rotation being changed is saved, without the
-// day before it whenever it changes, or '' when it has no time, and whether it's skipped, which it says.
+// day, or '' when it has no time, and whether it's skipped, which it says.
 const timesOf = (rows: Locator) =>
   rows.evaluateAll((rows) =>
-    rows.map((row) => ({
-      time: Array.from(row.querySelector('.rotation-set-time')!.childNodes)
-        .filter((node) => node.nodeType === Node.TEXT_NODE)
-        .map((node) => node.textContent)
-        .join(''),
-      skipped: row.textContent!.includes('Pas diffusé'),
-    })),
+    rows.map((row) => ({ time: row.querySelector('.rotation-set-time')!.textContent!, skipped: row.textContent!.includes('Pas diffusé') })),
   )
 const A_TIME = /^\d\d\s*h\s*\d\d$/
 
@@ -178,6 +173,83 @@ test('while the rotation is changed, each set that can be played says when it wo
   expect(times.map(({ time }) => time)).toEqual(times.map(({ skipped }) => (skipped ? '' : expect.stringMatching(A_TIME))))
   expect(await timesOf(items.filter({ hasText: 'Kwame Asante' }))).toEqual([{ time: '', skipped: true }])
   expect(await scrollsSideways(page)).toBe(false)
+  await page.getByRole('button', { name: 'annuler' }).click()
+})
+
+// The day as the rotation shows it, e.g. « dimanche 29 novembre ».
+const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', timeZone: QUEBEC_TIME_ZONE })
+
+test('while the rotation is changed, the day is a line above the first set of that day, left blank while a set is moved', async ({ page }, testInfo) => {
+  const touch = testInfo.project.name === 'mobile'
+  if (touch) await page.setViewportSize(NARROW)
+  await logIn(page)
+  await expect(adminMenu(page)).toBeVisible()
+  // The browser's clock, stopped at the last 23:45 in Québec, so that the sets after one put under the play head, which
+  // starts then, are on the next day. Not later than the server's clock, which would have the page load the rotation again
+  // every few seconds, once the set on air has ended by the browser's clock. Set once logged in, so that Turnstile's frame
+  // doesn't get it, and before the page is loaded, so that the timers it sets, which still run in real time, can be
+  // cleared.
+  const now = quebecDayAndTime(new Date())
+  let today = now.day
+  if (now.time < '23:45') today = addDays(today, -1)
+  await page.clock.setFixedTime(quebecInstant(today, '23:45')!)
+  await page.goto('/admin/rotation')
+  await page.getByRole('button', { name: 'modifier' }).click()
+  const items = page.locator('.admin-ordered > li')
+  // The set on air, first, taken out, so that the one under the play head is another, which starts now, by the browser's
+  // clock.
+  await expect(progress(items.first())).toBeVisible()
+  const count = await items.count()
+  await items.first().getByRole('button', { name: /^retirer / }).click()
+  await expect(items).toHaveCount(count - 1)
+
+  // The next day, above the box of the first set of that day, the one after the set under the play head that can be
+  // played, outside it, as the rotation's day lines are, but in its row, which the play head isn't drawn over. Which sets
+  // they are, by their places.
+  const tomorrow = dayFormat.format(quebecInstant(addDays(today, 1), '12:00')!)
+  const lined = async () => {
+    const [head, next] = (await timesOf(items)).flatMap(({ skipped }, i) => (skipped ? [] : [i]))
+    await expect(page.locator('.admin-ordered .rotation-day')).toHaveText([tomorrow])
+    const row = (i: number) => `.admin-ordered > li:nth-child(${i + 1})`
+    const [day, box, headBox, line] = await boxesIn(page.locator('.rotation-edit'), [
+      `${row(next)} > .rotation-day`,
+      `${row(next)} > .admin-ordered-item`,
+      `${row(head)} > .admin-ordered-item`,
+      '.rotation-head',
+    ])
+    expect(day.y + day.height).toBeLessThanOrEqual(box.y + TOLERANCE)
+    expect(Math.abs(day.x - box.x)).toBeLessThanOrEqual(TOLERANCE)
+    expect(Math.abs(line.y - headBox.y)).toBeLessThanOrEqual(TOLERANCE)
+    expect(await scrollsSideways(page)).toBe(false)
+    return { head, next }
+  }
+  const before = await lined()
+
+  // While a set is being moved, here with the keyboard, the day isn't shown, but its line keeps its place, until the set
+  // is put back.
+  const dayOf = items.nth(before.next).locator('.rotation-day')
+  const spacing = async () => {
+    const [day, box] = await boxesIn(items.nth(before.next), ['.rotation-day', '.admin-ordered-item'])
+    return { height: day.height, above: box.y - day.y }
+  }
+  const shown = await spacing()
+  await pickUp(page, items.nth(before.next).getByRole('button', { name: /^réordonner / }))
+  await expect(dayOf).toBeHidden()
+  expect(await spacing()).toEqual(shown)
+  await page.keyboard.press('Escape')
+  await expect(dayOf).toBeVisible()
+
+  // The set of that day, dragged to the first place, under the play head, which then starts it now: the day is worked out
+  // again once it's dropped, above the set that was under the play head.
+  const [moved, was] = await Promise.all([performersOf(items.nth(before.next)), performersOf(items.nth(before.head))])
+  // The first set, and the one dragged there, both on the screen, but out of where the page scrolls while a set is dragged
+  // near its edges, even on phones with the skipped set in between.
+  await items.first().evaluate((row) => window.scrollBy(0, row.getBoundingClientRect().top - 180))
+  await drag(page, items.nth(before.next).getByRole('button', { name: /^réordonner / }), items.first(), { touch })
+  expect(await performersOf(items.first())).toBe(moved)
+  const after = await lined()
+  expect(after.head).toBe(0)
+  expect(await performersOf(items.nth(after.next))).toBe(was)
   await page.getByRole('button', { name: 'annuler' }).click()
 })
 

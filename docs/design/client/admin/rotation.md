@@ -59,8 +59,9 @@ Each set that can be played shows when it would go on air once the list is saved
 [On air](../../server/radio.md#on-air)): the set under the play head shows when it went on air, if it's the set on air,
 or else now, by the browser's clock, so that the times move on with it; then each set after it that can be played shows
 when the one before it ends. A set whose length isn't known shows none, and the sets after the first of these have no
-time. Skipped sets have none either, as when the rotation isn't being changed. The day shows whenever it changes, in the
-row of the first set of that day, since the rows move.
+time. As when the rotation isn't being changed, skipped sets have none either, and the day shows whenever it changes, on
+a line of its own above the first set of that day, e.g. « dimanche 29 novembre ». While a set is being moved, these lines
+keep their place but are left blank; once it's dropped, or put back, the days are worked out again with the times.
 
 Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus. It offers the sets that can be
 added (see

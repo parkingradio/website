@@ -43,4 +43,7 @@ export function useSortableItem(id: string): { ref: (element: HTMLElement | null
   }
 }
 
+// Whether an item of the list it's rendered in is being dragged, e.g. to hide what the move changes until it's dropped.
+export const useSorting = (): boolean => useDndContext().active !== null
+
 export { arrayMove } from '@dnd-kit/sortable'
