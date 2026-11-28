@@ -79,12 +79,15 @@ export function instantIn(given: string | null | undefined, local: string): Date
   return new Date(right.length > 0 ? Math.min(...right) : before)
 }
 
+// `ms`, in milliseconds since the epoch, to the second, as instants are given, with the fraction of a second dropped.
+export const toTheSecond = (ms: number) => Math.floor(ms / 1000) * 1000
+
 // `instant` in Québec time, to the second, with the offset from UTC in effect then, e.g. "2026-11-14T21:00:00-05:00" for
 // "2026-11-15T02:00:00.000Z". Only the offset comes from Intl, and the day and time are worked out from it. Before 1895,
 // Québec's offset has seconds, e.g. "-05:17:32", which ISO 8601 doesn't: the instants requests send are kept from
 // `EARLIEST_INSTANT`.
 export function inQuebecTime(instant: Date | string): string {
-  const ms = Math.floor(new Date(instant).getTime() / 1000) * 1000
+  const ms = toTheSecond(new Date(instant).getTime())
   const offset = quebecOffset(ms)
   return `${new Date(ms + offsetMs(offset)).toISOString().slice(0, 19)}${offset}`
 }

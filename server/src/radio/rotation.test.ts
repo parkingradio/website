@@ -92,6 +92,13 @@ describe('what is on air', () => {
     ])
     expect(upcoming([entry('a', 0)], onAir('a', NOW, 0))).toEqual([])
   })
+
+  it('gives when the sets that come next start from when the set on air started, to the second', () => {
+    // Lasting an hour and 700 milliseconds each, from 600 milliseconds into a second.
+    const sets = [entry('a', 0), entry('b', 1)].map((set) => ({ ...set, durationMs: HOUR + 700 }))
+    const starts = upcoming(sets, onAir('a', NOW + 600, 0), 2).map(({ startsAt }) => startsAt - NOW)
+    expect(starts).toEqual([HOUR + 700, 2 * HOUR + 1400])
+  })
 })
 
 describe('the play head', () => {
