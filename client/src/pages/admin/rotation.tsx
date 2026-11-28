@@ -12,6 +12,7 @@ import { QUEBEC_TIME_ZONE } from '../../quebec-time'
 import { byWhom, capitalized, formatDuration, genreName, sessionLongDay, sessionName, setInSentence, setName } from './describe'
 import { search } from './list'
 import { OrderedList } from './ordered-list'
+import { useSorting } from './use-sortable'
 import { sessionPath } from './session-errors'
 import { Performers } from './set-cells'
 
@@ -425,6 +426,17 @@ function startTimes(sets: Listed[], start: number): (number | null)[] {
   })
 }
 
+// The day above the first set of that day while the rotation is being changed, left blank while a set is being moved,
+// keeping its place, since the days are only worked out again once it's dropped.
+function EditedDay({ day }: { day: string }) {
+  const sorting = useSorting()
+  return (
+    <div className="rotation-day" style={sorting ? { visibility: 'hidden' } : undefined}>
+      {day}
+    </div>
+  )
+}
+
 type Step = 'editing' | 'confirming' | 'sending'
 
 // The rotation's sets as they were shown when « modifier » was clicked, to reorder them, take them out, or add others,
@@ -536,7 +548,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
             keyOf={(set) => set.id}
             label={performerNames}
             name={(set) => setName(set, set.session)}
-            above={(_, i) => days[i] && <div className="rotation-day">{days[i]}</div>}
+            above={(_, i) => days[i] && <EditedDay day={days[i]} />}
             lead={(_, i) => <span className="rotation-set-time">{times[i] !== null && timeFormat.format(times[i])}</span>}
             text={(set) => {
               const length = lengthOf(set)

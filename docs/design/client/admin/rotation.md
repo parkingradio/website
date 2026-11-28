@@ -60,8 +60,8 @@ Each set that can be played shows when it would go on air once the list is saved
 or else now, by the browser's clock, so that the times move on with it; then each set after it that can be played shows
 when the one before it ends. A set whose length isn't known shows none, and the sets after the first of these have no
 time. As when the rotation isn't being changed, skipped sets have none either, and the day shows whenever it changes, on
-a line of its own above the first set of that day, e.g. « dimanche 29 novembre ». The line moves with that set while it's
-dragged, and is worked out again with the times once it's dropped.
+a line of its own above the first set of that day, e.g. « dimanche 29 novembre ». While a set is being moved, these lines
+are left blank, until it's dropped, or put back, and the days worked out again with the times.
 
 Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus. It offers the sets that can be
 added (see

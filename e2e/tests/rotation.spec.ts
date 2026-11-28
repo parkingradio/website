@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import { SEED_SESSIONS } from '../seed-data.ts'
 import { PREVIEW_SUFFIX } from '../../server/src/radio/stand-in-tracks.ts'
 import { addDays, QUEBEC_TIME_ZONE, quebecDayAndTime, quebecInstant } from '../../client/src/quebec-time.ts'
-import { drag } from './drag.ts'
+import { drag, pickUp } from './drag.ts'
 import { test, expect, adminMenu, logIn, NARROW, scrollsSideways } from './fixtures.ts'
 import type { Schemas } from './fixtures.ts'
 
@@ -179,7 +179,7 @@ test('while the rotation is changed, each set that can be played says when it wo
 // The day as the rotation shows it, e.g. « dimanche 29 novembre ».
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', timeZone: QUEBEC_TIME_ZONE })
 
-test('while the rotation is changed, the day is a line above the first set of that day, which goes with its row', async ({ page }, testInfo) => {
+test('while the rotation is changed, the day is a line above the first set of that day, left blank while a set is moved', async ({ page }, testInfo) => {
   const touch = testInfo.project.name === 'mobile'
   if (touch) await page.setViewportSize(NARROW)
   await logIn(page)
@@ -225,8 +225,22 @@ test('while the rotation is changed, the day is a line above the first set of th
   }
   const before = await lined()
 
-  // The set of that day, dragged with its line to the first place, under the play head, which then starts it now: the day
-  // is worked out again once it's dropped, above the set that was under the play head.
+  // While a set is being moved, here with the keyboard, the day isn't shown, but its line keeps its place, until the set
+  // is put back.
+  const dayOf = items.nth(before.next).locator('.rotation-day')
+  const spacing = async () => {
+    const [day, box] = await boxesIn(items.nth(before.next), ['.rotation-day', '.admin-ordered-item'])
+    return { height: day.height, above: box.y - day.y }
+  }
+  const shown = await spacing()
+  await pickUp(page, items.nth(before.next).getByRole('button', { name: /^réordonner / }))
+  await expect(dayOf).toBeHidden()
+  expect(await spacing()).toEqual(shown)
+  await page.keyboard.press('Escape')
+  await expect(dayOf).toBeVisible()
+
+  // The set of that day, dragged to the first place, under the play head, which then starts it now: the day is worked out
+  // again once it's dropped, above the set that was under the play head.
   const [moved, was] = await Promise.all([performersOf(items.nth(before.next)), performersOf(items.nth(before.head))])
   // The first set, and the one dragged there, both on the screen, but out of where the page scrolls while a set is dragged
   // near its edges, even on phones with the skipped set in between.

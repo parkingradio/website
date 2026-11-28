@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import type { Schema } from '../../api/client'
-import { held, jsonBody, mockFetch, moveWithKeyboard, named, requestsTo, spaced } from '../../test-utils'
+import { held, jsonBody, mockFetch, mockListLayout, moveWithKeyboard, named, pickUp, requestsTo, spaced } from '../../test-utils'
 import type { Body } from '../../test-utils'
 import { Rotation } from './rotation'
 
@@ -457,7 +457,8 @@ describe('Rotation', () => {
       // The day is a line of its own, above the box of the first set of that day, but in its row, which is what's dragged.
       const day = screen.getByText('vendredi 2 octobre')
       expect(draftOf(day.closest('li')!)).toBe(`2 Écume${SATURDAY} · 30 min`)
-      expect(day.nextElementSibling).toHaveClass('admin-ordered-item')
+      expect(day.closest('.admin-ordered-item')).toBeNull()
+      expect(day).toBeVisible()
       // Where « modifier » was.
       expect(document.activeElement).toBe(screen.getByRole('button', { name: named(`réordonner Set de Brume et Cyan, ${SATURDAY}`) }))
       expect(document.querySelector('.rotation-sets')).not.toBeInTheDocument()
@@ -511,6 +512,27 @@ describe('Rotation', () => {
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Kwame/ }), -1)
       expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Kwame', '3 Écume'])
       expect(draftTimes()).toEqual(['23 h 00', '', 'vendredi 2 octobre 00 h 05'])
+    })
+
+    it('leaves the days blank while a set is being moved, until it is dropped or put back', async () => {
+      await modify()
+      const day = () => screen.getByText('vendredi 2 octobre')
+      const aurore = screen.getByRole('button', { name: /^réordonner Set de Aurore/ })
+      mockListLayout()
+
+      // Picked up, and moved, but not dropped yet: the day keeps its place, but isn't shown.
+      await pickUp(aurore)
+      fireEvent.keyDown(aurore, { key: 'ArrowUp', code: 'ArrowUp' })
+      expect(day()).not.toBeVisible()
+      expect(draftTimes()).toEqual(['23 h 00', 'vendredi 2 octobre 00 h 05', '00 h 35', ''])
+      // Put back.
+      fireEvent.keyDown(aurore, { key: 'Escape', code: 'Escape' })
+      await act(() => new Promise((resolve) => setTimeout(resolve)))
+      expect(day()).toBeVisible()
+
+      // Dropped (see the test above for where the day is then).
+      await moveWithKeyboard(aurore, -1)
+      expect(day()).toBeVisible()
     })
 
     it('starts the set under the play head now when it is another than the set on air, so that the times move on with the clock', async () => {

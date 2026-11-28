@@ -173,17 +173,25 @@ export function mockListLayout({ widths = [], heights = [] }: ListLayout = {}) {
 }
 
 /**
+ * Picks up the item of a list whose handle is `handle` with the keyboard, with the list laid out (see `mockListLayout`).
+ * dnd-kit reads the keys' `code`, and only listens for the arrows a moment after the item is picked up, which is waited
+ * for.
+ */
+export async function pickUp(handle: HTMLElement) {
+  handle.focus()
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
+  await act(() => new Promise((resolve) => setTimeout(resolve)))
+}
+
+/**
  * Picks up the item of a list whose handle is `handle` with the keyboard, moves it `by` places down, or up if it's
  * negative, and drops it there, or puts it back with Escape if `cancel` (see pages/admin/sortable.tsx), with the list laid
- * out as `layout` says (see `mockListLayout`). dnd-kit reads the keys' `code`, and only listens for the arrows a moment
- * after the item is picked up.
+ * out as `layout` says (see `mockListLayout` and `pickUp`).
  */
 export async function moveWithKeyboard(handle: HTMLElement, by: number, { cancel = false, layout = {} }: { cancel?: boolean; layout?: ListLayout } = {}) {
   const laidOut = mockListLayout(layout)
   try {
-    handle.focus()
-    fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
-    await act(() => new Promise((resolve) => setTimeout(resolve)))
+    await pickUp(handle)
     for (let i = 0; i < Math.abs(by); i++) fireEvent.keyDown(handle, by > 0 ? { key: 'ArrowDown', code: 'ArrowDown' } : { key: 'ArrowUp', code: 'ArrowUp' })
     fireEvent.keyDown(handle, cancel ? { key: 'Escape', code: 'Escape' } : { key: ' ', code: 'Space' })
     await act(() => new Promise((resolve) => setTimeout(resolve)))
