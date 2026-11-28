@@ -11,10 +11,15 @@ have been entered, a line says that the radio can't read any track until then, a
 [Configuration](configuration.md), where they're entered.
 
 The sets are listed in the order they come on air, as the server gives them, from the play head (see
-[On air](../../server/radio.md#on-air)): the one on air, marked « en cours », first. Like the legacy page's tracks, each
-set that isn't skipped shows when it begins, with the day whenever it changes. Each set shows its performers and its
-session's title and day (see [Names, in Sessions](sessions.md#names)), linking to their pages, its track's length once
-it's been read, and its "SoundCloud" and "YouTube" links.
+[On air](../../server/radio.md#on-air)), the one on air first. Like the legacy page's tracks, each other set that isn't
+skipped shows when it begins, with the day whenever it changes. Each set shows its performers and its session's title
+and day (see [Names, in Sessions](sessions.md#names)), linking to their pages, its track's length once it's been read,
+and its "SoundCloud" and "YouTube" links.
+
+The play head is drawn across the list, as a red line over the set on air, with « ▶ en ondes » in the margin where the
+times are. The list moves under it, rather than it moving with a set. The set under it shows how far into it the radio
+is, by the browser's clock: a bar, with the time played and the set's length, e.g. « 23:14 / 55:02 », which moves on
+every second. Off air, there's no play head.
 
 Skipped sets stay in their place, faded out, without a time, and say why (see
 [Which sets](../../server/radio.md#which-sets)). When the last read of a set's track failed, the set has a warning (see
@@ -34,9 +39,12 @@ what it loaded last, and says why above it.
 
 « modifier » turns the list, in the order shown, into one that can be changed like a set's performers (see
 [A set's form, in Sessions](sessions.md#a-sets-form)): numbered, with handles that move the sets (see
-[Reordering](layout.md#reordering)), and a « × » that takes one out. Its first set that isn't skipped is marked
-« en ondes », since saving puts it on air (see [On air](../../server/radio.md#on-air)), and the other sets that aren't
-skipped « à suivre ». The sets added count as ones that can be played, since saving reads their tracks. It says why sets are skipped, with their warnings, but without times.
+[Reordering](layout.md#reordering)), and a « × » that takes one out. It says why sets are skipped, with their
+warnings, but without times. The play head stays where it is, over the first set that isn't skipped, the sets added
+counting as ones that can be played, since saving reads their tracks: saving puts that set on air (see
+[On air](../../server/radio.md#on-air)), so moving another set there puts it on air. Its bar goes on moving when it's
+the set on air, and otherwise shows « 0:00 » and its length, since saving starts it from its start, or no bar while its
+length isn't known, e.g. for a set just added. With no set that can be played, there's no play head.
 
 Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus. It offers the sets that can be
 added (see
@@ -53,9 +61,9 @@ clicked. Otherwise, « enregistrer » asks to confirm, in a dialog on the page r
 [On air](../../server/radio.md#on-air)), the first of these that applies:
 
 - The radio will be off air: the rotation would be empty, or every set in it skipped.
-- It will come back on air right away, with the set marked « en ondes »: it's off air.
-- The set on air goes on, and the changes apply from the next set: it's the set marked « en ondes ».
-- The set marked « en ondes » will go on air right away, in place of the set on air.
+- It will come back on air right away, with the set under the play head: it's off air.
+- The set on air goes on, and the changes apply from the next set: it's the set under the play head.
+- The set under the play head will go on air right away, in place of the set on air.
 
 The list is saved in the order shown, replacing whatever was saved in the meantime, e.g. by another admin. While the
 page asks to confirm, and while the list is sent, it can't be changed, and while it's sent, « confirmer » reads

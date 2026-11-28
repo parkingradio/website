@@ -356,10 +356,63 @@
   opacity: 0.55;
 }
 
-/* While it's changed, the sets that come after the one marked as on air are marked too, but quieter. */
-.radio-track-tag.rotation-next {
-  background: none;
+/* The play head: a red line across the list, the frame's rather than a row's, at the top of the row under it, with
+   « ▶ en ondes » in the margin where the times are (see `PlayHead` in rotation.tsx). Red like the environment's stamp
+   (see layout.css). While the list is changed, the frame makes room for the margin. */
+.rotation-frame {
+  position: relative;
+}
+
+.rotation-edit .rotation-frame {
+  padding-left: 5.5rem;
+}
+
+.rotation-head {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  margin-top: -4px;
+  border-top: 2px solid #e0301e;
+  pointer-events: none;
+}
+
+.rotation-head span {
+  position: absolute;
+  top: 0.25rem;
+  left: 0;
+  color: #e0301e;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* How far into the set under the play head the radio is: a thin bar, then the time played and the set's length. */
+.rotation-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 24rem;
+  margin-block: 0.25rem;
+}
+
+.rotation-progress-bar {
+  flex: 1;
+  min-width: 3rem;
+  height: 4px;
+  background: #ddd;
+}
+
+.rotation-progress-bar > div {
+  height: 100%;
+  background: #e0301e;
+}
+
+.rotation-progress-time {
+  flex: none;
   color: #666;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Changing it: the list, then the field that adds a set, as wide as its options' labels and details need. */

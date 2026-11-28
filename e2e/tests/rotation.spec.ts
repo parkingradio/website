@@ -34,6 +34,9 @@ test("the radio's rotation of sets has the seeded sets that seed-data.ts puts in
   expect(candidates.sets.map((set) => set.youtubeVideo!.id)).toEqual(expect.arrayContaining(sets.filter((set) => !set.rotation).map((set) => set.youtubeVideo)))
 })
 
+// How far into the set of the row `row` the radio is, on the row under the play head.
+const progress = (row: Locator) => row.getByRole('progressbar', { name: 'Avancement du set' })
+
 // The rows of the sets, without the days between them.
 const shownSets = (page: Page) => page.locator('.rotation-sets > li:not(.radio-tracks-day)')
 
@@ -41,8 +44,10 @@ test('Rotation radio lists the sets from the one on air, with why the skipped on
   await logIn(page, { at: '/admin/rotation' })
   await expect(page.getByRole('heading', { level: 1, name: 'Rotation radio' })).toBeVisible()
 
-  await expect(shownSets(page).first()).toContainText('en cours')
-  await expect(page.getByText('en cours', { exact: true })).toHaveCount(1)
+  // The play head, over the set on air, which shows how far into it the radio is.
+  await expect(page.locator('.rotation-head')).toHaveText('▶ en ondes')
+  await expect(progress(shownSets(page).first())).toBeVisible()
+  await expect(page.getByRole('progressbar')).toHaveCount(1)
   const kwame = shownSets(page).filter({ hasText: 'Kwame Asante' })
   await expect(kwame).toContainText('Pas diffusé\u00a0: seul un extrait de 30 secondes de la piste peut être joué.')
   await expect(kwame).toHaveClass('rotation-set-skipped')
@@ -67,8 +72,8 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     const items = page.locator('.admin-ordered > li')
     await expect(items).toHaveCount(seeded.sets.length)
     // The first set, which is on air, is the one on air once it's saved.
-    await expect(items.first()).toContainText('en ondes')
-    await expect(page.getByText('en ondes', { exact: true })).toHaveCount(1)
+    await expect(page.locator('.rotation-head')).toHaveText('▶ en ondes')
+    await expect(progress(items.first())).toBeVisible()
 
     // One of the sets that can be added, found by its performer, at the end.
     const picker = page.getByRole('combobox', { name: 'Ajouter un set' })
@@ -138,10 +143,10 @@ test('another set, dragged first, goes on air right away once the rotation is sa
     await expect(items).toHaveCount(seeded.sets.length)
     // The first set after the one on air that can be played, which comes next.
     const next = seeded.sets.findIndex((set, i) => i > 0 && set.skipped.length === 0)
-    await expect(items.nth(next)).toContainText('à suivre')
     await drag(page, items.nth(next).getByRole('button', { name: /^réordonner / }), items.first(), { touch: false })
     expect(await performersOf(items.first())).toBe(seeded.sets[next].performers.map((performer) => performer.name).join(', '))
-    await expect(items.first()).toContainText('en ondes')
+    // Under the play head, from its start once it's saved.
+    await expect(progress(items.first())).toHaveAttribute('aria-valuenow', '0')
 
     await page.getByRole('button', { name: 'enregistrer' }).click()
     const dialog = page.getByRole('dialog', { name: 'Enregistrer la rotation' })
@@ -155,7 +160,7 @@ test('another set, dragged first, goes on air right away once the rotation is sa
     const saved = await getRotation(page)
     expect(saved.current?.setId).toBe(seeded.sets[next].id)
     expect(Date.parse(saved.current!.startedAt)).toBeGreaterThan(Date.parse(seeded.current!.startedAt))
-    await expect(shownSets(page).first()).toContainText('en cours')
+    await expect(progress(shownSets(page).first())).toBeVisible()
     await expect(shownSets(page).first()).toContainText(seeded.sets[next].performers[0].name)
   } finally {
     const restored = await page.request.put(ROTATION, { data: { sets: seeded.sets.map((set) => set.id) } })
