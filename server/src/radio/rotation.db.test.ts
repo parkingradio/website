@@ -317,6 +317,24 @@ describe('the rotation of sets', () => {
     expect(await onAir()).toEqual({ ok: true, current: null, upcoming: [] })
   })
 
+  it('goes on as it does anyway once the tracks of a change are read, when it has been changed again meanwhile', async () => {
+    const [a, b] = setIds(await createSession(2))
+    const [x] = setIds(await createSession(1, { day: 2 }))
+    await putRotation([a, b])
+    const store = rotationStore(database.db)
+    const t1 = Date.now()
+    // x, first, is unread, so a goes on.
+    const first = await store.replace([x, a], 'admin@example.com', () => t1)
+    expect(first.saved).toMatchObject({ setId: a })
+    // Then b is put first, before x is read.
+    const t2 = t1 + 1000
+    expect((await store.replace([b, x, a], 'admin@example.com', () => t2)).saved).toMatchObject({ setId: b, startedAt: t2 })
+    await reads.readDue()
+    // Once the first change's reads are done, b has ended: x comes after it, rather than b going on air again.
+    const { saved } = await store.afterReads(first, t2 + HOUR + 1)
+    expect(saved).toMatchObject({ setId: x, startedAt: t2 + HOUR })
+  })
+
   it('changes the rotation at a time taken once nothing else can change what is on air', async () => {
     const [a, b] = setIds(await createSession(2))
     await putRotation([a, b])

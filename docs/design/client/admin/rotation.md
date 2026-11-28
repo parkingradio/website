@@ -35,9 +35,8 @@ what it loaded last, and says why above it.
 « modifier » turns the list, in the order shown, into one that can be changed like a set's performers (see
 [A set's form, in Sessions](sessions.md#a-sets-form)): numbered, with handles that move the sets (see
 [Reordering](layout.md#reordering)), and a « × » that takes one out. Its first set that isn't skipped is marked
-« en ondes », since it's the one on air once the list is saved, so that moving another set first puts it on air, and the
-other sets that aren't skipped « à suivre ». The sets added count as ones that can be played, since saving reads their
-tracks. It says why sets are skipped, with their warnings, but without times.
+« en ondes », since saving puts it on air (see [On air](../../server/radio.md#on-air)), and the other sets that aren't
+skipped « à suivre ». The sets added count as ones that can be played, since saving reads their tracks. It says why sets are skipped, with their warnings, but without times.
 
 Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus. It offers the sets that can be
 added (see

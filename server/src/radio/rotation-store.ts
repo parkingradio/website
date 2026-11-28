@@ -50,8 +50,8 @@ export type RotationStore = {
   // The rotation as it is, with what's on air at `now`, which is kept when it changed (see `onAirAt` in rotation.ts).
   onAir(now: number): Promise<Rotation>
   // Makes the rotation `setIds`, ids of sets in lower case, in order from the play head, as a change by `updatedBy`, which
-  // changes what's on air (see `onAirAfterChange` in rotation.ts), and returns it. It's changed at the time `now` gives once nothing else can
-  // change what's on air, so that it's never before what another request kept. Throws a RotationRefused when a set is
+  // changes what's on air (see `onAirAfterChange` in rotation.ts), and returns it. It's changed at the time `now` gives
+  // once nothing else can change what's on air, so that it's never before what another request kept. Throws a RotationRefused when a set is
   // there twice, doesn't exist, or can't be added, as its endpoint checks them, in that order (see
   // `PUT /api/admin/radio/rotation` in docs/design/server/radio.md), in which case nothing changes.
   replace(setIds: string[], updatedBy: string, now?: () => number): Promise<Rotation>

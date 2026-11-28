@@ -45,8 +45,9 @@ end, so that every listener hears the same set at the same point. A set lasts as
 millisecond, rather than its `durationMinutes`. Skipped sets are passed over: the set after another one is the next one
 that isn't skipped, around the rotation. When every set is skipped, or the rotation is empty, the radio is off air.
 
-The rotation is read from a play head: the set on air, or, off air, where the radio comes back on air: after the set
-that was on air last, or, when the rotation has been changed since, or no set has ever been on air, at its first set.
+The rotation is read from a play head: the set on air, or, off air, where the radio comes back on air: after the place
+of the set that was on air last, or, when the rotation has been changed since, or no set has ever been on air, at its
+first set.
 
 It's a radio, so changing the rotation changes what's on air right away: the rotation is given from the play head, and
 its first set that isn't skipped is on air. When that's the set already on air, it goes on where it is. Otherwise, it
@@ -57,7 +58,7 @@ What happens to sets elsewhere, e.g. a set being cancelled or deleted, its sessi
 being read again, is taken into account the next time anyone asks what's on air. When the set on air is then skipped,
 out of the rotation, or has another track than the one it went on air with, the first set after its place in the
 rotation, in the rotation's order and around it, that isn't skipped goes on air from then on. The radio comes back on
-air the same way, with the first set from the play head that isn't skipped.
+air with the first set from the play head that isn't skipped.
 
 Every set of the rotation that isn't skipped can be streamed, not only the one on air, since a listener's clock can be a
 little ahead of the server's when a set ends.

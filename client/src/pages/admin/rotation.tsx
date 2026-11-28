@@ -216,11 +216,6 @@ function RotationSet({ set, startsAt, onAir }: { set: Schema<'RotationSet'>; sta
 const Tag = ({ label, next = false }: { label: string; next?: boolean }) => <span className={next ? 'radio-track-tag rotation-next' : 'radio-track-tag'}>{label}</span>
 const OnAirTag = () => <Tag label="en cours" />
 
-// While the rotation is being changed, what its sets will be once it's saved: the first that can be played on air, and the
-// others that can be played next.
-const HEAD_MARK = 'en ondes'
-const NEXT_MARK = 'à suivre'
-
 // Why a set is skipped, if it is, and why the last read of its track failed, if it did.
 function SetState({ set }: { set: Listed & Partial<Pick<Schema<'RotationSet'>, 'readError'>> }) {
   return (
@@ -308,10 +303,10 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
     return (options, query) => search(options, query, (option) => fields.get(option.key)!)
   }, [offered])
 
-  // The set on air, as the rotation was last loaded, which gives it first, and the one that will be once it's saved: the
-  // first that can be played, the sets added counting as ones that can be, since saving reads their tracks (see "On air"
-  // in docs/design/server/radio.md).
-  const onAir = rotation.current ? rotation.sets[0] : undefined
+  // The set on air, as the rotation was last loaded, and the one that will be once it's saved: the first that can be
+  // played, the sets added counting as ones that can be, since saving reads their tracks (see "On air" in
+  // docs/design/server/radio.md).
+  const onAir = rotation.current && rotation.sets.find((set) => set.id === rotation.current!.setId)
   const head = sets.find((set) => set.skipped.length === 0)
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
   // What saving does to what's on air.
@@ -342,7 +337,8 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
           detail={(set) => (
             <>
               {sessionName(set.session)}
-              {set === head ? <Tag label={HEAD_MARK} /> : set.skipped.length === 0 && <Tag label={NEXT_MARK} next />}
+              {/* What the set will be once the list is saved: on air, or next. */}
+              {set === head ? <Tag label="en ondes" /> : set.skipped.length === 0 && <Tag label="à suivre" next />}
               <SetState set={set} />
             </>
           )}
