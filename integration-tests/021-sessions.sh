@@ -613,6 +613,8 @@ json POST "${SESSIONS}/${replacement}/sets" "$(set_json "$(performers "$ana")" n
 expect_conflict "This YouTube video is another set's" "$first" "$opening"
 
 echo "  a SoundCloud link has to be on soundcloud.com, and can't be resolved until the SoundCloud app's credentials are entered"
+# Which other checks may have entered (e.g. 033-rotation.sh).
+sql "delete from soundcloud_credentials" >/dev/null
 json PATCH "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://on.soundcloud.com/AbCdE"')"
 expect_status 400
 expect_body_contains 'must be a link to it on soundcloud.com'

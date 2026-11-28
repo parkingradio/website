@@ -1,6 +1,8 @@
 import { SEED_ARTISTS, SEED_COLLECTIVES, SEED_SESSIONS } from '../seed-data.ts'
 import { day, seed } from '../seed.ts'
+import { PREVIEW_SUFFIX } from '../../server/src/radio/stand-in-tracks.ts'
 import { test, expect, admin, adminMenu, logIn } from './fixtures.ts'
+import type { Schemas } from './fixtures.ts'
 
 // The seed that global-setup.ts ran, which every test relies on.
 
@@ -88,4 +90,19 @@ test('the seeded applications have the statuses their sets and sessions give the
   expect(status('Rosalie Tremblay', [55])).toBe('accepted')
   expect(status('Clément Brûlé', [70])).toBe('new')
   expect(status('Kwame Asante', [65])).toBe('rejected')
+})
+
+test("the radio's rotation of sets has the seeded sets that seed-data.ts puts in it, in order, the others can be added", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'seeding is the same whatever the screen')
+  await logIn(page)
+  await expect(adminMenu(page)).toBeVisible()
+  const sets = SEED_SESSIONS.flatMap((session) => session.sets).filter((set) => set.soundcloudTrack)
+  const inRotation = sets.filter((set) => set.rotation)
+  // Told apart by their videos.
+  const rotation: Schemas['RadioRotation'] = await (await page.request.get('/api/admin/radio/rotation')).json()
+  expect(rotation.sets.map((set) => set.youtubeVideo!.id)).toEqual(inRotation.map((set) => set.youtubeVideo))
+  // Those whose track the stand-in for SoundCloud only lets a preview be played of are skipped.
+  expect(rotation.sets.map((set) => set.skipped)).toEqual(inRotation.map((set) => (set.soundcloudTrack!.endsWith(PREVIEW_SUFFIX) ? ['preview'] : [])))
+  const candidates: { sets: Schemas['RotationCandidate'][] } = await (await page.request.get('/api/admin/radio/rotation/candidates')).json()
+  expect(candidates.sets.map((set) => set.youtubeVideo!.id)).toEqual(expect.arrayContaining(sets.filter((set) => !set.rotation).map((set) => set.youtubeVideo)))
 })

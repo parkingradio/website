@@ -85,4 +85,9 @@ export const config = {
   get chatStandIn() {
     return process.env.CHAT_STAND_IN === 'true'
   },
+  // Whether the server uses a stand-in for SoundCloud, so that nothing reaches it, e.g. in development and in tests (see
+  // "SoundCloud" in the README): when SOUNDCLOUD_STAND_IN is `true`.
+  get soundcloudStandIn() {
+    return process.env.SOUNDCLOUD_STAND_IN === 'true'
+  },
 }

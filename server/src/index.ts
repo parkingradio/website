@@ -11,6 +11,7 @@ import { logger } from './core/logger.js'
 import { spaRoutes } from './site/spa.js'
 import { notFoundRoutes } from './site/not-found.js'
 import { soundCloudClient } from './radio/soundcloud.js'
+import { soundCloudStandIn } from './radio/soundcloud-stand-in.js'
 import { soundCloudApp } from './radio/soundcloud-app.js'
 import { soundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
 import { onAirStore } from './radio/on-air.js'
@@ -55,8 +56,9 @@ const backfill = sizesBackfill(() => storedImages(db), privateFiles, photos, app
 const calendarFeeds = calendarFeedsStore(db)
 const calendarFeedReads = calendarReads({ feeds: calendarFeeds, log: app.log })
 // And for the reads of the tracks of the radio's rotation of sets, through the SoundCloud app, which the radio and
-// sessions share (see radio/soundcloud-app.ts).
-const soundcloud = soundCloudApp(soundCloudClient, soundCloudCredentialsStore(db))
+// sessions share (see radio/soundcloud-app.ts), and which reaches SoundCloud, or its stand-in (see
+// radio/soundcloud-stand-in.ts).
+const soundcloud = soundCloudApp(config.soundcloudStandIn ? () => soundCloudStandIn : soundCloudClient, soundCloudCredentialsStore(db))
 const rotation = rotationStore(db)
 const rotationTrackReads = trackReads({ store: rotation, soundcloud, log: app.log })
 const backgroundTasks = [backfill, calendarFeedReads, rotationTrackReads]
@@ -70,6 +72,7 @@ app.addHook('onClose', async () => {
 })
 
 if (config.chatStandIn) app.log.info('Using the stand-in for Discord (CHAT_STAND_IN)')
+if (config.soundcloudStandIn) app.log.info('Using the stand-in for SoundCloud (SOUNDCLOUD_STAND_IN)')
 
 try {
   await migrateDatabase(db)
