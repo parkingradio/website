@@ -507,7 +507,6 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   const headStartedAt = head !== undefined && head.id === onAir?.id ? Date.parse(rotation.current!.startedAt) : null
   const now = useClock(head !== undefined && headStartedAt === null)
   const times = startTimes(listed, headStartedAt ?? now)
-  // The set under the play head never has a day above it, as the first that has a time.
   const days = daysChanging(times)
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
   // What saving does to what's on air.
@@ -530,6 +529,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   return (
     <>
       <div ref={list} className="rotation-edit">
+        {/* Over the whole row of the set under it, which never has a day above it, as the first set that has a time. */}
         <PlayHead rows="[data-item]" index={head ? listed.indexOf(head) : null}>
           <OrderedList
             items={listed}

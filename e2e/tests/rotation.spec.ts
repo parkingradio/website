@@ -184,10 +184,11 @@ test('while the rotation is changed, the day is a line above the first set of th
   if (touch) await page.setViewportSize(NARROW)
   await logIn(page)
   await expect(adminMenu(page)).toBeVisible()
-  // The browser's clock, at the last 23:45 in Québec, so that the sets after one put under the play head, which starts
-  // then, are on the next day. Neither later than the server's clock nor long before it, so that the page doesn't load the
-  // rotation again every few seconds. Set once logged in, and before the page is loaded, so that all of its timers are the
-  // fake clock's.
+  // The browser's clock, stopped at the last 23:45 in Québec, so that the sets after one put under the play head, which
+  // starts then, are on the next day. Not later than the server's clock, which would have the page load the rotation again
+  // every few seconds, once the set on air has ended by the browser's clock. Set once logged in, so that Turnstile's frame
+  // doesn't get it, and before the page is loaded, so that the timers it sets, which still run in real time, can be
+  // cleared.
   const now = quebecDayAndTime(new Date())
   let today = now.day
   if (now.time < '23:45') today = addDays(today, -1)
@@ -227,7 +228,9 @@ test('while the rotation is changed, the day is a line above the first set of th
   // The set of that day, dragged with its line to the first place, under the play head, which then starts it now: the day
   // is worked out again once it's dropped, above the set that was under the play head.
   const [moved, was] = await Promise.all([performersOf(items.nth(before.next)), performersOf(items.nth(before.head))])
-  await page.evaluate(() => window.scrollTo(0, 0))
+  // The first set, and the one dragged there, both on the screen, but out of where the page scrolls while a set is dragged
+  // near its edges, even on phones with the skipped set in between.
+  await items.first().evaluate((row) => window.scrollBy(0, row.getBoundingClientRect().top - 180))
   await drag(page, items.nth(before.next).getByRole('button', { name: /^réordonner / }), items.first(), { touch })
   expect(await performersOf(items.first())).toBe(moved)
   const after = await lined()

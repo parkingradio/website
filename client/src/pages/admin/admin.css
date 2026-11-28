@@ -564,9 +564,9 @@
   padding-block: 4px;
 }
 
-/* The day above the first set of that day, outside its box, as in the list (see `.rotation-day`). */
+/* The day above the first set of that day, outside its box, spaced as in the list (see `.rotation-sets > li`). */
 .rotation-edit .rotation-day {
-  padding-bottom: 0.25rem;
+  padding: 0.6rem 0 0.5rem;
   line-height: 1.6;
 }
 
