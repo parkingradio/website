@@ -67,11 +67,11 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     // One of the sets that can be added, found by its performer, at the end.
     const picker = page.getByRole('combobox', { name: 'Ajouter un set' })
     await picker.click()
-    await picker.fill('omizs')
-    await page.getByRole('option', { name: /^Set de OMIZS/ }).click()
+    await picker.fill('orval')
+    await page.getByRole('option', { name: /^Set de ORVAL/ }).click()
     await expect(items).toHaveCount(seeded.sets.length + 1)
     await expect(picker).toBeFocused()
-    expect(await performersOf(items.last())).toBe('OMIZS')
+    expect(await performersOf(items.last())).toBe('ORVAL')
 
     // Neither the set on air, which is first, nor the skipped one, which the mobile project checks.
     let out = 1
@@ -80,10 +80,10 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     await items.nth(out).getByRole('button', { name: /^retirer / }).click()
     await expect(items).toHaveCount(seeded.sets.length)
 
-    // OMIZS's set, dragged up a place with the mouse.
+    // ORVAL's set, dragged up a place with the mouse.
     const last = seeded.sets.length - 1
-    await drag(page, items.nth(last).getByRole('button', { name: /^réordonner Set de OMIZS/ }), items.nth(last - 1), { touch: false })
-    expect(await performersOf(items.nth(last - 1))).toBe('OMIZS')
+    await drag(page, items.nth(last).getByRole('button', { name: /^réordonner Set de ORVAL/ }), items.nth(last - 1), { touch: false })
+    expect(await performersOf(items.nth(last - 1))).toBe('ORVAL')
     const changed = await Promise.all((await items.all()).map(performersOf))
 
     await page.getByRole('button', { name: 'enregistrer' }).click()
@@ -95,7 +95,7 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     const saved = await getRotation(page)
     expect(saved.sets.map((set) => set.performers.map((performer) => performer.name).join(', '))).toEqual(changed)
     await expect(shownSets(page)).toHaveCount(seeded.sets.length)
-    await expect(shownSets(page).filter({ hasText: 'OMIZS' })).toHaveCount(1)
+    await expect(shownSets(page).filter({ hasText: 'ORVAL' })).toHaveCount(1)
     await expect(shownSets(page).filter({ hasText: removed })).toHaveCount(0)
   } finally {
     // The seeded rotation, in its order, for the tests that come after.
