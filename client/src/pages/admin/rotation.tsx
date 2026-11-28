@@ -266,6 +266,8 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   const [candidatesVersion, setCandidatesVersion] = useState(0)
   const candidates = useApi('/api/admin/radio/rotation/candidates', { version: candidatesVersion })
   const pickerId = useId()
+  // What « confirmer » is described by, for screen readers, which read it as it gets the focus.
+  const confirmationId = useId()
   const list = useRef<HTMLDivElement>(null)
   const save = useRef<HTMLButtonElement>(null)
   const confirm = useRef<HTMLButtonElement>(null)
@@ -302,6 +304,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
   let consequence: string | null = null
   if (sets.length === 0) consequence = 'La rotation sera vide\u00a0: la radio sera hors ondes.'
+  else if (sets.every((set) => set.skipped.length > 0)) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
   else if (onAir && !sets.some((set) => set.id === onAir)) consequence = 'Le set en cours en sera retiré\u00a0: la radio passera tout de suite au suivant.'
 
   const send = async () => {
@@ -390,10 +393,12 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
         </div>
       ) : (
         <div className="admin-notice rotation-confirm">
-          <p>Le changement s'applique tout de suite à la radio.</p>
-          {consequence && <p>{consequence}</p>}
+          <div id={confirmationId}>
+            <p>Le changement s'applique tout de suite à la radio.</p>
+            {consequence && <p>{consequence}</p>}
+          </div>
           <div className="admin-toolbar">
-            <button ref={confirm} type="button" className="admin-primary" disabled={step === 'sending'} onClick={send}>
+            <button ref={confirm} type="button" className="admin-primary" aria-describedby={confirmationId} disabled={step === 'sending'} onClick={send}>
               {step === 'sending' ? 'enregistrement…' : 'confirmer'}
             </button>
             <button type="button" disabled={step === 'sending'} onClick={() => setStep('editing')}>

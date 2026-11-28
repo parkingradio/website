@@ -168,7 +168,7 @@ describe('Rotation', () => {
 
     it('says when the rotation is empty, and the radio off air, and still lets sets be added', async () => {
       renderPage({ [ROTATION_URL]: { ...ROTATION, updatedBy: null, updatedAt: null, current: null, sets: [] } })
-      await loaded()
+      expect(await loaded()).toBeEnabled()
 
       expect(spaced(screen.getByText(/^La rotation est vide/).textContent)).toBe('La rotation est vide : la radio est hors ondes.')
       expect(screen.queryByText(/^Modifiée par/)).not.toBeInTheDocument()
@@ -386,7 +386,7 @@ describe('Rotation', () => {
   })
 
   describe('confirming', () => {
-    const confirmation = () => Array.from(document.querySelectorAll('.rotation-confirm > p')).map((p) => spaced(p.textContent))
+    const confirmation = () => Array.from(document.querySelectorAll('.rotation-confirm p')).map((p) => spaced(p.textContent))
 
     it('asks to confirm that the change applies on the radio right away, and goes back to the changes with « revenir »', async () => {
       await modify()
@@ -394,7 +394,8 @@ describe('Rotation', () => {
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
       expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio."])
-      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer' }))
+      // Which screen readers read along with it, as it gets the focus.
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer', description: "Le changement s'applique tout de suite à la radio." }))
       // The list can't be changed meanwhile.
       expect(screen.getByRole('button', { name: /^retirer Set de Aurore/ })).toBeDisabled()
       expect(picker()).toBeDisabled()
@@ -406,14 +407,21 @@ describe('Rotation', () => {
       expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(0)
     })
 
-    it('says when the set on air is taken out, and when the rotation would be empty', async () => {
+    it('says when the set on air is taken out, when only skipped sets would be left, and when the rotation would be empty', async () => {
       await modify()
-      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Brume/ }))
+      const remove = (...names: string[]) => names.forEach((name) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^retirer Set de ${name}`) })))
+      remove('Brume')
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
       expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'Le set en cours en sera retiré : la radio passera tout de suite au suivant.'])
 
+      // Only Kwame's set, which is skipped.
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
-      for (const name of ['Écume', 'Aurore', 'Kwame']) fireEvent.click(screen.getByRole('button', { name: new RegExp(`^retirer Set de ${name}`) }))
+      remove('Écume', 'Aurore')
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'Aucun set de la rotation ne pourra être diffusé : la radio sera hors ondes.'])
+
+      fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
+      remove('Kwame')
       expect(document.activeElement).toBe(picker())
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
       expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'La rotation sera vide : la radio sera hors ondes.'])
@@ -450,6 +458,26 @@ describe('Rotation', () => {
       // Until the rotation is changed again.
       fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
       expect(screen.queryByText('La rotation a été enregistrée.')).not.toBeInTheDocument()
+    })
+
+    it('keeps the rotation as it was saved when a load sent before that answers after it', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(ON_AIR_AT)
+      await modify()
+      // The tab is shown again, and the load it sends is held back.
+      const reload = held()
+      mockFetch({ [ROTATION_URL]: reload.body, [CREDENTIALS_URL]: CREDENTIALS, [CANDIDATES_URL]: CANDIDATES, [`PUT ${ROTATION_URL}`]: { ...ROTATION, sets: [A, K, B] } })
+      vi.setSystemTime(ON_AIR_AT + 61 * 1000)
+      await act(() => document.dispatchEvent(new Event('visibilitychange')))
+      await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1))
+
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Écume/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      fireEvent.click(screen.getByRole('button', { name: 'confirmer' }))
+      await screen.findByText('La rotation a été enregistrée.')
+
+      await reload.answer(ROTATION)
+      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyanen cours', 'vendredi 2 octobre', '00 h 35Aurore', 'Kwame'])
     })
 
     it("says which set can't be added, and why, keeps the changes, and loads the sets that can be added again", async () => {

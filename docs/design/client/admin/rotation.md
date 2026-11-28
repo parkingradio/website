@@ -28,10 +28,10 @@ rotation is skipped, it says that no set can be played, so that the radio is off
 rotation's order, without times. When the rotation can't be loaded, the page says why in place of the list, without
 « modifier ».
 
-The page loads the rotation again when the set on air ends, a couple of seconds after it, though never sooner than 10
-seconds after it was last loaded, so that a browser whose clock is ahead doesn't load it again and again, and when the
-browser's tab is shown again, at most once a minute, also while the rotation is being changed. When it can't be loaded
-again, the page goes on showing what it loaded last, and says why above it.
+Even while the rotation is being changed, the page loads it again when the set on air ends, a couple of seconds after
+it, though never sooner than 10 seconds after it was last loaded, so that a browser whose clock is ahead doesn't load it
+again and again, and when the browser's tab is shown again, at most once a minute. When it can't be loaded again, the
+page goes on showing what it loaded last, and says why above it.
 
 ## Changing the rotation
 
@@ -52,13 +52,14 @@ field says which sets can be added. When they can't be loaded, the field can't b
 
 « annuler » leaves the rotation as it is. « enregistrer » only closes the list when it's as it was shown when
 « modifier » was clicked. Otherwise, it asks to confirm, next to it rather than in a dialog: « Le changement s'applique
-tout de suite à la radio. », followed, when the set on air is taken out, by « Le set en cours en sera retiré : la radio
-passera tout de suite au suivant. », or, when no set is left, by « La rotation sera vide : la radio sera hors ondes. »,
-then « confirmer », and « revenir », which goes back to changing the list. The rotation is saved in the order shown, so
-that the set on air comes first in the rotation's order, which changes nothing that's played. Whatever was saved in the
-meantime, e.g. by another admin, is replaced. While the page asks to confirm, and while the rotation is sent, which can
-take several seconds, since the server reads the tracks of the sets added, the list can't be changed, and while it's
-sent, the button reads « enregistrement… ».
+tout de suite à la radio. », followed, when no set is left, by « La rotation sera vide : la radio sera hors ondes. »,
+or, when every set left is skipped, by « Aucun set de la rotation ne pourra être diffusé : la radio sera hors ondes. »,
+or else, when the set on air is taken out, by « Le set en cours en sera retiré : la radio passera tout de suite au
+suivant. », then « confirmer », and « revenir », which goes back to changing the list. The rotation is saved in the
+order shown, so that the set on air comes first in the rotation's order, which changes nothing that's played. Whatever
+was saved in the meantime, e.g. by another admin, is replaced. While the page asks to confirm, and while the rotation is
+sent, which can take several seconds, since the server reads the tracks of the sets added, the list can't be changed,
+and while it's sent, the button reads « enregistrement… ».
 
 Once it's saved, the page shows the rotation as the server returns it, and says « La rotation a été enregistrée. »
 When it can't be saved, the list stays as it was being changed, and the page says why: for a set that can't be added,

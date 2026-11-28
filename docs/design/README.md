@@ -69,7 +69,7 @@ design: when they disagree, these documents still win.
 | [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |
 | [Publier sur RA](client/admin/publier-sur-ra.md) | Creating a session's event on Resident Advisor, with a bookmarklet |
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
-| [Rotation radio](client/admin/rotation.md) | The radio's rotation of sets: which sets are on air, and when, and choosing and ordering them |
+| [Rotation radio](client/admin/rotation.md) | The radio's rotation of sets: its sets in the order they come on air, and when, and choosing and ordering them |
 | [Rotation radio (legacy)](client/admin/rotation-legacy.md) | Choosing the radio's playlist |
 | [Intégrations](client/admin/integrations.md) | Connecting Claude, the admin's connected apps, and the RA bookmarklet |
 | [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin, and the page that ends connecting an app |
