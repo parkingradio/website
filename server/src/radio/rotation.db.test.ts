@@ -294,13 +294,13 @@ describe('the rotation of sets', () => {
     const [a, p, b, c] = setIds(session)
     // Tracks that last an hour and 700 milliseconds, p's too, which is skipped, so that its length isn't counted.
     const length = HOUR + 700
-    for (let i = 0; i < 4; i++) answers.set(linkOf(session, i), { state: 'playable', durationMs: length, secretToken: null })
-    answers.set(linkOf(session, 1), { state: 'preview', durationMs: length, secretToken: null })
+    const states = ['playable', 'preview', 'playable', 'playable'] as const
+    states.forEach((state, i) => answers.set(linkOf(session, i), { state, durationMs: length, secretToken: null }))
     await putRotation([a, p, b, c])
     // a went on air 600 milliseconds into a second, which the API drops.
     const startedAt = Math.floor(Date.now() / 1000) * 1000 - 10_000
     await database.db.execute(sql`update radio_rotation set on_air_started_at = ${new Date(startedAt + 600).toISOString()}::timestamptz`)
-    // When the set `k` sets after a goes on air, as anyone adding the lengths to when a started, as it's given, works it out.
+    // When the set k after a goes on air: a's start as given, plus k lengths, to the second.
     const after = (k: number) => Math.floor((startedAt + k * length) / 1000) * 1000
 
     for (const given of [await rotation(), (await putRotation([a, p, b, c])).json()]) {

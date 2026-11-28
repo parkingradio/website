@@ -204,7 +204,7 @@ Each of the rotation's sets has:
 | `durationMs` | number or null | Its track's length, in milliseconds, as it was last read, or null when it hasn't been read |
 | `readError` | string or null | Why the last read of its track failed, or null when it didn't. The radio goes on with what was read before |
 | `skipped` | list of strings | Why it's skipped, or empty when it isn't (see [Which sets](#which-sets)) |
-| `startsAt` | string or null | When it goes on air next, if nothing changes until then: `current`'s `startedAt`, as it's given, plus the lengths of the set on air and of the sets between it and this one that aren't skipped. For the set on air, when it went on air. Null when it's skipped, or the radio is off air |
+| `startsAt` | string or null | When it goes on air next, if nothing changes until then: `current`'s `startedAt`, as it's given, plus the `durationMs` of the set on air and of the sets between it and this one that aren't skipped. For the set on air, when it went on air. Null when it's skipped, or the radio is off air |
 
 ## `PUT /api/admin/radio/rotation` (admin)
 
