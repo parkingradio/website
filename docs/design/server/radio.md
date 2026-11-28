@@ -198,6 +198,7 @@ Each of the rotation's sets has:
 |---|---|---|
 | `id` | string | The set's id |
 | `performers` | list of objects | Its performers, as the admin endpoints give them (see [Sets](sessions.md#sets)) |
+| `genres` | list of strings | Its genres, as the admin endpoints give them (see [Sets](sessions.md#sets)) |
 | `soundcloudTrack`, `youtubeVideo` | object or null | As the admin endpoints give them (see [Links](sessions.md#links)) |
 | `session` | object | Its session's `id`, `title` and `start`, which is null when the session no longer has one, which keeps the set from being added, but not from staying in the rotation, skipped as not announced |
 | `durationMs` | number or null | Its track's length, in milliseconds, as it was last read, or null when it hasn't been read |
@@ -235,7 +236,7 @@ The errors about one of the sets have `setIndex`, its place in `sets`, from 0. W
 |---|---|---|
 | `ok` | `true` | |
 | `total` | number | How many sets `sets` has (see [Conventions](README.md#conventions)) |
-| `sets` | list of objects | The sets that can be added to the rotation (see [Which sets](#which-sets)), and aren't in it, each with its `id`, `performers`, `soundcloudTrack`, `youtubeVideo` and `session`, as the rotation's sets have them. The most recent session first (by `start`), then in the session's order |
+| `sets` | list of objects | The sets that can be added to the rotation (see [Which sets](#which-sets)), and aren't in it, each with its `id`, `performers`, `genres`, `soundcloudTrack`, `youtubeVideo` and `session`, as the rotation's sets have them. The most recent session first (by `start`), then in the session's order |
 
 ## `GET /api/admin/radio/rotation/candidates/:id` (admin)
 

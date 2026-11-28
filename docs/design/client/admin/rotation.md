@@ -14,8 +14,11 @@ The sets are listed in the order they come on air, as the server gives them, fro
 [On air](../../server/radio.md#on-air)), the one on air first, one per row, set apart like the rows of the admin pages'
 tables. Like the legacy page's tracks, each set that isn't skipped shows when it begins, or began, for the one on air,
 with the day whenever it changes. Each set shows its performers and its session's title and day (see
-[Names, in Sessions](sessions.md#names)), linking to their pages, and its track's length once it's been read, each in
-its column.
+[Names, in Sessions](sessions.md#names)), linking to their pages, then its genres, in order, and its track's length once
+it's been read, each in its column. The genres are small grey labels, which don't look like buttons, since they can't be
+clicked, and which screen readers read as text, e.g. « house, techno ». Their column fits about two genres on one line,
+e.g. « tech house, deep house »; more go on more lines. It's empty for a set without genres. Where the list has no room
+for that column, e.g. on phones, the genres are under the session instead.
 
 The play head is drawn across the list, over the set on air, which screen readers are told is « en ondes ». The set
 under it shows how far into it the radio is, by the browser's clock: a bar, with the time played and the set's length,
@@ -39,9 +42,9 @@ air ends. When it can't be loaded again, the page goes on showing what it loaded
 
 « modifier » turns the list, in the order shown, into one that can be changed like a set's performers (see
 [A set's form, in Sessions](sessions.md#a-sets-form)): numbered, with handles that move the sets (see
-[Reordering](layout.md#reordering)), and a « × » that takes one out. It says why sets are skipped, with their warnings,
-and the length of each set whose track has been read. Each time a set that wasn't in the rotation is added, its track is
-read (see
+[Reordering](layout.md#reordering)), and a « × » that takes one out. Each set says its length after its session, once
+its track has been read, and why it's skipped, with its warnings, and shows its genres as when the rotation isn't being
+changed. Each time a set that wasn't in the rotation is added, its track is read (see
 [`GET /api/admin/radio/rotation/candidates/:id`](../../server/radio.md#get-apiadminradiorotationcandidatesid-admin)):
 once that answers, the set is shown as the answer says, with its length, why it's skipped, if it is, and its warning,
 like the others. Until it answers, or when it can't, the set is shown as its last answer since « modifier » was clicked
@@ -64,9 +67,10 @@ added (see
 [`GET /api/admin/radio/rotation/candidates`](../../server/radio.md#get-apiadminradiorotationcandidates-admin)), then
 those taken out of the list since « modifier » was clicked, even skipped ones, since a set already in the rotation can
 stay in it (see [`PUT /api/admin/radio/rotation`](../../server/radio.md#put-apiadminradiorotation-admin)). They're
-named with their session (see [Names, in Sessions](sessions.md#names)), and searched (see
-[Searching lists](layout.md#searching-lists)) by their performers and their session's title and day. A line under the
-field says which sets can be added. When they can't be loaded, the field can't be used, and the page says why.
+named with their session (see [Names, in Sessions](sessions.md#names)), followed by their genres, if they have any, e.g.
+« GUEST MIXES, ven. 16 oct. 2026 · ambient, techno », and searched (see [Searching lists](layout.md#searching-lists)) by
+their performers, their session's title and day, and their genres. A line under the field says which sets can be added.
+When they can't be loaded, the field can't be used, and the page says why.
 
 « annuler » leaves the rotation as it is, and so does « enregistrer » when the list is as it was when « modifier » was
 clicked. Otherwise, « enregistrer » asks to confirm, in a dialog on the page rather than the browser's, with

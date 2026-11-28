@@ -5,10 +5,11 @@ import { api } from '../../api/client'
 import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import { useTabShownCount } from '../../api/use-tab-shown'
+import type { GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxFilter, ComboboxOption } from '../../combobox'
 import { QUEBEC_TIME_ZONE } from '../../quebec-time'
-import { byWhom, capitalized, formatDuration, formatQuebecDayInYear, sessionLongDay, sessionName, setInSentence, setName } from './describe'
+import { byWhom, capitalized, formatDuration, formatQuebecDayInYear, genreName, sessionLongDay, sessionName, setInSentence, setName } from './describe'
 import { search } from './list'
 import { OrderedList } from './ordered-list'
 import { sessionPath } from './session-errors'
@@ -208,26 +209,58 @@ function daysChanging(times: (number | null)[], format: (time: number) => string
 const lengthText = (ms: number) => formatDuration(Math.round(ms / 60000))
 
 // A set of the rotation, in columns: when it goes on air, or, for the set on air, when it went on air, `onAir`, in
-// milliseconds since the epoch, then what it is, then its length. The set on air shows how far into it the radio is, and
-// says it's on air to screen readers, which the play head isn't drawn for.
+// milliseconds since the epoch, then what it is, with its genres, then its length. The set on air shows how far into it
+// the radio is, and says it's on air to screen readers, which the play head isn't drawn for.
 function RotationSet({ set, startsAt, onAir }: { set: Schema<'RotationSet'>; startsAt: number | null; onAir: number | null }) {
   const skipped = set.skipped.length > 0
   return (
     <li data-set className={skipped ? 'rotation-set-skipped' : onAir !== null ? 'rotation-set-current' : undefined}>
       <span className="rotation-set-time">{startsAt === null ? '' : timeFormat.format(startsAt)}</span>
-      <div className="rotation-set">
-        <p className="rotation-set-performers">
-          {set.performers.length > 0 ? <Performers performers={set.performers} /> : 'Set'}
-          {onAir !== null && <span className="visually-hidden"> en ondes</span>}
-        </p>
-        <p>
-          <Link to={sessionPath(set.session)}>{sessionName(set.session)}</Link>
-        </p>
+      <SetLines
+        performers={
+          <>
+            {set.performers.length > 0 ? <Performers performers={set.performers} /> : 'Set'}
+            {onAir !== null && <span className="visually-hidden"> en ondes</span>}
+          </>
+        }
+        session={<Link to={sessionPath(set.session)}>{sessionName(set.session)}</Link>}
+        genres={set.genres}
+      >
         {onAir !== null && set.durationMs !== null && <Progress startedAt={onAir} durationMs={set.durationMs} />}
         <SetState set={set} />
-      </div>
+      </SetLines>
       <span className="rotation-set-length">{set.durationMs !== null && lengthText(set.durationMs)}</span>
     </li>
+  )
+}
+
+// What a set is, in lines, in the list as while it's changed: its performers, its session, then `children`, e.g. why it's
+// skipped, with its genres beside them, or under its session on phones (see `.rotation-set` in admin.css).
+function SetLines({ performers, session, genres, children }: { performers: ReactNode; session: ReactNode; genres: GenreId[]; children: ReactNode }) {
+  return (
+    <div className="rotation-set">
+      <p className="rotation-set-performers">{performers}</p>
+      <p className="rotation-set-session">{session}</p>
+      <Genres genres={genres} />
+      <div className="rotation-set-more">{children}</div>
+    </div>
+  )
+}
+
+// A set's genres, in order, as small labels, which screen readers read as text, e.g. "house, techno": the commas between
+// them are only hidden from view. Without `rotation-genres-tags`, they're written out as text, as in the rest of the
+// admin pages, rather than as labels. Nothing for a set without genres.
+function Genres({ genres }: { genres: GenreId[] }) {
+  if (genres.length === 0) return null
+  return (
+    <p className="rotation-genres rotation-genres-tags">
+      {genres.map((genre, i) => (
+        <Fragment key={genre}>
+          {i > 0 && <span className="rotation-genres-sep">, </span>}
+          <span className="rotation-genre">{genreName(genre)}</span>
+        </Fragment>
+      ))}
+    </p>
   )
 }
 
@@ -355,8 +388,18 @@ const lengthOf = (set: Listed): number | null => ('durationMs' in set && typeof 
 // What a set's performers are called, e.g. "Aurore, Brume", or "Set" once they're all deleted.
 const performerNames = (set: Listed) => set.performers.map((performer) => performer.name).join(', ') || 'Set'
 
-// What finds a set in the field that adds one: its performers, its session's title, and its day, written out.
-const searchFields = (set: Listed) => [...set.performers.map((performer) => performer.name), set.session.title, sessionLongDay(set.session)]
+// What finds a set in the field that adds one: its performers, its session's title, its day, written out, and its genres,
+// as the admin pages name them.
+const searchFields = (set: Listed) => [
+  ...set.performers.map((performer) => performer.name),
+  set.session.title,
+  sessionLongDay(set.session),
+  ...set.genres.map(genreName),
+]
+
+// What the field that adds a set says of it after its name: its session, and its genres, if it has any, e.g.
+// "GUEST MIXES, ven. 16 oct. 2026 · ambient, techno".
+const optionDetail = (set: Listed) => [sessionName(set.session), set.genres.map(genreName).join(', ')].filter(Boolean).join(' · ')
 
 // Why saving the rotation `sent` failed: about one of its sets, by its place, or else the server's error.
 function saveError(error: { error: string; setIndex?: number; reasons?: SkipReason[] }, sent: Listed[]): string {
@@ -436,7 +479,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
     return [...addable.map((set): Listed => ({ ...set, skipped: [] })), ...removed]
   }, [candidates, sets, shown])
   // Kept from one render to the next, so that the field doesn't search them again on every render (see combobox.tsx).
-  const options = useMemo(() => offered.map((set): ComboboxOption => ({ key: set.id, label: setName(set), detail: sessionName(set.session) })), [offered])
+  const options = useMemo(() => offered.map((set): ComboboxOption => ({ key: set.id, label: setName(set), detail: optionDetail(set) })), [offered])
   const filter = useMemo((): ComboboxFilter => {
     const fields = new Map(offered.map((set) => [set.id, searchFields(set)]))
     return (options, query) => search(options, query, (option) => fields.get(option.key)!)
@@ -498,17 +541,24 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
                 {times[i] !== null && timeFormat.format(times[i])}
               </span>
             )}
-            detail={(set) => {
+            text={(set) => {
               const length = lengthOf(set)
               return (
-                <>
-                  {set === head && <span className="visually-hidden">en ondes </span>}
-                  {sessionName(set.session)}
-                  {length !== null && ` · ${lengthText(length)}`}
+                <SetLines
+                  performers={performerNames(set)}
+                  session={
+                    <>
+                      {set === head && <span className="visually-hidden">en ondes </span>}
+                      {sessionName(set.session)}
+                      {length !== null && ` · ${lengthText(length)}`}
+                    </>
+                  }
+                  genres={set.genres}
+                >
                   {/* The set on air goes on, and another starts from its start, if its length is known. */}
                   {set === head && length !== null && <Progress startedAt={headStartedAt} durationMs={length} />}
                   <SetState set={set} />
-                </>
+                </SetLines>
               )
             }}
             onChange={setSets}

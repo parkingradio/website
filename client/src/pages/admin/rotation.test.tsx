@@ -25,6 +25,7 @@ function rotationSet(id: string, names: string[], minutes: number | null, change
   return {
     id,
     performers: names.map((name) => ({ id: `artist-${name}`, name })),
+    genres: [],
     soundcloudTrack: { id: `track-${id}`, url: `https://soundcloud.com/parkingdotradio/${id}` },
     youtubeVideo: { id: `video-${id}`, url: `https://www.youtube.com/watch?v=video-${id}` },
     session: HAUTE_RIVE,
@@ -38,10 +39,10 @@ function rotationSet(id: string, names: string[], minutes: number | null, change
 
 const at = (time: number) => new Date(time).toISOString()
 
-// From the play head, as the server gives them: B, on air, C, A, then K, which is skipped.
-const A = rotationSet('a', ['Aurore'], 30, { startsAt: at(ON_AIR_AT + 95 * MINUTE) })
-const K = rotationSet('k', ['Kwame'], 62, { skipped: ['preview'] })
-const B = rotationSet('b', ['Brume', 'Cyan'], 65, { startsAt: at(ON_AIR_AT) })
+// From the play head, as the server gives them: B, on air, C, A, then K, which is skipped. C has no genres.
+const A = rotationSet('a', ['Aurore'], 30, { genres: ['tech-house', 'deep-house'], startsAt: at(ON_AIR_AT + 95 * MINUTE) })
+const K = rotationSet('k', ['Kwame'], 62, { genres: ['ambient'], skipped: ['preview'] })
+const B = rotationSet('b', ['Brume', 'Cyan'], 65, { genres: ['house', 'techno'], startsAt: at(ON_AIR_AT) })
 const C = rotationSet('c', ['Écume'], 30, { startsAt: at(ON_AIR_AT + 65 * MINUTE) })
 
 const ROTATION: RadioRotation = {
@@ -53,12 +54,12 @@ const ROTATION: RadioRotation = {
 }
 
 // Two sets that can be added: the most recent session first.
-const candidate = (id: string, name: string, session: RotationSet['session']): Schema<'RotationCandidate'> => {
+const candidate = (id: string, name: string, session: RotationSet['session'], genres: RotationSet['genres']): Schema<'RotationCandidate'> => {
   const { performers, soundcloudTrack, youtubeVideo } = rotationSet(id, [name], 60)
-  return { id, performers, soundcloudTrack, youtubeVideo, session }
+  return { id, performers, genres, soundcloudTrack, youtubeVideo, session }
 }
-const F = candidate('f', 'Fréquence Boréale', HAUTE_RIVE)
-const G = candidate('g', 'Gaïa', GUEST_MIXES)
+const F = candidate('f', 'Fréquence Boréale', HAUTE_RIVE, ['house'])
+const G = candidate('g', 'Gaïa', GUEST_MIXES, ['deep-house', 'ambient'])
 const CANDIDATES = { ok: true, total: 2, sets: [F, G] }
 // What reading the track of a set that can be added answers: by default, nothing yet.
 const candidateUrl = (set: { id: string }) => `${CANDIDATES_URL}/${set.id}`
@@ -87,15 +88,30 @@ function renderPage(bodies: Record<string, Body | Promise<Body>> = {}) {
 }
 
 const list = () => document.querySelector<HTMLElement>('.rotation-sets')!
-// The text of `element`, but for how far into the set under the play head the radio is, which `progress` gives, and what
-// only screen readers are told, which `onAirSaid` gives.
+// The text of `element`, but for how far into the set under the play head the radio is, which `progress` gives, what
+// only screen readers are told, which `onAirSaid` gives, and the genres, which `genresOf` gives.
 function textOf(element: Element): string {
   const copy = element.cloneNode(true) as Element
-  copy.querySelectorAll('.rotation-progress, .visually-hidden').forEach((hidden) => hidden.remove())
+  copy.querySelectorAll('.rotation-progress, .visually-hidden, .rotation-genres').forEach((hidden) => hidden.remove())
   return spaced(copy.textContent)
 }
+// The genres of each row of `rows`, as screen readers read them, e.g. "house, techno", or null without any, and as they're
+// shown, one label each.
+const genresOf = (rows: Element[]) =>
+  rows.map((row) => {
+    const genres = row.querySelector('.rotation-genres')
+    return genres && { read: genres.textContent, shown: Array.from(genres.querySelectorAll('.rotation-genre'), (genre) => genre.textContent) }
+  })
 // The text of each row of the list, the days between them included.
 const rows = () => within(list()).getAllByRole('listitem').map(textOf)
+
+// What `genresOf` gives for B, C, A and K, in that order.
+const GENRES = [
+  { read: 'house, techno', shown: ['house', 'techno'] },
+  null,
+  { read: 'tech house, deep house', shown: ['tech house', 'deep house'] },
+  { read: 'ambient', shown: ['ambient'] },
+]
 
 // The rows are laid out 100px apart, in their list, so that where the play head is drawn says which row it's over.
 beforeEach(() => {
@@ -164,6 +180,7 @@ function pick(name: string) {
 }
 
 const SATURDAY = 'HAUTE RIVE TAKEOVER, sam. 12 sept. 2026'
+const AUGUST = 'GUEST MIXES, dim. 2 août 2026'
 // A row's text, or a set's being changed, up to its session.
 const performersOf = (text: string | null) => text!.replace(/(HAUTE RIVE TAKEOVER|GUEST MIXES),.*$/, '')
 
@@ -188,6 +205,19 @@ describe('Rotation', () => {
         `Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.1 h 02`,
       ])
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it("shows each set's genres, in order, as labels that screen readers read as text, and none for a set without any", async () => {
+      renderPage()
+      await loaded()
+
+      const sets = within(list()).getAllByRole('listitem').filter((row) => row.matches('[data-set]'))
+      expect(genresOf(sets)).toEqual(GENRES)
+      // Among the lines of what the set is, after its session, before its length.
+      expect(sets[0].querySelector('.rotation-set-session + .rotation-genres')).toHaveTextContent('house, techno')
+      expect(sets[0].lastElementChild).toHaveClass('rotation-set-length')
+      // Not buttons, nor anything else that could be clicked.
+      expect(within(sets[0]).queryAllByRole('button')).toEqual([])
     })
 
     it('draws the play head over the set on air, which shows how far into it the radio is, every second', async () => {
@@ -428,6 +458,21 @@ describe('Rotation', () => {
       expect(screen.getByText('Seuls les sets annoncés et joués, avec un lien SoundCloud et YouTube, sont disponibles.')).toBeInTheDocument()
     })
 
+    it("shows each set's genres as when it isn't being changed, those of a set added before and after its track is read", async () => {
+      const answer = held()
+      await modify({ [candidateUrl(F)]: answer.body })
+      const items = () => Array.from(document.querySelectorAll('.admin-ordered > li'))
+      expect(genresOf(items())).toEqual(GENRES)
+      // Among the lines of its text, after its session and its length.
+      expect(items()[0].querySelector('.rotation-set-session + .rotation-genres')).toHaveTextContent('house, techno')
+
+      pick('Set de Fréquence')
+      expect(genresOf(items()).at(-1)).toEqual({ read: 'house', shown: ['house'] })
+      await answer.answer(withTrack(F, 45))
+      expect(draft().at(-1)).toBe(`5 Fréquence Boréale${SATURDAY} · 45 min`)
+      expect(genresOf(items()).at(-1)).toEqual({ read: 'house', shown: ['house'] })
+    })
+
     it('keeps the play head over the first set that can be played, whose bar only moves on when it is the set on air', async () => {
       vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
       vi.setSystemTime(ON_AIR_AT + 23 * MINUTE + 14 * 1000)
@@ -616,26 +661,35 @@ describe('Rotation', () => {
     })
 
     it('offers the sets that can be added, the most recent session first, then those taken out, whatever they are, and searches them', async () => {
+      const [gaia, kwame] = [`Set de Gaïa${AUGUST} · deep house, ambient`, `Set de Kwame${SATURDAY} · ambient`]
       await modify()
       fireEvent.click(picker())
-      expect(options()).toEqual([`Set de Fréquence Boréale${SATURDAY}`, 'Set de GaïaGUEST MIXES, dim. 2 août 2026'])
+      // With their genres, after their session.
+      expect(options()).toEqual([`Set de Fréquence Boréale${SATURDAY} · house`, gaia])
       fireEvent.keyDown(picker(), { key: 'Escape' })
 
       fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Kwame/ }))
       pick('Set de Fréquence')
       fireEvent.click(picker())
-      expect(options()).toEqual(['Set de GaïaGUEST MIXES, dim. 2 août 2026', `Set de Kwame${SATURDAY}`])
+      expect(options()).toEqual([gaia, kwame])
       fireEvent.keyDown(picker(), { key: 'Escape' })
 
       // By performer, session title or day, whatever the case and the accents.
       search('gaia')
-      expect(options()).toEqual(['Set de GaïaGUEST MIXES, dim. 2 août 2026'])
+      expect(options()).toEqual([gaia])
       search('haute rive')
-      expect(options()).toEqual([`Set de Kwame${SATURDAY}`])
+      expect(options()).toEqual([kwame])
       search('2 août')
-      expect(options()).toEqual(['Set de GaïaGUEST MIXES, dim. 2 août 2026'])
+      expect(options()).toEqual([gaia])
       search('samedi')
-      expect(options()).toEqual([`Set de Kwame${SATURDAY}`])
+      expect(options()).toEqual([kwame])
+      // And by genre, as the admin pages name them, even that of a set taken out, alone or with the other fields.
+      search('ambient')
+      expect(options()).toEqual([gaia, kwame])
+      search('deep house')
+      expect(options()).toEqual([gaia])
+      search('ambient kwame')
+      expect(options()).toEqual([kwame])
 
       // Kwame's set, though skipped, goes back in, with why.
       fireEvent.mouseDown(screen.getByRole('option', { name: /^Set de Kwame/ }))

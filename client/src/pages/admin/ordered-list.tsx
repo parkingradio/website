@@ -10,11 +10,11 @@ type OrderedListProps<T> = {
   items: T[]
   // What tells items apart, e.g. as React's keys.
   keyOf: (item: T) => string
-  // What's shown of an item, and the name its buttons say, e.g. "retirer Aurore", which is what's shown unless it's given.
+  // What's shown of an item, unless `text` is given, and the name its buttons say, e.g. "retirer Aurore", unless `name` is.
   label: (item: T) => string
   name?: (item: T) => string
-  // What's shown on a second line under an item's label, if anything, e.g. a set's session in the radio's rotation.
-  detail?: (item: T) => ReactNode
+  // What's shown in place of an item's label, if anything, e.g. a set of the radio's rotation, with its session.
+  text?: (item: T) => ReactNode
   // What's shown before an item's label, from it and its index, if anything, e.g. when a set goes on air in the radio's
   // rotation.
   lead?: (item: T, index: number) => ReactNode
@@ -27,7 +27,7 @@ type OrderedListProps<T> = {
   autoScroll?: boolean
 }
 
-export function OrderedList<T>({ items, keyOf, label, name = label, detail, lead, onChange, nextFocus, disabled = false, autoScroll }: OrderedListProps<T>) {
+export function OrderedList<T>({ items, keyOf, label, name = label, text, lead, onChange, nextFocus, disabled = false, autoScroll }: OrderedListProps<T>) {
   const list = useRef<HTMLOListElement>(null)
   // What gets the focus once an item is removed, since its × is gone: the next item's ×, by its key, or else `nextFocus`.
   const focusNext = useRef<{ key: string } | 'next' | null>(null)
@@ -67,7 +67,7 @@ export function OrderedList<T>({ items, keyOf, label, name = label, detail, lead
             number={index + 1}
             label={label(item)}
             name={name(item)}
-            detail={detail?.(item)}
+            text={text?.(item)}
             lead={lead?.(item, index)}
             disabled={disabled}
             onRemove={() => remove(index)}
@@ -83,27 +83,20 @@ type OrderedItemProps = {
   number: number
   label: string
   name: string
-  detail: ReactNode
+  text: ReactNode
   lead: ReactNode
   disabled: boolean
   onRemove: () => void
 }
 
-function OrderedItem({ id, number, label, name, detail, lead, disabled, onRemove }: OrderedItemProps) {
+function OrderedItem({ id, number, label, name, text, lead, disabled, onRemove }: OrderedItemProps) {
   const { ref, style, dragging, handle } = useSortableItem(id)
   return (
     <li ref={ref} style={style} data-item={id} data-dragging={dragging || undefined}>
       <DragHandle handle={handle} label={`réordonner ${name}`} />
       <b>{number}</b>
       {lead}
-      {detail ? (
-        <div className="admin-ordered-text">
-          {label}
-          <div className="admin-ordered-detail">{detail}</div>
-        </div>
-      ) : (
-        label
-      )}
+      {text ? <div className="admin-ordered-text">{text}</div> : label}
       <button type="button" data-action="remove" aria-label={`retirer ${name}`} disabled={disabled} onClick={onRemove}>
         ×
       </button>

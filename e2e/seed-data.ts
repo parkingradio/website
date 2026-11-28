@@ -691,11 +691,11 @@ export type SeedSession = {
 }
 
 // A set of an hour of a past session, as a DJ, with its track, one of the real ones the stand-in for SoundCloud knows,
-// by the end of its link, "https://soundcloud.com/parkingdotradio/<track>", and its video on YouTube.
-function recorded(performer: string, track: string, youtubeVideo: string): SeedSet {
+// by the end of its link, "https://soundcloud.com/parkingdotradio/<track>", its video on YouTube, and its genres, if any.
+function recorded(performer: string, track: string, youtubeVideo: string, genres: SetFields['genres'] = []): SeedSet {
   const soundcloudTrack = `https://soundcloud.com/parkingdotradio/${track}`
   if (!STAND_IN_TRACKS.some(({ link }) => link === soundcloudTrack)) throw new Error(`${soundcloudTrack} isn't one of STAND_IN_TRACKS`)
-  return { performers: [performer], durationMinutes: 60, performanceTypes: ['dj'], youtubeVideo, soundcloudTrack, status: 'done' }
+  return { performers: [performer], durationMinutes: 60, performanceTypes: ['dj'], genres, youtubeVideo, soundcloudTrack, status: 'done' }
 }
 
 // A past session of 3 hours, announced, at 20:00 `day` days ago, guest mixes or else `takeover`'s, with its `sets`, in
@@ -755,6 +755,7 @@ export const SEED_SESSIONS: SeedSession[] = [
         performers: ['kwame@example.com'],
         durationMinutes: 60,
         performanceTypes: ['dj'],
+        genres: ['afro-house', 'amapiano'],
         youtubeVideo: 'oNdEcOmMuN3',
         soundcloudTrack: `https://soundcloud.com/parkingdotradio/onde-commune-kwame-asante${PREVIEW_SUFFIX}`,
         rotation: true,
@@ -763,16 +764,40 @@ export const SEED_SESSIONS: SeedSession[] = [
     ],
   },
   // Past sessions whose sets are on SoundCloud, with Parking Radio's real tracks, and on YouTube.
-  played(80, [recorded('MIRO VELANE', 'jeysyano', 'ktTsEHfsQdA'), recorded('NOX BRUMAL', 'lexferenda', '00hn04sElAs'), recorded('TERRAFORMEUSE', 'softwarewolfe', '1HUqys2m2fU')], {
-    takeover: 'Haie Vive',
-  }),
-  played(52, [recorded('SIRÈNE', 'deneb', 'JZSPYmZZ_1U'), recorded('BOUMIX', 'boomy', 'I40svMNkmdM'), recorded('PLUMEFEUTRE', 'crissemarqueur', '6Cyve922ib4')]),
-  played(44, [recorded('lumio', 'esile', 'ZRyaKC8S4aI'), recorded('Margot Lafleur', 'chloelallouz', 'imjJl6feoM0'), recorded('SYNTH3TIC ÉCHO', 'simulat3dhuman', 'fKOHZ10XrIQ')]),
+  // Some have genres, up to four, which take more than a line in Rotation radio's column of genres (MIRO VELANE's), and
+  // some don't.
+  played(
+    80,
+    [
+      recorded('MIRO VELANE', 'jeysyano', 'ktTsEHfsQdA', ['techno', 'hard-techno', 'acid', 'ebm-industrial']),
+      recorded('NOX BRUMAL', 'lexferenda', '00hn04sElAs', ['ambient', 'experimental']),
+      recorded('TERRAFORMEUSE', 'softwarewolfe', '1HUqys2m2fU'),
+    ],
+    { takeover: 'Haie Vive' },
+  ),
+  played(52, [recorded('SIRÈNE', 'deneb', 'JZSPYmZZ_1U', ['house', 'disco']), recorded('BOUMIX', 'boomy', 'I40svMNkmdM'), recorded('PLUMEFEUTRE', 'crissemarqueur', '6Cyve922ib4', ['electro'])]),
+  played(44, [recorded('lumio', 'esile', 'ZRyaKC8S4aI', ['downtempo']), recorded('Margot Lafleur', 'chloelallouz', 'imjJl6feoM0'), recorded('SYNTH3TIC ÉCHO', 'simulat3dhuman', 'fKOHZ10XrIQ', ['synthwave', 'italo'])]),
   // Whose sets can be added to the rotation, but aren't in it.
-  played(43, [recorded('ORVAL', 'omizs', 'iyiDOPQH6AA'), recorded('KALMAR', 'palmeer', 'PmFA8bW89W8'), recorded('BRVCK', 'chvck', 'SnMkR1Rwz7o')], { rotation: false }),
-  played(33, [recorded('Reinette Jr', 'queeniejr-20261029', 'kLcswPJayeo'), recorded('Talia', 'vayia', '9LRBWCfX5iY'), recorded('Gaspard Rivet', 'mizen', 'IT57ovDzKzo')], {
-    takeover: 'PANKRAT',
-  }),
+  played(
+    43,
+    [
+      recorded('ORVAL', 'omizs', 'iyiDOPQH6AA', ['ambient', 'techno']),
+      recorded('KALMAR', 'palmeer', 'PmFA8bW89W8', ['house', 'minimal']),
+      recorded('BRVCK', 'chvck', 'SnMkR1Rwz7o', ['breakbeat']),
+    ],
+    { rotation: false },
+  ),
+  played(
+    33,
+    [
+      recorded('Reinette Jr', 'queeniejr-20261029', 'kLcswPJayeo', ['house', 'disco']),
+      // Two genres that fit on a line in Rotation radio's column of genres, with little room to spare, which
+      // tests/rotation.spec.ts relies on.
+      recorded('Talia', 'vayia', '9LRBWCfX5iY', ['tech-house', 'deep-house']),
+      recorded('Gaspard Rivet', 'mizen', 'IT57ovDzKzo'),
+    ],
+    { takeover: 'PANKRAT' },
+  ),
   // Collectif Béton's takeover, which comes from its application, with a name of its own: a guest who isn't one of its
   // artists, then two of its artists together, until after midnight.
   {
