@@ -9,7 +9,7 @@ import type { GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxFilter, ComboboxOption } from '../../combobox'
 import { QUEBEC_TIME_ZONE } from '../../quebec-time'
-import { byWhom, capitalized, formatDuration, formatQuebecDayInYear, genreName, sessionLongDay, sessionName, setInSentence, setName } from './describe'
+import { byWhom, capitalized, formatDuration, genreName, sessionLongDay, sessionName, setInSentence, setName } from './describe'
 import { search } from './list'
 import { OrderedList } from './ordered-list'
 import { sessionPath } from './session-errors'
@@ -171,7 +171,7 @@ export function Rotation() {
 function RotationSets({ rotation }: { rotation: RadioRotation }) {
   if (rotation.sets.length === 0) return <p className="admin-placeholder">La rotation est vide&nbsp;: la radio est hors ondes.</p>
   const times = rotation.sets.map((set) => (set.startsAt === null ? null : Date.parse(set.startsAt)))
-  const days = daysChanging(times, (time) => dayFormat.format(time))
+  const days = daysChanging(times)
   const { current } = rotation
   const onAir = current ? rotation.sets.findIndex((set) => set.id === current.setId) : -1
   return (
@@ -193,14 +193,14 @@ function RotationSets({ rotation }: { rotation: RadioRotation }) {
   )
 }
 
-// The day of each of `times`, as `format` writes it, where it isn't that of the time before it that there is, and isn't the
-// first, or else null, e.g. for a list's sets, which say the day whenever it changes.
-function daysChanging(times: (number | null)[], format: (time: number) => string): (string | null)[] {
+// The day of each of `times`, e.g. "dimanche 29 novembre", where it isn't that of the time before it that there is, and
+// isn't the first, or else null, e.g. for a list's sets, which say the day whenever it changes.
+function daysChanging(times: (number | null)[]): (string | null)[] {
   let day: string | null = null
   return times.map((time) => {
     if (time === null) return null
     const previous = day
-    day = format(time)
+    day = dayFormat.format(time)
     return previous !== null && day !== previous ? day : null
   })
 }
@@ -507,7 +507,8 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   const headStartedAt = head !== undefined && head.id === onAir?.id ? Date.parse(rotation.current!.startedAt) : null
   const now = useClock(head !== undefined && headStartedAt === null)
   const times = startTimes(listed, headStartedAt ?? now)
-  const days = daysChanging(times, formatQuebecDayInYear)
+  // The set under the play head never has a day above it, as the first that has a time.
+  const days = daysChanging(times)
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
   // What saving does to what's on air.
   let consequence: string
@@ -535,12 +536,8 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
             keyOf={(set) => set.id}
             label={performerNames}
             name={(set) => setName(set, set.session)}
-            lead={(_, i) => (
-              <span className="rotation-set-time">
-                {days[i] && <span className="rotation-edit-day">{days[i]}</span>}
-                {times[i] !== null && timeFormat.format(times[i])}
-              </span>
-            )}
+            above={(_, i) => days[i] && <div className="rotation-day">{days[i]}</div>}
+            lead={(_, i) => <span className="rotation-set-time">{times[i] !== null && timeFormat.format(times[i])}</span>}
             text={(set) => {
               const length = lengthOf(set)
               return (
