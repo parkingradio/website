@@ -425,9 +425,9 @@ export const radioRotation = pgTable(
   ],
 )
 
-// What was read from SoundCloud of the tracks of the rotation's sets, by SoundCloud's id for the track, through the link
-// of the set that has it (see "Reading the tracks" in docs/design/server/radio.md). A read only counts for a set that
-// still has that link.
+// What was read from SoundCloud of the tracks of the rotation's sets, and of sets that can be added to it, by SoundCloud's
+// id for the track, through the link of the set that has it (see "Reading the tracks" in docs/design/server/radio.md). A
+// read only counts for a set that still has that link.
 export const soundcloudTrackReads = pgTable(
   'soundcloud_track_reads',
   {

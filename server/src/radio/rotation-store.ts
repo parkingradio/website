@@ -7,6 +7,7 @@ import type { StoredSession, StoredSet } from '../sessions/store.js'
 import { durationOf, ineligibility, onAirAfterChange, onAirAfterReads, onAirAt, readThrough, sameSaved, skipReasons } from './rotation.js'
 import type { Entry, Saved, SkipReason } from './rotation.js'
 import type { TrackRead } from './soundcloud.js'
+import type { Track } from './track-reads.js'
 
 // Keeps the radio's rotation of sets in the database: its sets, in order, who last changed it, the set on air, and what
 // was read from SoundCloud of their tracks (see "The rotation of sets" in docs/design/server/radio.md). It keeps what's
@@ -17,6 +18,11 @@ export type StoredTrackRead = typeof soundcloudTrackReads.$inferSelect
 // A set of the rotation, as the rules of what's on air work from it, with its session, and what was read of its track
 // through the link it has, if anything.
 export type RotationEntry = Entry & { set: StoredSet; session: StoredSession; read: StoredTrackRead | null }
+
+// A set, with its session, and what was read of its track, its length and why it's skipped, as the rotation has them.
+export type SetWithTrack = Pick<RotationEntry, 'set' | 'session' | 'read' | 'durationMs' | 'skipped'>
+// A set that can be added to the rotation, as it would be once added, with its track, as it's read.
+export type RotationCandidateEntry = SetWithTrack & { track: Track }
 
 // The rotation: who last changed it, and when, its sets, in order, and what's kept of what's on air (see `Saved` in
 // rotation.ts).
@@ -62,8 +68,10 @@ export type RotationStore = {
   // The sets that can be added to the rotation, and aren't in it, with their sessions: the most recent session first, then
   // in each session's order.
   candidates(): Promise<{ set: StoredSet; session: StoredSession }[]>
+  // The set `setId`, an id in lower case, when it's one of the sets that `candidates` gives, or else null.
+  candidate(setId: string): Promise<RotationCandidateEntry | null>
   // The tracks of the rotation's sets, with the links they have, and what was read of them, if anything.
-  tracks(): Promise<{ trackId: string; link: string; read: StoredTrackRead | null }[]>
+  tracks(): Promise<Track[]>
   // Keeps what a read of the track `trackId` through `link`, which ended `at`, got. A read that failed keeps what was read
   // before through the same link, if anything.
   saveRead(trackId: string, link: string, outcome: ReadOutcome, at: Date): Promise<void>
@@ -90,6 +98,13 @@ async function setsWithIds(db: Queryable, setIds: string[]): Promise<Map<string,
   return new Map(found.flatMap((session) => session.sets.map((set) => [set.id, { set, session }] as const)))
 }
 
+// What a set's place in the rotation depends on of its track: what was read of it through the link the set has, if
+// anything, out of `stored`, what was last read of it, its length, and why the set is skipped.
+function withRead(set: StoredSet, session: StoredSession, stored: StoredTrackRead | null) {
+  const read = readThrough(set.soundcloudTrackUrl, stored)
+  return { read, durationMs: durationOf(set, read), skipped: skipReasons(set, session, read) }
+}
+
 // The rotation, as `db` sees it.
 async function loadFrom(db: Queryable): Promise<Rotation> {
   const [row] = await db.select().from(radioRotation)
@@ -105,9 +120,8 @@ async function loadFrom(db: Queryable): Promise<Rotation> {
     // Only a set deleted since its place was read, which a transaction that sees both at the same instant doesn't see.
     const { set, session } = found.get(setId) ?? {}
     if (!set || !session) return []
-    const read = readThrough(set.soundcloudTrackUrl, (set.soundcloudTrackId !== null && readOf.get(set.soundcloudTrackId)) || null)
-    const skipped = skipReasons(set, session, read)
-    return [{ setId, position, trackId: set.soundcloudTrackId, durationMs: durationOf(set, read), skipped, set, session, read }]
+    const stored = (set.soundcloudTrackId !== null && readOf.get(set.soundcloudTrackId)) || null
+    return [{ setId, position, trackId: set.soundcloudTrackId, set, session, ...withRead(set, session, stored) }]
   })
   return { updatedBy: row.updatedBy, updatedAt: row.updatedAt, entries, saved: savedOf(row) }
 }
@@ -193,6 +207,25 @@ export function rotationStore(db: Queryable): RotationStore {
       const taken = new Set(inRotation.map(({ id }) => id))
       return all.flatMap((session) =>
         session.sets.filter((set) => !taken.has(set.id) && ineligibility(set, session).length === 0).map((set) => ({ set, session })),
+      )
+    },
+
+    async candidate(setId) {
+      if (!isUuid(setId)) return null
+      return db.transaction(
+        async (tx) => {
+          const found = (await setsWithIds(tx, [setId])).get(setId)
+          if (!found || ineligibility(found.set, found.session).length > 0) return null
+          const [inRotation] = await tx.select({ id: rotationSets.setId }).from(rotationSets).where(eq(rotationSets.setId, setId))
+          if (inRotation) return null
+          const { set, session } = found
+          // A set that can be added has a track (see `ineligibility` in rotation.ts).
+          const track = { trackId: set.soundcloudTrackId!, link: set.soundcloudTrackUrl! }
+          const [stored] = await tx.select().from(soundcloudTrackReads).where(eq(soundcloudTrackReads.trackId, track.trackId))
+          const facts = withRead(set, session, stored ?? null)
+          return { set, session, ...facts, track: { ...track, read: facts.read } }
+        },
+        { isolationLevel: 'repeatable read', accessMode: 'read only' },
       )
     },
 

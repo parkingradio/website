@@ -470,6 +470,27 @@
   min-width: 0;
 }
 
+/* Numbers as wide whatever their digits, so that the times after them line up. */
+.rotation-edit .admin-ordered > li > b {
+  min-width: 2ch;
+}
+
+/* When each set would go on air, aligned with its performers' line, and the day above it whenever it changes, which
+   never breaks: wide enough for the longest, e.g. « mer. 30 sept. », 13 characters of the admin pages' monospace font,
+   94px at 12px, with room to spare. */
+.rotation-edit .rotation-set-time {
+  flex: none;
+  align-self: flex-start;
+  width: 6.25rem;
+  padding-block: 4px;
+}
+
+.rotation-edit-day {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .rotation-add {
   max-width: 600px;
 }

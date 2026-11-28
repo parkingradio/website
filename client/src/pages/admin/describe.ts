@@ -391,8 +391,8 @@ function startAndEnd(start: string, end: string) {
   return { from, to, days: daysBetween(from.day, to.day), lasts: Date.parse(end) - Date.parse(start) }
 }
 
-// E.g. "dim. 15 nov.", the day of `instant` (ISO 8601) in Québec, without its year.
-export function formatQuebecDayInYear(instant: string): string {
+// E.g. "dim. 15 nov.", the day of `instant` (ISO 8601, or in milliseconds since the epoch) in Québec, without its year.
+export function formatQuebecDayInYear(instant: string | number): string {
   return quebecDayInYearFormat(new Date(instant))
 }
 
