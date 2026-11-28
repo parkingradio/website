@@ -1,22 +1,24 @@
-import { asc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import { asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import type { Queryable } from '../db/connection.js'
-import { radioRotation, rotationSets, sessions, sets, soundcloudTrackReads } from '../db/schema.js'
+import { violatesConstraint } from '../api/errors.js'
+import { radioRotation, rotationSets, sessions, sets, setTrackReads } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
 import { lockSessions, sessionsWhere } from '../sessions/store.js'
 import type { StoredSession, StoredSet } from '../sessions/store.js'
-import { durationOf, ineligibility, onAirAfterChange, onAirAfterReads, onAirAt, readThrough, sameSaved, skipReasons } from './rotation.js'
+import { durationOf, ineligibility, onAirAfterChange, onAirAfterReads, onAirAt, sameSaved, skipReasons } from './rotation.js'
 import type { Entry, Saved, SkipReason } from './rotation.js'
 import type { TrackRead } from './soundcloud.js'
 import type { Track } from './track-reads.js'
 
 // Keeps the radio's rotation of sets in the database: its sets, in order, who last changed it, the set on air, and what
-// was read from SoundCloud of their tracks (see "The rotation of sets" in docs/design/server/radio.md). It keeps what's
-// on air as the rules of rotation.ts decide it, under a lock, so that no request keeps what another one already changed.
+// was read from SoundCloud of each set's track, through the link the set has (see "The rotation of sets" in
+// docs/design/server/radio.md). It keeps what's on air as the rules of rotation.ts decide it, under a lock, so that no
+// request keeps what another one already changed.
 
-export type StoredTrackRead = typeof soundcloudTrackReads.$inferSelect
+export type StoredTrackRead = typeof setTrackReads.$inferSelect
 
-// A set of the rotation, as the rules of what's on air work from it, with its session, and what was read of its track
-// through the link it has, if anything.
+// A set of the rotation, as the rules of what's on air work from it, with its session, and what was read of its track,
+// if anything.
 export type RotationEntry = Entry & { set: StoredSet; session: StoredSession; read: StoredTrackRead | null }
 
 // A set, with its session, and what was read of its track, its length and why it's skipped, as the rotation has them.
@@ -72,9 +74,10 @@ export type RotationStore = {
   candidate(setId: string): Promise<RotationCandidateEntry | null>
   // The tracks of the rotation's sets, with the links they have, and what was read of them, if anything.
   tracks(): Promise<Track[]>
-  // Keeps what a read of the track `trackId` through `link`, which ended `at`, got. A read that failed keeps what was read
-  // before through the same link, if anything.
-  saveRead(trackId: string, link: string, outcome: ReadOutcome, at: Date): Promise<void>
+  // Keeps what a read of the track of the set `setId` through `link`, which ended `at`, got, as what was read of it, if the
+  // set still has that link: nothing is kept for a set that has another one by then, or is gone. A read that failed keeps
+  // what was read before, if anything.
+  saveRead(setId: string, link: string, outcome: ReadOutcome, at: Date): Promise<void>
 }
 
 function savedOf(row: typeof radioRotation.$inferSelect): Saved | null {
@@ -98,30 +101,25 @@ async function setsWithIds(db: Queryable, setIds: string[]): Promise<Map<string,
   return new Map(found.flatMap((session) => session.sets.map((set) => [set.id, { set, session }] as const)))
 }
 
-// What a set's place in the rotation depends on of its track: what was read of it through the link the set has, if
-// anything, out of `stored`, what was last read of it, its length, and why the set is skipped.
-function withRead(set: StoredSet, session: StoredSession, stored: StoredTrackRead | null) {
-  const read = readThrough(set.soundcloudTrackUrl, stored)
-  return { read, durationMs: durationOf(set, read), skipped: skipReasons(set, session, read) }
+// What a set's place in the rotation depends on of its track: what was read of it, if anything, its length, and why the
+// set is skipped.
+function withRead(set: StoredSet, session: StoredSession, read: StoredTrackRead | null) {
+  return { read, durationMs: durationOf(read), skipped: skipReasons(set, session, read) }
 }
 
 // The rotation, as `db` sees it.
 async function loadFrom(db: Queryable): Promise<Rotation> {
   const [row] = await db.select().from(radioRotation)
   const places = await db.select().from(rotationSets).orderBy(asc(rotationSets.position))
-  const found = await setsWithIds(
-    db,
-    places.map(({ setId }) => setId),
-  )
-  const trackIds = [...found.values()].flatMap(({ set }) => (set.soundcloudTrackId === null ? [] : [set.soundcloudTrackId]))
-  const reads = trackIds.length === 0 ? [] : await db.select().from(soundcloudTrackReads).where(inArray(soundcloudTrackReads.trackId, trackIds))
-  const readOf = new Map(reads.map((read) => [read.trackId, read]))
+  const setIds = places.map(({ setId }) => setId)
+  const found = await setsWithIds(db, setIds)
+  const reads = setIds.length === 0 ? [] : await db.select().from(setTrackReads).where(inArray(setTrackReads.setId, setIds))
+  const readOf = new Map(reads.map((read) => [read.setId, read]))
   const entries = places.flatMap(({ setId, position }): RotationEntry[] => {
     // Only a set deleted since its place was read, which a transaction that sees both at the same instant doesn't see.
     const { set, session } = found.get(setId) ?? {}
     if (!set || !session) return []
-    const stored = (set.soundcloudTrackId !== null && readOf.get(set.soundcloudTrackId)) || null
-    return [{ setId, position, trackId: set.soundcloudTrackId, set, session, ...withRead(set, session, stored) }]
+    return [{ setId, position, trackId: set.soundcloudTrackId, set, session, ...withRead(set, session, readOf.get(setId) ?? null) }]
   })
   return { updatedBy: row.updatedBy, updatedAt: row.updatedAt, entries, saved: savedOf(row) }
 }
@@ -220,8 +218,8 @@ export function rotationStore(db: Queryable): RotationStore {
           if (inRotation) return null
           const { set, session } = found
           // A set that can be added has a track (see `ineligibility` in rotation.ts).
-          const track = { trackId: set.soundcloudTrackId!, link: set.soundcloudTrackUrl! }
-          const [stored] = await tx.select().from(soundcloudTrackReads).where(eq(soundcloudTrackReads.trackId, track.trackId))
+          const track = { setId, trackId: set.soundcloudTrackId!, link: set.soundcloudTrackUrl! }
+          const [stored] = await tx.select().from(setTrackReads).where(eq(setTrackReads.setId, setId))
           const facts = withRead(set, session, stored ?? null)
           return { set, session, ...facts, track: { ...track, read: facts.read } }
         },
@@ -231,42 +229,31 @@ export function rotationStore(db: Queryable): RotationStore {
 
     async tracks() {
       const rows = await db
-        .select({ trackId: sets.soundcloudTrackId, link: sets.soundcloudTrackUrl, read: soundcloudTrackReads })
+        .select({ setId: sets.id, trackId: sets.soundcloudTrackId, link: sets.soundcloudTrackUrl, read: setTrackReads })
         .from(rotationSets)
         .innerJoin(sets, eq(sets.id, rotationSets.setId))
-        .leftJoin(soundcloudTrackReads, eq(soundcloudTrackReads.trackId, sets.soundcloudTrackId))
+        .leftJoin(setTrackReads, eq(setTrackReads.setId, sets.id))
         .where(isNotNull(sets.soundcloudTrackId))
         .orderBy(asc(rotationSets.position))
-      return rows.map(({ trackId, link, read }) => ({ trackId: trackId!, link: link!, read }))
+      return rows.map(({ setId, trackId, link, read }) => ({ setId, trackId: trackId!, link: link!, read }))
     },
 
-    async saveRead(trackId, link, outcome, at) {
-      if ('read' in outcome) {
-        const { state, durationMs, secretToken } = outcome.read
-        const values = { link, state, durationMs, secretToken, readAt: at, attemptedAt: at, error: null }
+    async saveRead(setId, link, outcome, at) {
+      // A read that failed only changes when it was tried, and why it failed. Both change `link`, so that the foreign key
+      // refuses what was read through a link the set no longer has (see "set_track_reads" in db/schema.ts).
+      const values =
+        'read' in outcome
+          ? { link, state: outcome.read.state, durationMs: outcome.read.durationMs, secretToken: outcome.read.secretToken, readAt: at, attemptedAt: at, error: null }
+          : { link, attemptedAt: at, error: outcome.error }
+      try {
         await db
-          .insert(soundcloudTrackReads)
-          .values({ trackId, ...values })
-          .onConflictDoUpdate({ target: soundcloudTrackReads.trackId, set: values })
-        return
+          .insert(setTrackReads)
+          .values({ setId, ...values })
+          .onConflictDoUpdate({ target: setTrackReads.setId, set: values })
+      } catch (error) {
+        // The set has another link by then, or is gone: there's nothing to keep.
+        if (!violatesConstraint(error, 'set_track_reads_set_fk')) throw error
       }
-      // What was read through another link doesn't count anymore (see "soundcloud_track_reads" in db/schema.ts).
-      const kept = <T>(column: T) => sql`case when ${soundcloudTrackReads.link} = excluded.link then ${column} else null end`
-      await db
-        .insert(soundcloudTrackReads)
-        .values({ trackId, link, attemptedAt: at, error: outcome.error })
-        .onConflictDoUpdate({
-          target: soundcloudTrackReads.trackId,
-          set: {
-            link: sql`excluded.link`,
-            attemptedAt: sql`excluded.attempted_at`,
-            error: sql`excluded.error`,
-            state: kept(soundcloudTrackReads.state),
-            durationMs: kept(soundcloudTrackReads.durationMs),
-            secretToken: kept(soundcloudTrackReads.secretToken),
-            readAt: kept(soundcloudTrackReads.readAt),
-          },
-        })
     },
   }
 }

@@ -1,7 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify'
 import { withoutValues } from '../api/errors.js'
 import { pause } from '../core/pause.js'
-import { readThrough } from './rotation.js'
 import { NO_CREDENTIALS, NoSoundCloudCredentials } from './soundcloud-app.js'
 import type { SoundCloudApp } from './soundcloud-app.js'
 import { SoundCloudStatusError } from './soundcloud.js'
@@ -34,16 +33,15 @@ export type TrackReads = {
   stopped(): Promise<void>
 }
 
-// A set's track, with the link it has, and what was read of it, if anything.
-export type Track = { trackId: string; link: string; read: StoredTrackRead | null }
+// The track of the set `setId`, with the link the set has, and what was read of it through that link, if anything.
+export type Track = { setId: string; trackId: string; link: string; read: StoredTrackRead | null }
 
 // Whether `track` is due to be read at `now`: right away when it was never read through its link, a minute after a read
 // that failed, and an hour after one that didn't.
-function isDue({ link, read }: Track, now: number): boolean {
-  const current = readThrough(link, read)
-  if (!current) return true
-  if (current.state === null || current.error !== null) return current.attemptedAt.getTime() <= now - RETRY_AFTER_MS
-  return current.readAt!.getTime() <= now - READ_AGAIN_AFTER_MS
+function isDue({ read }: Track, now: number): boolean {
+  if (!read) return true
+  if (read.state === null || read.error !== null) return read.attemptedAt.getTime() <= now - RETRY_AFTER_MS
+  return read.readAt!.getTime() <= now - READ_AGAIN_AFTER_MS
 }
 
 // Why a read failed, as it's kept, shown to admins and logged: only the server's own messages, which never quote what
@@ -59,32 +57,34 @@ type Options = { store: RotationStore; soundcloud: SoundCloudApp; log: FastifyBa
 
 export function trackReads({ store, soundcloud, log, now = Date.now }: Options): TrackReads {
   const stopping = new AbortController()
-  // The reads under way, by track and link, which reading the same track again shares.
+  // The reads under way, by set and link, which reading the same set's track through the same link again shares.
   const underWay = new Map<string, Promise<void>>()
   let running: Promise<void> = Promise.resolve()
 
-  async function read(trackId: string, link: string) {
+  async function read({ setId, trackId, link }: Track) {
     let outcome: ReadOutcome
     try {
       const read = await (await soundcloud.client()).readTrack(link, trackId, stopping.signal)
-      if (read.problem) log.warn({ trackId, problem: read.problem }, 'SoundCloud describes a track of a set unexpectedly')
+      if (read.problem) log.warn({ setId, trackId, problem: read.problem }, 'SoundCloud describes a track of a set unexpectedly')
       outcome = { read }
     } catch (error) {
       if (stopping.signal.aborted) return
       outcome = { error: readError(error) }
       // Not the error itself, whose message or cause could quote what SoundCloud answered, or the link.
-      log.error({ trackId, error: outcome.error }, 'Failed to read the track of a set from SoundCloud')
+      log.error({ setId, trackId, error: outcome.error }, 'Failed to read the track of a set from SoundCloud')
     }
-    await store.saveRead(trackId, link, outcome, new Date(now()))
+    await store.saveRead(setId, link, outcome, new Date(now()))
   }
 
-  function readShared({ trackId, link }: Track): Promise<void> {
-    const key = `${trackId} ${link}`
+  function readShared(track: Track): Promise<void> {
+    const key = `${track.setId} ${track.link}`
     let reading = underWay.get(key)
     if (!reading) {
-      reading = read(trackId, link)
+      reading = read(track)
         // Without the query's values, which have the link, and the secret of a private track.
-        .catch((error: unknown) => log.error({ err: withoutValues(error), trackId }, 'Failed to keep what was read of the track of a set'))
+        .catch((error: unknown) =>
+          log.error({ err: withoutValues(error), setId: track.setId, trackId: track.trackId }, 'Failed to keep what was read of the track of a set'),
+        )
         .finally(() => underWay.delete(key))
       underWay.set(key, reading)
     }

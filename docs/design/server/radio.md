@@ -66,8 +66,11 @@ little ahead of the server's when a set ends.
 ### Reading the tracks
 
 The server reads each set's track through the SoundCloud app (see [The SoundCloud app](#the-soundcloud-app)), from the
-set's link: its length, and whether it can be played in full. It keeps what it read, so that the radio goes on as it
-was when the server restarts, or while SoundCloud can't be reached. It reads:
+set's link: its length, and whether it can be played in full. It keeps what it last read of each set's track, in the
+rotation or not, so that the radio goes on as it was when the server restarts, or while SoundCloud can't be reached. It
+keeps it only while the set has the link it was read through: giving the set another link, removing its track, or
+deleting it or its session forgets it, so that nothing is kept of a private link, or its secret, that the set no longer
+has. It reads:
 
 - every minute, the tracks of the rotation that haven't been read through the link their set has, e.g. those of the sets
   that were just added, or whose link changed, and those whose last read failed a minute ago or more,

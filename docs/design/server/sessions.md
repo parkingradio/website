@@ -79,9 +79,9 @@ A set, as the endpoints below return it, also has:
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when (see [Status](#status)) |
 
 A set can be in the radio's rotation (see [The rotation of sets, in Radio](radio.md#the-rotation-of-sets)). Deleting it,
-or its session, takes it out. Cancelling it, removing its track or its video, or un-announcing its session gets it
-skipped while that lasts, and giving it another track, or another link to it, gets it skipped until it's read through
-that link.
+or its session, takes it out. Cancelling it, removing its video, or un-announcing its session gets it skipped while that
+lasts, and removing its track, or giving it another track or another link to it, gets it skipped until its track is read
+through the link it has by then.
 
 ## Times
 

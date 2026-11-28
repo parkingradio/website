@@ -374,7 +374,7 @@ describe('the rotation of sets', () => {
     const [a] = setIds(session)
     await putRotation([a])
     answers.set(linkOf(session, 0), new Error('SoundCloud is down'))
-    await database.db.execute(sql`update soundcloud_track_reads set read_at = read_at - interval '2 hours'`)
+    await database.db.execute(sql`update set_track_reads set read_at = read_at - interval '2 hours'`)
     await reads.readDue()
     const [set] = (await rotation()).sets
     expect(set).toMatchObject({ skipped: [], durationMs: HOUR, readError: "SoundCloud can't be reached, or answered unexpectedly" })
@@ -451,12 +451,12 @@ describe('a set that can be added to the rotation', () => {
     expect(readTrack).toHaveBeenCalledTimes(1)
 
     answers.delete(linkOf(session, 0))
-    await database.db.execute(sql`update soundcloud_track_reads set attempted_at = attempted_at - ${`${MINUTE} milliseconds`}::interval`)
+    await database.db.execute(sql`update set_track_reads set attempted_at = attempted_at - ${`${MINUTE} milliseconds`}::interval`)
     expect(await candidateSet(x)).toMatchObject({ durationMs: HOUR, readError: null, skipped: [] })
     expect(readTrack).toHaveBeenCalledTimes(2)
 
     answers.set(linkOf(session, 0), { state: 'blocked', durationMs: HOUR, secretToken: null })
-    await database.db.execute(sql`update soundcloud_track_reads set read_at = read_at - interval '1 hour'`)
+    await database.db.execute(sql`update set_track_reads set read_at = read_at - interval '1 hour'`)
     expect(await candidateSet(x)).toMatchObject({ skipped: ['blocked'] })
     expect(readTrack).toHaveBeenCalledTimes(3)
   })
@@ -502,5 +502,96 @@ describe('a set that can be added to the rotation', () => {
     // It's in the rotation by then.
     expect((await asked).statusCode).toBe(404)
     expect(readTrack).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("what's read of a set's track", () => {
+  // What's kept of what was read, by set: the link it was read through, and when it was last read.
+  async function kept() {
+    const { rows } = await database.db.execute<{ set_id: string; link: string; read_at: string | null }>(
+      sql`select set_id, link, read_at::text from set_track_reads order by link`,
+    )
+    return rows.map(({ set_id, link, read_at }) => ({ set: set_id, link, readAt: read_at }))
+  }
+  const skippedOf = async (id: string) => (await rotation()).sets.find((set: { id: string }) => set.id === id).skipped
+
+  it('is forgotten when the set gets another link, even one it had before, or loses its track, or when it or its session is deleted', async () => {
+    const session = await createSession(3)
+    const [a, b, c] = setIds(session)
+    const other = await createSession(1, { day: 2 })
+    const [d] = setIds(other)
+    await putRotation([a, b, c, d])
+    const before = linkOf(session, 0)
+    expect((await kept()).map(({ set }) => set).sort()).toEqual([a, b, c, d].sort())
+
+    const link = trackLink(900)
+    await ok('PATCH', `/api/admin/sets/${a}`, { soundcloudTrack: link })
+    expect((await kept()).map(({ set }) => set)).not.toContain(a)
+    expect(await skippedOf(a)).toEqual(['unread'])
+    await reads.readDue()
+    expect((await kept()).filter(({ set }) => set === a)).toEqual([{ set: a, link, readAt: expect.any(String) }])
+    // Back to the link it had: read again through it.
+    readTrack.mockClear()
+    await ok('PATCH', `/api/admin/sets/${a}`, { soundcloudTrack: before })
+    expect(await skippedOf(a)).toEqual(['unread'])
+    await reads.readDue()
+    expect(readTrack.mock.calls.map(([readLink]) => readLink)).toEqual([before])
+
+    await ok('PATCH', `/api/admin/sets/${b}`, { soundcloudTrack: null })
+    await ok('DELETE', `/api/admin/sets/${c}`)
+    await ok('DELETE', `/api/admin/sessions/${other.id}`)
+    expect(await kept()).toEqual([{ set: a, link: before, readAt: expect.any(String) }])
+  })
+
+  it('is kept while the set has its link: when its link is sent again, it is otherwise changed or moved, or taken out of the rotation', async () => {
+    const session = await createSession(2)
+    const [a, b] = setIds(session)
+    const other = await createSession(1, { day: 2 })
+    await putRotation([a, b])
+    const before = await kept()
+    expect(before).toHaveLength(2)
+    readTrack.mockClear()
+
+    await ok('PATCH', `/api/admin/sets/${a}`, { soundcloudTrack: linkOf(session, 0), durationMinutes: 90 })
+    await ok('PATCH', `/api/admin/sets/${b}`, { durationMinutes: 45 })
+    await ok('PUT', `/api/admin/sets/${b}/session`, { session: other.id })
+    // Added back within the hour, it isn't read again.
+    await putRotation([b])
+    await putRotation([a, b])
+    expect(await kept()).toEqual(before)
+    expect((await rotation()).sets.map(({ skipped }: { skipped: string[] }) => skipped)).toEqual([[], []])
+    expect(readTrack).not.toHaveBeenCalled()
+  })
+
+  it('keeps nothing of a read that ends once its set has another link, or is gone', async () => {
+    const session = await createSession(2)
+    const [a, b] = setIds(session)
+    await putRotation([a, b])
+    const [old, link] = [linkOf(session, 0), trackLink(901)]
+    // Every track is due to be read again, and SoundCloud only answers through the links the sets had once they've changed.
+    await database.db.execute(sql`update set_track_reads set read_at = read_at - interval '2 hours'`)
+    let answer!: (read: TrackRead) => void
+    const held = new Promise<TrackRead>((resolve) => (answer = resolve))
+    readTrack.mockImplementation((readLink) => (readLink === link ? readAnswer(readLink) : held))
+    const errors = vi.spyOn(app.log, 'error')
+    try {
+      const reading = reads.readDue()
+      await vi.waitFor(() => expect(readTrack).toHaveBeenCalledTimes(2))
+      await ok('PATCH', `/api/admin/sets/${a}`, { soundcloudTrack: link })
+      await ok('DELETE', `/api/admin/sets/${b}`)
+      // Read through its new link meanwhile.
+      await reads.readDue()
+      expect(await kept()).toEqual([{ set: a, link, readAt: expect.any(String) }])
+      const fresh = await kept()
+
+      answer({ state: 'preview', durationMs: 30_000, secretToken: 's-SeCrEt' })
+      await reading
+      expect(readTrack.mock.calls.map(([readLink]) => readLink)).toContain(old)
+      expect(await kept()).toEqual(fresh)
+      expect(await skippedOf(a)).toEqual([])
+      expect(errors).not.toHaveBeenCalled()
+    } finally {
+      errors.mockRestore()
+    }
   })
 })

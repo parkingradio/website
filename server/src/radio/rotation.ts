@@ -21,9 +21,10 @@ export const SKIP_REASONS = [
 export type SkipReason = (typeof SKIP_REASONS)[number]
 
 // What a set's place in the rotation depends on, of the set, its session, and what was read of its track.
-export type RotationSetFacts = { status: Status; soundcloudTrackId: string | null; soundcloudTrackUrl: string | null; youtubeVideoId: string | null }
+export type RotationSetFacts = { status: Status; soundcloudTrackId: string | null; youtubeVideoId: string | null }
 export type RotationSessionFacts = { announced: boolean }
-export type TrackReadFacts = { link: string; state: TrackState | null; durationMs: number | null }
+// What was read of its track is always through the link the set has (see "set_track_reads" in db/schema.ts).
+export type TrackReadFacts = { state: TrackState | null; durationMs: number | null }
 
 // Why a set can't be added to the rotation, or is skipped if it's in it, besides its track: empty when it can be. This is
 // the only place that says which sets can be in the rotation.
@@ -36,31 +37,18 @@ export function ineligibility(set: RotationSetFacts, session: RotationSessionFac
   return reasons
 }
 
-// What was read of a track, if it was read through `link`, the link its set has: what was read through another one
-// doesn't count.
-export function readThrough<Read extends { link: string }>(link: string | null, read: Read | null): Read | null {
-  return read !== null && read.link === link ? read : null
-}
-
-// What was read of the set's track, if it was read through the link the set has, and SoundCloud answered.
-function readOf(set: RotationSetFacts, read: TrackReadFacts | null): (TrackReadFacts & { state: TrackState }) | null {
-  const current = readThrough(set.soundcloudTrackUrl, read)
-  return current?.state != null ? { ...current, state: current.state } : null
-}
-
 // Why a set of the rotation is skipped, or empty when it isn't.
 export function skipReasons(set: RotationSetFacts, session: RotationSessionFacts, read: TrackReadFacts | null): SkipReason[] {
   const reasons = ineligibility(set, session)
   if (set.soundcloudTrackId === null) return reasons
-  const known = readOf(set, read)
-  if (!known) return [...reasons, 'unread']
-  return known.state === 'playable' ? reasons : [...reasons, known.state]
+  // Until SoundCloud answers.
+  if (read?.state == null) return [...reasons, 'unread']
+  return read.state === 'playable' ? reasons : [...reasons, read.state]
 }
 
-// How long the set's track lasts, in milliseconds, as it was last read through the link the set has, or null when it
-// wasn't.
-export function durationOf(set: RotationSetFacts, read: TrackReadFacts | null): number | null {
-  return readOf(set, read)?.durationMs ?? null
+// How long the set's track lasts, in milliseconds, as it was last read, or null when it wasn't.
+export function durationOf(read: TrackReadFacts | null): number | null {
+  return read?.state != null ? read.durationMs : null
 }
 
 // A set of the rotation, as what's on air is worked out from it, in the rotation's order. One that isn't skipped has a
