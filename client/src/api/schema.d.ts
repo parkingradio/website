@@ -977,9 +977,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The radio's rotation of sets, in order, with the set on air, when each set goes on air next, and the sets that are skipped, and why */
+        /** The radio's rotation of sets, in order, from the set on air, or, off air, from where the radio comes back on air, with when each set goes on air next, and the sets that are skipped, and why */
         get: operations["get_rotation"];
-        /** Makes the radio's rotation of sets these sets, in this order, which changes what's on air right away, then reads the tracks of the sets it adds, and returns the rotation */
+        /** Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds, which can put the first of them on air then, and returns the rotation */
         put: operations["update_rotation_sets"];
         post?: never;
         delete?: never;
@@ -4582,7 +4582,7 @@ export interface components {
                 /** Format: date-time */
                 startedAt: string;
             } | null;
-            /** @description In order */
+            /** @description In order, from the play head: the set on air, or, off air, where the radio comes back on air */
             sets: components["schemas"]["RotationSet"][];
         };
         RadioStream: {
@@ -5327,7 +5327,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The ids of the sets, in order */
+                    /** @description The ids of the sets, in order, from the play head: the first that is not skipped is on air */
                     sets: string[];
                 };
             };

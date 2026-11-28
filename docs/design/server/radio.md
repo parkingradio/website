@@ -45,17 +45,19 @@ end, so that every listener hears the same set at the same point. A set lasts as
 millisecond, rather than its `durationMinutes`. Skipped sets are passed over: the set after another one is the next one
 that isn't skipped, around the rotation. When every set is skipped, or the rotation is empty, the radio is off air.
 
-It's a radio, so changing the rotation changes what's on air right away. The set on air stays on air, where it is in
-it, as long as it's still in the rotation, wherever it was moved, and isn't skipped. Taking it out, or it being skipped,
-puts on air, from then on, the first set after it, in the rotation as it was until then, that's still in it and isn't
-skipped, or, when there's none, the first set of the rotation that isn't skipped.
+The rotation is read from a play head: the set on air, or, off air, where the radio comes back on air: after the set
+that was on air last, or, when the rotation has been changed since, or no set has ever been on air, at its first set.
+
+It's a radio, so changing the rotation changes what's on air right away: the rotation is given from the play head, and
+its first set that isn't skipped is on air. When that's the set already on air, it goes on where it is. Otherwise, it
+goes on air right away, from its start. So giving the rotation back as it was given changes nothing, and taking out the
+set on air puts the one after it on air.
 
 What happens to sets elsewhere, e.g. a set being cancelled or deleted, its session being un-announced, or its track
 being read again, is taken into account the next time anyone asks what's on air. When the set on air is then skipped,
 out of the rotation, or has another track than the one it went on air with, the first set after its place in the
 rotation, in the rotation's order and around it, that isn't skipped goes on air from then on. The radio comes back on
-air the same way, after the place of the set that was on air last, or, when no set has ever been on air, with the first
-set of the rotation that isn't skipped.
+air the same way, with the first set from the play head that isn't skipped.
 
 Every set of the rotation that isn't skipped can be streamed, not only the one on air, since a listener's clock can be a
 little ahead of the server's when a set ends.
@@ -181,7 +183,7 @@ Where to stream a set of the rotation from, for every set that isn't skipped (se
 | `ok` | `true` | |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the rotation (an admin's email), and when, or null until it's first changed |
 | `current` | object or null | The set on air, its `setId` and when it went on air, `startedAt`, as [`GET /api/on-air`](#get-apion-airupcomingn) gives them, or null when the radio is off air |
-| `sets` | list of objects | The rotation's sets, in order (below) |
+| `sets` | list of objects | The rotation's sets (below), in order, from the play head (see [On air](#on-air)) |
 
 Each of the rotation's sets has:
 
@@ -200,14 +202,16 @@ Each of the rotation's sets has:
 
 | Request field | Type | |
 |---|---|---|
-| `sets` | list of strings | The ids of the rotation's sets, in order |
+| `sets` | list of strings | The ids of the rotation's sets, in order, from the play head: the first that isn't skipped is on air (see [On air](#on-air)) |
 
 Makes the rotation these sets, in this order, which changes what's on air right away (see [On air](#on-air)). A set that
 isn't in the rotation yet can only be added when it meets the conditions of [Which sets](#which-sets), while one that
 already is stays, even when it doesn't meet them anymore, skipped. Then reads the tracks that are due to be read (see
 [Reading the tracks](#reading-the-tracks)), for up to about 8 seconds, those that aren't read by then being read later,
-as they would anyway, and responds like [`GET /api/admin/radio/rotation`](#get-apiadminradiorotation-admin). It sets
-`updatedBy` and `updatedAt`, even when nothing changes.
+as they would anyway. When that makes another of the sets the first that can be played, e.g. a set just added at the
+play head, it goes on air then, as if the rotation were given again, unless it has been changed again meanwhile. Then
+responds like [`GET /api/admin/radio/rotation`](#get-apiadminradiorotation-admin). It sets `updatedBy` and `updatedAt`,
+even when nothing changes.
 
 Fails with:
 

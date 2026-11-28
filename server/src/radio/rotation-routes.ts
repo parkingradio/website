@@ -6,7 +6,7 @@ import { sessionTitle } from '../sessions/fields.js'
 import { youtubeVideoUrl } from '../sessions/links.js'
 import { SetBody, link, soundcloudTrackLink } from '../sessions/routes.js'
 import type { StoredSession, StoredSet } from '../sessions/store.js'
-import { SKIP_REASONS, isOnAir, upcoming } from './rotation.js'
+import { SKIP_REASONS, fromHead, isOnAir, upcoming } from './rotation.js'
 import { RotationRefused } from './rotation-store.js'
 import type { Rotation, RotationStore } from './rotation-store.js'
 import type { SoundCloudApp } from './soundcloud-app.js'
@@ -68,7 +68,7 @@ const RadioRotation = z
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),
     current: z.object({ setId: z.string(), startedAt: Timestamp }).nullable().meta({ description: 'The set on air, or null when the radio is off air' }),
-    sets: z.array(RotationSet).meta({ description: 'In order' }),
+    sets: z.array(RotationSet).meta({ description: 'In order, from the play head: the set on air, or, off air, where the radio comes back on air' }),
   })
   .meta({ id: 'RadioRotation' })
 type RadioRotation = z.infer<typeof RadioRotation>
@@ -77,7 +77,11 @@ type RadioRotation = z.infer<typeof RadioRotation>
 const SetId = z.string().toLowerCase()
 
 const RotationRequest = z.strictObject(
-  { sets: z.array(SetId, { error: '`sets` must be a list of the ids of sets' }).meta({ description: 'The ids of the sets, in order' }) },
+  {
+    sets: z
+      .array(SetId, { error: '`sets` must be a list of the ids of sets' })
+      .meta({ description: 'The ids of the sets, in order, from the play head: the first that is not skipped is on air' }),
+  },
   { error: objectError('The rotation must be an object with its `sets`') },
 )
 
@@ -107,7 +111,7 @@ function candidate({ set, session }: { set: StoredSet; session: StoredSession })
 
 const iso = (time: number) => new Date(time).toISOString()
 
-// The rotation as the admin endpoints give it, with when each set goes on air next.
+// The rotation as the admin endpoints give it, from its play head, with when each set goes on air next.
 function rotationResponse(rotation: Rotation): RadioRotation {
   const { saved } = rotation
   const startsAt = new Map<string, number>()
@@ -120,7 +124,7 @@ function rotationResponse(rotation: Rotation): RadioRotation {
     updatedBy: rotation.updatedBy,
     updatedAt: rotation.updatedAt?.toISOString() ?? null,
     current: isOnAir(saved) ? { setId: saved.setId, startedAt: iso(saved.startedAt) } : null,
-    sets: rotation.entries.map((entry) => ({
+    sets: fromHead(rotation.entries, saved).map((entry) => ({
       ...candidate(entry),
       durationMs: entry.durationMs,
       readError: entry.read?.error ?? null,
@@ -213,7 +217,8 @@ export async function rotationRoutes(app: FastifyInstance, { soundcloud, store, 
       config: { admin: true, tool: { title: 'Voir la rotation de la radio' } },
       schema: {
         operationId: 'get_rotation',
-        summary: "The radio's rotation of sets, in order, with the set on air, when each set goes on air next, and the sets that are skipped, and why",
+        summary:
+          "The radio's rotation of sets, in order, from the set on air, or, off air, from where the radio comes back on air, with when each set goes on air next, and the sets that are skipped, and why",
         tags: ['Radio'],
         response: { 200: RadioRotation },
       },
@@ -228,15 +233,16 @@ export async function rotationRoutes(app: FastifyInstance, { soundcloud, store, 
       schema: {
         operationId: 'update_rotation_sets',
         summary:
-          "Makes the radio's rotation of sets these sets, in this order, which changes what's on air right away, then reads the tracks of the sets it adds, and returns the rotation",
+          "Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds, which can put the first of them on air then, and returns the rotation",
         tags: ['Radio'],
         body: RotationRequest,
         response: { 200: RadioRotation, 400: RotationError, 409: RotationError },
       },
     },
     async (request, reply) => {
+      let changed: Rotation
       try {
-        await store.replace(request.body.sets, request.user!.email)
+        changed = await store.replace(request.body.sets, request.user!.email)
       } catch (error) {
         if (!(error instanceof RotationRefused)) throw error
         const { status, message, setIndex, reasons } = error
@@ -245,7 +251,7 @@ export async function rotationRoutes(app: FastifyInstance, { soundcloud, store, 
       request.log.info({ sets: request.body.sets.length, by: request.user!.email }, 'Changed the rotation of sets of the radio')
       // Once it's saved, rather than while it holds the sessions' lock (see `replace`).
       await reads.readDue(READ_NEW_TRACKS_MS)
-      return rotationResponse(await store.onAir(Date.now()))
+      return rotationResponse(await store.afterReads(changed, Date.now()))
     },
   )
 

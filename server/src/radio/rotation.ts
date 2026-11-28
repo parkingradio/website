@@ -71,7 +71,8 @@ export type Entry = { setId: string; position: number; trackId: string | null; d
 // in the rotation, from which the radio goes on when the set isn't in the rotation anymore, or is skipped.
 export type OnAir = { setId: string; trackId: string; startedAt: number; position: number }
 // What's kept of it: once the radio goes off air, the set that was on air last, with null as when it went on air, so that
-// the radio comes back after its place.
+// the radio comes back after its place. Null when nothing has been on air since the rotation was changed, so that the
+// radio comes back at its first set.
 export type Saved = Omit<OnAir, 'startedAt'> & { startedAt: number | null }
 
 export const isOnAir = (saved: Saved | null): saved is OnAir => saved !== null && saved.startedAt !== null
@@ -129,32 +130,33 @@ export function upcoming<E extends Entry>(entries: readonly E[], onAir: OnAir, c
   return found
 }
 
-// The place in `entries` of the set at `place` in `before`, the rotation as it was: its own, if it's still in it, or else
-// just before the first set after it, in the rotation as it was, that's still in it.
-function placeIn(entries: readonly Entry[], before: readonly Entry[], place: Pick<OnAir, 'setId' | 'position'>): number {
-  const positions = new Map(entries.map((entry) => [entry.setId, entry.position]))
-  const own = positions.get(place.setId)
-  if (own !== undefined) return own
-  const next = after(before, place.position).find((entry) => positions.has(entry.setId))
-  return next ? positions.get(next.setId)! - 1 : -1
+// The rotation from its play head (see "On air" in docs/design/server/radio.md), what's kept being `saved`, as `onAirAt`
+// keeps it: from the set on air, or, off air, after the place of the set that was on air last, or from its first set.
+export function fromHead<E extends Entry>(entries: readonly E[], saved: Saved | null): E[] {
+  if (!saved) return [...entries]
+  const at = isOnAir(saved) ? entries.findIndex((entry) => entry.setId === saved.setId) : entries.findIndex((entry) => entry.position > saved.position)
+  return at <= 0 ? [...entries] : [...entries.slice(at), ...entries.slice(0, at)]
 }
 
-// What's kept once the rotation changes from `before` to `entries` at `now`, from `saved`, what was kept with `before`
-// (see "On air" in docs/design/server/radio.md): the set on air stays on air, where it is in it, while it's still in the
-// rotation and isn't skipped. Otherwise the first set after it, in the rotation as it was, that's still in it and isn't
-// skipped goes on air, or else the first set of the rotation that isn't skipped. When the radio was off air, it comes back
-// as it would have anyway, after the place of the set that was on air last, wherever that is now.
+// What's kept once the rotation changes from `before` to `entries`, which starts at the play head, at `now`, from `saved`,
+// what was kept with `before` (see "On air" in docs/design/server/radio.md): the first set of `entries` that isn't skipped
+// is on air, where it is, if it's the set on air, once caught up to `now` in the rotation as it was, or else from `now`.
+// When none can be played, the radio is off air, and comes back at the rotation's first set.
 export function onAirAfterChange(before: readonly Entry[], entries: readonly Entry[], saved: Saved | null, now: number): Saved | null {
+  const head = entries.find(playable)
+  if (!head) return null
   const current = onAirAt(before, saved, now)
-  if (!isOnAir(current)) return onAirAt(entries, current && { ...current, position: placeIn(entries, before, current) }, now)
-  const byId = new Map(entries.map((entry) => [entry.setId, entry]))
-  const same = byId.get(current.setId)
-  if (stillOnAir(same, current)) return { ...current, position: same.position }
-  const next = after(before, current.position)
-    .map((entry) => byId.get(entry.setId))
-    .find((entry) => entry !== undefined && playable(entry))
-  const first = next ?? entries.find(playable)
-  return first ? startingAt(first, now) : { ...current, position: placeIn(entries, before, current), startedAt: null }
+  if (isOnAir(current) && current.setId === head.setId && stillOnAir(head, current)) return { ...current, position: head.position }
+  return startingAt(head, now)
+}
+
+// What's kept once the tracks that changing the rotation to `changed` reads are read, the rotation being `entries` then,
+// from `saved`: when another set is the first that can be played than in `changed`, e.g. a set just added at the play
+// head, which can be played once its track is read, it goes on air as if the rotation were changed again, and otherwise
+// the radio goes on as it does anyway.
+export function onAirAfterReads(changed: readonly Entry[], entries: readonly Entry[], saved: Saved | null, now: number): Saved | null {
+  const head = entries.find(playable)
+  return head === undefined || head.setId === changed.find(playable)?.setId ? onAirAt(entries, saved, now) : onAirAfterChange(entries, entries, saved, now)
 }
 
 export const sameSaved = (a: Saved | null, b: Saved | null): boolean =>

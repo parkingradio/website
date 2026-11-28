@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
-import { ineligibility, onAirAfterChange, onAirAt, skipReasons, upcoming } from './rotation.js'
+import { fromHead, ineligibility, onAirAfterChange, onAirAfterReads, onAirAt, skipReasons, upcoming } from './rotation.js'
 import type { Entry, OnAir, Saved, SkipReason } from './rotation.js'
 
 // The rules of the rotation of sets (see "The rotation of sets" in docs/design/server/radio.md), on their own.
@@ -96,39 +96,64 @@ describe('what is on air', () => {
   })
 })
 
+describe('the play head', () => {
+  it('is the set on air, or, off air, after the place of the set that was on air last, or the first set without one', () => {
+    const ids = (entries: Entry[]) => entries.map((entry) => entry.setId).join('')
+    expect(ids(fromHead(rotation('abcd'), onAir('c', NOW, 2)))).toBe('cdab')
+    expect(ids(fromHead(rotation('abcd'), { ...onAir('c', NOW, 2), startedAt: null }))).toBe('dabc')
+    expect(ids(fromHead(rotation('abcd'), { ...onAir('d', NOW, 3), startedAt: null }))).toBe('abcd')
+    // b was deleted, at place 1.
+    expect(ids(fromHead([entry('a', 0), entry('c', 2)], { ...onAir('b', NOW, 1), startedAt: null }))).toBe('ca')
+    expect(ids(fromHead(rotation('abcd'), null))).toBe('abcd')
+  })
+})
+
 describe('changing the rotation', () => {
-  it('keeps the set on air on air, wherever it moved', () => {
-    expect(onAirAfterChange(rotation('abc'), rotation('cab'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('b', NOW - HOUR / 2, 2))
+  it('keeps the set on air on air when it is first, wherever the others moved', () => {
+    expect(onAirAfterChange(rotation('abc'), rotation('bca'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('b', NOW - HOUR / 2, 0))
+    expect(onAirAfterChange(rotation('abc'), rotation('bac'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('b', NOW - HOUR / 2, 0))
+  })
+
+  it('puts another first set on air from now, which is how the set on air is taken out', () => {
+    expect(onAirAfterChange(rotation('abc'), rotation('cab'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('c', NOW, 0))
+    expect(onAirAfterChange(rotation('abc'), rotation('ca'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('c', NOW, 0))
+  })
+
+  it('goes by the first set that is not skipped, which goes on when it is the set on air', () => {
+    expect(onAirAfterChange(rotation('abc'), rotation('abc', 'a'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('b', NOW - HOUR / 2, 1))
+    expect(onAirAfterChange(rotation('abc'), rotation('acb', 'a'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('c', NOW, 1))
+    // b has another track than the one it went on air with.
+    expect(onAirAfterChange(rotation('abc'), rotation('bc'), { ...onAir('b', NOW - HOUR / 2, 1), trackId: 'another' }, NOW)).toEqual(onAir('b', NOW, 0))
   })
 
   it('catches the set on air up to now in the rotation as it was, first', () => {
     // a's hour is over: b is on air, and stays so.
     expect(onAirAfterChange(rotation('abc'), rotation('bc'), onAir('a', NOW - HOUR - 1, 0), NOW)).toEqual(onAir('b', NOW - 1, 0))
+    // Given as it was before a ended, a goes on air again, from its start.
+    expect(onAirAfterChange(rotation('abc'), rotation('abc'), onAir('a', NOW - HOUR - 1, 0), NOW)).toEqual(onAir('a', NOW, 0))
   })
 
-  it('puts on air the first set after the one taken out, in the rotation as it was, that is still in it and not skipped', () => {
-    // After b, c is gone, and d is skipped: e. In the new order, a would come after b's place, but e is what came next.
-    const after = [entry('a', 0), entry('d', 1, 1, ['not-announced']), entry('e', 2)]
-    expect(onAirAfterChange(rotation('abcde'), after, onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual(onAir('e', NOW, 2))
-    // None of them is still in it: the first set of the rotation that isn't skipped.
-    expect(onAirAfterChange(rotation('abc'), [entry('x', 0, 1, ['cancelled']), entry('y', 1)], onAir('a', NOW - HOUR / 2, 0), NOW)).toEqual(onAir('y', NOW, 1))
-  })
-
-  it('goes off air when nothing can be played, keeping the place, and starts with the first set when nothing was ever on air', () => {
-    expect(onAirAfterChange(rotation('abc'), rotation('ac', 'ac'), onAir('b', NOW - HOUR / 2, 1), NOW)).toEqual({
-      setId: 'b',
-      trackId: 'tb',
-      startedAt: null,
-      position: 0,
-    })
-    expect(onAirAfterChange([], rotation('xy', 'x'), null, NOW)).toEqual(onAir('y', NOW, 1))
+  it('goes off air when nothing can be played, to come back at the first set, and comes back with it when off air', () => {
+    expect(onAirAfterChange(rotation('abc'), rotation('ac', 'ac'), onAir('b', NOW - HOUR / 2, 1), NOW)).toBeNull()
     expect(onAirAfterChange([], [], null, NOW)).toBeNull()
+    expect(onAirAfterChange([], rotation('xy', 'x'), null, NOW)).toEqual(onAir('y', NOW, 1))
+    const off: Saved = { setId: 'b', trackId: 'tb', startedAt: null, position: 1 }
+    expect(onAirAfterChange(rotation('abc', 'abc'), rotation('cda'), off, NOW)).toEqual(onAir('c', NOW, 0))
   })
 
-  it('comes back on air after the place of the set that was on air last, when it was off air', () => {
-    const off: Saved = { setId: 'b', trackId: 'tb', startedAt: null, position: 1 }
-    // b is gone: c came after it, and is now at place 0.
-    expect(onAirAfterChange(rotation('abc', 'abc'), rotation('cda'), off, NOW)).toEqual(onAir('c', NOW, 0))
+  it('puts on air, once the tracks are read, a set before the first that could be played, which can be played now', () => {
+    // x was added first, unread: b went on, and x goes on air once it's read.
+    const saved = onAirAfterChange(rotation('abc'), rotation('xbc', 'x'), onAir('b', NOW - HOUR / 2, 1), NOW)
+    expect(saved).toEqual(onAir('b', NOW - HOUR / 2, 1))
+    const changed = rotation('xbc', 'x')
+    expect(onAirAfterReads(changed, rotation('xbc'), saved, NOW + 1000)).toEqual(onAir('x', NOW + 1000, 0))
+    // Still unread, or read and skipped: b goes on.
+    expect(onAirAfterReads(changed, rotation('xbc', 'x'), saved, NOW + 1000)).toEqual(saved)
+    // The radio goes on as it does anyway when b ends meanwhile, or is skipped once read again.
+    expect(onAirAfterReads(changed, rotation('xbc', 'x'), saved, NOW + HOUR)).toEqual(onAir('c', NOW + HOUR / 2, 2))
+    expect(onAirAfterReads(changed, rotation('xbc', 'xb'), saved, NOW + 1000)).toEqual(onAir('c', NOW + 1000, 2))
+    // Off air until x is read.
+    expect(onAirAfterReads(rotation('x', 'x'), rotation('x'), null, NOW + 1000)).toEqual(onAir('x', NOW + 1000, 0))
   })
 })
 
@@ -191,45 +216,64 @@ describe('properties of what is on air', () => {
     )
   })
 
-  it('does not change when the rotation is changed to what it already was', () => {
+  it('does not change when the rotation is given back as it is given, from the play head', () => {
     fc.assert(
       fc.property(rotations, saveds, later, (entries, sent, elapsed) => {
         const now = NOW + elapsed
-        const saved = toSaved(sent)
-        const expected = onAirAt(entries, saved, now)
-        const changed = onAirAfterChange(entries, entries, saved, now)
-        if (expected?.startedAt == null) expect(changed?.startedAt ?? null).toBeNull()
-        else expect(changed).toEqual(expected)
-      }),
-    )
-  })
-
-  it('keeps the set on air when the rotation is reordered, and when it changes but keeps that set', () => {
-    fc.assert(
-      fc.property(rotations, saveds, later, fc.integer(), fc.array(fc.boolean()), (entries, sent, elapsed, seed, kept) => {
-        const now = NOW + elapsed
         const current = onAirAt(entries, toSaved(sent), now)
-        fc.pre(current !== null && current.startedAt !== null)
-        // Some of the sets, the one on air included, in another order, each at its new place.
-        const others = entries.filter((entry, i) => entry.setId === current.setId || (kept[i] ?? true))
-        const shuffled = others.map((entry, i) => ({ entry, key: (i * 7919 + seed) % 101 })).sort((a, b) => a.key - b.key)
-        const after = shuffled.map(({ entry }, position) => ({ ...entry, position }))
-        const result = onAirAfterChange(entries, after, toSaved(sent), now)
-        expect(result).toEqual({ ...current, position: after.find((entry) => entry.setId === current.setId)!.position })
+        const given = fromHead(entries, current).map((entry, position) => ({ ...entry, position }))
+        const changed = onAirAfterChange(entries, given, toSaved(sent), now)
+        const observed = (saved: Saved | null) => (saved?.startedAt == null ? null : { setId: saved.setId, trackId: saved.trackId, startedAt: saved.startedAt })
+        expect(observed(changed)).toEqual(observed(current))
+        expect(fromHead(given, changed).map((entry) => entry.setId)).toEqual(given.map((entry) => entry.setId))
       }),
     )
   })
 
-  it('puts on air a set that is in the new rotation, and not skipped, when there is one', () => {
+  it('puts the first set that is not skipped on air, where it is if it is the set on air, or else from now', () => {
     fc.assert(
       fc.property(rotations, rotations, saveds, later, (before, after, sent, elapsed) => {
-        const result = onAirAfterChange(before, after, toSaved(sent), NOW + elapsed)
-        if (after.some((entry) => entry.skipped.length === 0)) {
-          expect(result?.startedAt).not.toBeNull()
-          expect(playable(after, result!.setId)).toBe(true)
-        } else {
-          expect(result?.startedAt ?? null).toBeNull()
+        const now = NOW + elapsed
+        const current = onAirAt(before, toSaved(sent), now)
+        const result = onAirAfterChange(before, after, toSaved(sent), now)
+        const head = after.find((entry) => entry.skipped.length === 0)
+        if (!head) {
+          // Off air, from the first set.
+          expect(result).toBeNull()
+          return
         }
+        expect(result).toMatchObject({ setId: head.setId, trackId: head.trackId, position: head.position })
+        const goesOn = current?.startedAt != null && current.setId === head.setId && current.trackId === head.trackId
+        expect(result!.startedAt).toBe(goesOn ? current.startedAt : now)
+      }),
+    )
+  })
+
+  it('puts the first set that can be played on air, once the tracks that were unread when it was changed are read', () => {
+    fc.assert(
+      fc.property(rotations, rotations, fc.array(fc.boolean()), saveds, later, (before, sets, unread, sent, elapsed) => {
+        const now = NOW + elapsed
+        // A track lasts as long whichever rotation it's in.
+        const lengths = new Map(before.map((entry) => [entry.setId, entry.durationMs]))
+        const read = sets.map((entry) => ({ ...entry, durationMs: lengths.get(entry.setId) ?? entry.durationMs }))
+        // Some of the sets, unread when the rotation was changed, can be played once they're read.
+        const changedTo = read.map((entry, i): Entry => (unread[i] ? { ...entry, skipped: [...entry.skipped, 'unread'] } : entry))
+        const changed = onAirAfterChange(before, changedTo, toSaved(sent), now)
+        const result = onAirAfterReads(changedTo, read, changed, now)
+        expect(result?.startedAt == null ? null : result.setId).toBe(read.find((entry) => entry.skipped.length === 0)?.setId ?? null)
+      }),
+    )
+  })
+
+  it('gives the rotation around from its play head, which is the set on air when there is one', () => {
+    fc.assert(
+      fc.property(rotations, saveds, later, (entries, sent, elapsed) => {
+        const current = onAirAt(entries, toSaved(sent), NOW + elapsed)
+        const ids = entries.map((entry) => entry.setId)
+        const given = fromHead(entries, current).map((entry) => entry.setId)
+        const at = Math.max(ids.indexOf(given[0]), 0)
+        expect(given).toEqual([...ids.slice(at), ...ids.slice(0, at)])
+        if (current?.startedAt != null) expect(given[0]).toBe(current.setId)
       }),
     )
   })

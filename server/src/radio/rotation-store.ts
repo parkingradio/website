@@ -4,7 +4,7 @@ import { radioRotation, rotationSets, sessions, sets, soundcloudTrackReads } fro
 import { isUuid } from '../db/uuid.js'
 import { lockSessions, sessionsWhere } from '../sessions/store.js'
 import type { StoredSession, StoredSet } from '../sessions/store.js'
-import { durationOf, ineligibility, onAirAfterChange, onAirAt, readThrough, sameSaved, skipReasons } from './rotation.js'
+import { durationOf, ineligibility, onAirAfterChange, onAirAfterReads, onAirAt, readThrough, sameSaved, skipReasons } from './rotation.js'
 import type { Entry, Saved, SkipReason } from './rotation.js'
 import type { TrackRead } from './soundcloud.js'
 
@@ -49,12 +49,16 @@ export type RotationStore = {
   load(): Promise<Rotation>
   // The rotation as it is, with what's on air at `now`, which is kept when it changed (see `onAirAt` in rotation.ts).
   onAir(now: number): Promise<Rotation>
-  // Makes the rotation `setIds`, ids of sets in lower case, in order, as a change by `updatedBy`, which changes what's on
-  // air (see `onAirAfterChange` in rotation.ts), and returns it. It's changed at the time `now` gives once nothing else can
+  // Makes the rotation `setIds`, ids of sets in lower case, in order from the play head, as a change by `updatedBy`, which
+  // changes what's on air (see `onAirAfterChange` in rotation.ts), and returns it. It's changed at the time `now` gives once nothing else can
   // change what's on air, so that it's never before what another request kept. Throws a RotationRefused when a set is
   // there twice, doesn't exist, or can't be added, as its endpoint checks them, in that order (see
   // `PUT /api/admin/radio/rotation` in docs/design/server/radio.md), in which case nothing changes.
   replace(setIds: string[], updatedBy: string, now?: () => number): Promise<Rotation>
+  // The rotation as it is, with what's on air at `now`, once the tracks that changing it to `changed`, which `replace`
+  // returned, reads are read: unless it has been changed again since, the first set that can be played then goes on air,
+  // when it isn't the one that could be played first before (see `onAirAfterReads` in rotation.ts).
+  afterReads(changed: Rotation, now: number): Promise<Rotation>
   // The sets that can be added to the rotation, and aren't in it, with their sessions: the most recent session first, then
   // in each session's order.
   candidates(): Promise<{ set: StoredSet; session: StoredSession }[]>
@@ -118,6 +122,18 @@ async function keep(tx: Queryable, before: Saved | null, saved: Saved | null) {
   if (!sameSaved(before, saved)) await tx.update(radioRotation).set(onAirColumns(saved))
 }
 
+// Keeps what `decide` makes of what's on air, from the rotation as it is once nothing else can change it, and returns the
+// rotation with it.
+function keepLocked(db: Queryable, decide: (latest: Rotation) => Saved | null): Promise<Rotation> {
+  return db.transaction(async (tx) => {
+    await lockOnAir(tx)
+    const latest = await loadFrom(tx)
+    const saved = decide(latest)
+    await keep(tx, latest.saved, saved)
+    return { ...latest, saved }
+  })
+}
+
 export function rotationStore(db: Queryable): RotationStore {
   const load = () => db.transaction(loadFrom, { isolationLevel: 'repeatable read', accessMode: 'read only' })
   return {
@@ -127,13 +143,7 @@ export function rotationStore(db: Queryable): RotationStore {
       const rotation = await load()
       // It's only kept under the lock, from what's read then, when it changed, which is about once a set.
       if (sameSaved(onAirAt(rotation.entries, rotation.saved, now), rotation.saved)) return rotation
-      return db.transaction(async (tx) => {
-        await lockOnAir(tx)
-        const latest = await loadFrom(tx)
-        const saved = onAirAt(latest.entries, latest.saved, now)
-        await keep(tx, latest.saved, saved)
-        return { ...latest, saved }
-      })
+      return keepLocked(db, (latest) => onAirAt(latest.entries, latest.saved, now))
     },
 
     async replace(setIds, updatedBy, now = Date.now) {
@@ -168,6 +178,14 @@ export function rotationStore(db: Queryable): RotationStore {
         await keep(tx, after.saved, saved)
         return { ...after, saved }
       })
+    },
+
+    async afterReads(changed, now) {
+      return keepLocked(db, (latest) =>
+        latest.updatedAt?.getTime() === changed.updatedAt?.getTime()
+          ? onAirAfterReads(changed.entries, latest.entries, latest.saved, now)
+          : onAirAt(latest.entries, latest.saved, now),
+      )
     },
 
     async candidates() {
