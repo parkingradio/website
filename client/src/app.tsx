@@ -33,6 +33,7 @@ function App() {
               <Route path="admins" element={<AdminPage page="Admins" />} />
               <Route path="calendrier" element={<AdminPage page="Calendrier" />} />
               <Route path="rotation" element={<AdminPage page="Rotation" />} />
+              <Route path="rotation-legacy" element={<AdminPage page="RotationLegacy" />} />
               <Route path="candidatures" element={<AdminPage page="ApplicationsPage" />} />
               <Route path="candidatures/nouvelle" element={<AdminPage page="NewApplicationPage" />} />
               <Route path="candidatures/:id" element={<AdminPage page="ApplicationPage" />} />

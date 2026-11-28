@@ -18,7 +18,8 @@ type Pointer = { down: (at: Point) => Promise<void>; move: (to: Point) => Promis
 // Drags the item whose handle is `handle` onto `target`, another item, whose place it takes: with a finger, holding the
 // handle for a moment first, when `touch`, or else with the mouse. Both have to be on the screen once the handle is.
 // The item is picked up once it's moved a little, and the page measures the list then, which is waited for, as is the
-// page following the last move, before it's dropped.
+// page following the last move, before it's dropped. dnd-kit ignores the clicks that come within 50 ms of a drop, which a
+// person never makes, but a test can, so that's waited for too.
 export async function drag(page: Page, handle: Locator, target: Locator, { touch }: { touch: boolean }) {
   await handle.scrollIntoViewIfNeeded()
   const from = await centerOf(handle)
@@ -34,6 +35,7 @@ export async function drag(page: Page, handle: Locator, target: Locator, { touch
     for (let i = 1; i <= 5; i++) await pointer.move({ x: to.x, y: nudged.y + ((to.y - nudged.y) * i) / 5 })
     await nextFrames(page)
     await pointer.up()
+    await page.waitForTimeout(100)
   }
   if (touch) return withFinger(page, dragWith)
   await dragWith({

@@ -95,7 +95,7 @@ type RadioCredentials = z.infer<typeof RadioCredentials>
 // Links to SoundCloud playlists, e.g. "https://soundcloud.com/parkingdotradio/sets/rotation". A private
 // playlist can only be read through its private link, which ends with its secret, e.g.
 // "https://soundcloud.com/parkingdotradio/sets/rotation/s-AbC123". Parameters, e.g. "?si=...", are allowed.
-// The client has a copy of this, to check links before asking for a preview (see client/src/pages/admin/rotation.tsx).
+// The client has a copy of this, to check links before asking for a preview (see client/src/pages/admin/rotation-legacy.tsx).
 const PLAYLIST_LINK = /^\s*https?:\/\/(?:www\.)?soundcloud\.com(\/[^/?#\s]+\/sets\/[^/?#\s]+(?:\/s-[^/?#\s]+)?)\/?(?:[?#]\S*)?\s*$/
 
 // The playlist `link` leads to, as a link without anything that doesn't identify the playlist, or null if

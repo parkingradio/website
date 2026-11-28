@@ -1,323 +1,483 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import type { Data, Schema } from '../../api/client'
-import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+import type { Schema } from '../../api/client'
+import { held, jsonBody, mockFetch, moveWithKeyboard, named, requestsTo, spaced } from '../../test-utils'
+import type { Body } from '../../test-utils'
 import { Rotation } from './rotation'
 
-type RadioTrack = Schema<'RadioTrack'>
-type RadioPlaylist = Schema<'RadioPlaylist'>
+type RotationSet = Schema<'RotationSet'>
+type RadioRotation = Schema<'RadioRotation'>
 
 const MINUTE = 60 * 1000
+const ROTATION_URL = '/api/admin/radio/rotation'
+const CANDIDATES_URL = '/api/admin/radio/rotation/candidates'
+const CREDENTIALS_URL = '/api/admin/radio/credentials'
 
-function track(id: string, artist: string, minutes: number): RadioTrack {
-  return { id, artist, event: null, date: '2026-09-13', durationMs: minutes * MINUTE }
+// Saturday, September 12, 2026, at 20:00 in Québec, and Sunday, August 2, 2026.
+const HAUTE_RIVE = { id: 'session-1', title: 'HAUTE RIVE TAKEOVER', start: '2026-09-13T00:00:00.000Z' }
+const GUEST_MIXES = { id: 'session-2', title: 'GUEST MIXES', start: '2026-08-02T23:00:00.000Z' }
+
+// B goes on air at 23:00 in Québec, on Thursday, October 1, and lasts 65 minutes, so that C starts the next day.
+const ON_AIR_AT = Date.parse('2026-10-01T23:00:00-04:00')
+
+function rotationSet(id: string, names: string[], minutes: number | null, changes: Partial<RotationSet> = {}): RotationSet {
+  return {
+    id,
+    performers: names.map((name) => ({ id: `artist-${name}`, name })),
+    soundcloudTrack: { id: `track-${id}`, url: `https://soundcloud.com/parkingdotradio/${id}` },
+    youtubeVideo: { id: `video-${id}`, url: `https://www.youtube.com/watch?v=video-${id}` },
+    session: HAUTE_RIVE,
+    durationMs: minutes === null ? null : minutes * MINUTE,
+    readError: null,
+    skipped: [],
+    startsAt: null,
+    ...changes,
+  }
 }
 
-const onRadio = (track: RadioTrack): Schema<'RadioPlaylistTrack'> => ({ kind: 'rotation', track })
+const at = (time: number) => new Date(time).toISOString()
 
-// The playlist's order, with B on air (see ON_AIR).
-const ROTATION: RadioPlaylist = {
-  url: 'https://soundcloud.com/parkingdotradio/sets/rotation',
-  title: 'Rotation',
-  private: false,
-  account: { name: 'parking.radio', url: 'https://soundcloud.com/parkingdotradio' },
-  tracks: [
-    onRadio(track('a', 'A', 60)),
-    { kind: 'left-out', track: { ...track('t', 'TEASER', 2), date: '2026-09-01' }, reason: 'preview' },
-    onRadio(track('b', 'B', 65)),
-    onRadio(track('c', 'C', 30)),
-  ],
+// In the rotation's order: A, K, which is skipped, B, on air, then C.
+const A = rotationSet('a', ['Aurore'], 30, { startsAt: at(ON_AIR_AT + 95 * MINUTE) })
+const K = rotationSet('k', ['Kwame'], 62, { skipped: ['preview'] })
+const B = rotationSet('b', ['Brume', 'Cyan'], 65, { startsAt: at(ON_AIR_AT) })
+const C = rotationSet('c', ['Écume'], 30, { startsAt: at(ON_AIR_AT + 65 * MINUTE) })
+
+const ROTATION: RadioRotation = {
+  ok: true,
+  updatedBy: 'someone@example.com',
+  updatedAt: '2026-09-30T12:00:00.000Z',
+  current: { setId: 'b', startedAt: at(ON_AIR_AT) },
+  sets: [A, K, B, C],
 }
 
-const CHOSEN: Schema<'ChosenPlaylist'> = {
-  url: ROTATION.url,
-  title: 'Rotation',
-  chosenBy: 'someone@example.com',
-  chosenAt: '2026-09-30T12:00:00.000Z',
-  playlist: ROTATION,
-  error: null,
+// Two sets that can be added: the most recent session first.
+const candidate = (id: string, name: string, session: RotationSet['session']): Schema<'RotationCandidate'> => {
+  const { performers, soundcloudTrack, youtubeVideo } = rotationSet(id, [name], 60)
+  return { id, performers, soundcloudTrack, youtubeVideo, session }
+}
+const F = candidate('f', 'Fréquence Boréale', HAUTE_RIVE)
+const G = candidate('g', 'Gaïa', GUEST_MIXES)
+const CANDIDATES = { ok: true, total: 2, sets: [F, G] }
+
+const CREDENTIALS = { ok: true, credentials: { clientId: 'id', updatedBy: 'someone@example.com', updatedAt: '2026-09-01T12:00:00.000Z', error: null } }
+
+function renderPage(bodies: Record<string, Body | Promise<Body>> = {}) {
+  mockFetch({ [ROTATION_URL]: ROTATION, [CREDENTIALS_URL]: CREDENTIALS, [CANDIDATES_URL]: CANDIDATES, ...bodies })
+  render(
+    <MemoryRouter>
+      <Rotation />
+    </MemoryRouter>,
+  )
 }
 
-const CURRENT: Data<'get', '/api/admin/radio'> = { ok: true, credentialsEntered: true, current: CHOSEN }
-
-// Midday, local time, so that the tracks of the rotation all begin the same day.
-const STARTED_AT = new Date(2026, 9, 1, 12, 0).getTime()
-
-function onAir(id: string, startedAt = STARTED_AT): Schema<'Radio'> {
-  const playlistTrack = ROTATION.tracks.find((t) => t.kind === 'rotation' && t.track.id === id) as { track: RadioTrack }
-  return { current: { track: playlistTrack.track, startedAt: new Date(startedAt).toISOString() }, upcoming: [] }
-}
-
-const LINK = 'https://soundcloud.com/parkingdotradio/sets/other/s-AbC123'
-const OTHER: RadioPlaylist = {
-  ...ROTATION,
-  url: LINK,
-  title: 'Other',
-  private: true,
-  tracks: [onRadio(track('h', 'H', 60)), onRadio(track('i', 'I', 60))],
-}
-
-const time = (at: number) => new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit' }).format(at)
-const day = (at: number) => new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }).format(at)
-
-// The text of each row of the list of tracks in `container`.
-const rows = (container: HTMLElement = document.body) =>
-  within(container)
+const list = () => document.querySelector<HTMLElement>('.rotation-sets')!
+// The text of each row of the list, the days between them included.
+const rows = () =>
+  within(list())
     .getAllByRole('listitem')
-    .map((row) => row.textContent)
+    .map((row) => spaced(row.textContent))
+const loaded = () => screen.findByRole('button', { name: 'modifier' })
 
-function preview(link: string) {
-  fireEvent.change(screen.getByLabelText('Lien de la playlist'), { target: { value: link } })
-  fireEvent.click(screen.getByRole('button', { name: 'prévisualiser' }))
+// What's being changed: each set's number and performers, and its session's title and day.
+const draft = () =>
+  Array.from(document.querySelectorAll('.admin-ordered > li')).map((item) => spaced(`${item.querySelector('b')!.textContent} ${item.querySelector('.admin-ordered-text')!.textContent}`))
+
+async function modify(bodies?: Record<string, Body | Promise<Body>>) {
+  renderPage(bodies)
+  fireEvent.click(await loaded())
+  await waitFor(() => expect(picker()).toHaveAttribute('placeholder', 'choisir un set…'))
 }
 
-const previewBox = () => document.querySelector<HTMLElement>('.radio-preview')!
+const picker = () => screen.getByRole('combobox', { name: 'Ajouter un set' })
+const options = () => screen.queryAllByRole('option').map((option) => spaced(option.textContent))
+
+function search(query: string) {
+  fireEvent.click(picker())
+  fireEvent.change(picker(), { target: { value: query } })
+}
+
+function pick(name: string) {
+  picker().focus()
+  fireEvent.click(picker())
+  fireEvent.mouseDown(screen.getByRole('option', { name: new RegExp(`^${name}`) }))
+}
+
+const SATURDAY = 'HAUTE RIVE TAKEOVER, sam. 12 sept. 2026'
+// A row's text, or a set's being changed, up to its session.
+const performersOf = (text: string | null) => text!.replace(/(HAUTE RIVE TAKEOVER|GUEST MIXES),.*$/, '')
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('Rotation', () => {
-  it('shows the playlist on air, and its tracks from the one on air, around the playlist and back, with when each begins', async () => {
-    mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': onAir('b') })
-    render(<Rotation />)
+  describe('the rotation', () => {
+    it('lists the sets from the one on air, around the rotation, with when each one starts, and the day whenever it changes', async () => {
+      renderPage()
+      await loaded()
 
-    await waitFor(() => expect(screen.getByText('en cours')).toBeInTheDocument())
-    expect(screen.getByRole('link', { name: 'Rotation' })).toHaveAttribute('href', ROTATION.url)
-    expect(screen.getByText(/^Playlist publique de/)).toHaveTextContent('Playlist publique de parking.radio')
-    expect(screen.getByRole('link', { name: 'parking.radio' })).toHaveAttribute('href', ROTATION.account.url)
-    expect(screen.getByText(/^Choisie par/)).toHaveTextContent(/^Choisie par someone@example.com le 30 septembre 2026/)
-    expect(rows()).toEqual([
-      `${time(STARTED_AT)}B · 2026-09-13en cours`,
-      `${time(STARTED_AT + 65 * MINUTE)}C · 2026-09-13`,
-      `${time(STARTED_AT + 95 * MINUTE)}A · 2026-09-13`,
-      'TEASER · 2026-09-01',
-    ])
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Rotation radio')
+      expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par someone@example.com le 30 septembre 2026 à 08 h 00.')
+      expect(rows()).toEqual([
+        `23 h 00Brume, Cyanen cours${SATURDAY} · 1 h 05 · SoundCloud · YouTube`,
+        'vendredi 2 octobre',
+        `00 h 05Écume${SATURDAY} · 30 min · SoundCloud · YouTube`,
+        `00 h 35Aurore${SATURDAY} · 30 min · SoundCloud · YouTube`,
+        `Kwame${SATURDAY} · 1 h 02 · SoundCloud · YouTube` + "Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.",
+      ])
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('links to the performers, the session, the track and the video, and fades out the sets that are skipped', async () => {
+      renderPage()
+      await loaded()
+
+      const b = within(list()).getAllByRole('listitem')[0]
+      expect(within(b).getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-Brume')
+      expect(within(b).getByRole('link', { name: 'Cyan' })).toHaveAttribute('href', '/admin/artistes/artist-Cyan')
+      expect(within(b).getByRole('link', { name: named(SATURDAY) })).toHaveAttribute('href', '/admin/sessions/session-1')
+      expect(within(b).getByRole('link', { name: 'SoundCloud' })).toHaveAttribute('href', 'https://soundcloud.com/parkingdotradio/b')
+      expect(within(b).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=video-b')
+      expect(b).toHaveClass('rotation-set-current')
+      expect(screen.getByText(/^Kwame$/).closest('li')).toHaveClass('rotation-set-skipped')
+    })
+
+    it('says why each skipped set is skipped, and leaves out what a set has no length or link for', async () => {
+      const unread = rotationSet('u', ['Ulysse'], null, { youtubeVideo: null, session: { ...GUEST_MIXES, start: null }, skipped: ['not-announced', 'no-youtube-video', 'unread'] })
+      renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [...ROTATION.sets, unread] } })
+      await loaded()
+
+      expect(rows().find((row) => row!.startsWith('Ulysse'))).toBe("UlysseGUEST MIXES, date à déterminer · SoundCloudPas diffusé : la session n'est pas annoncée, le set n'a pas de vidéo sur YouTube, la piste n'a pas encore été lue sur SoundCloud.")
+    })
+
+    it('warns when the last read of a track failed, and that the radio goes on with what was read before, unless it never was', async () => {
+      const failed = { ...C, readError: 'SoundCloud cannot be reached' }
+      const never = rotationSet('n', ['Nadia'], null, { skipped: ['unread'], readError: 'SoundCloud cannot be reached' })
+      renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [A, K, B, failed, never] } })
+      await loaded()
+
+      const warnings = document.querySelectorAll('.rotation-set .admin-warning')
+      expect(Array.from(warnings).map((warning) => spaced(warning.textContent))).toEqual([
+        '\u26a0\ufe0e La piste n\'a pas pu être lue sur SoundCloud : SoundCloud cannot be reached. La radio continue avec ce qui en avait été lu avant.',
+        "\u26a0\ufe0e La piste n'a pas pu être lue sur SoundCloud : SoundCloud cannot be reached.",
+      ])
+      expect(warnings[0].closest('li')).toHaveTextContent(/^00 h 05Écume/)
+    })
+
+    it('says when the rotation is empty, and the radio off air, and still lets sets be added', async () => {
+      renderPage({ [ROTATION_URL]: { ...ROTATION, updatedBy: null, updatedAt: null, current: null, sets: [] } })
+      await loaded()
+
+      expect(spaced(screen.getByText(/^La rotation est vide/).textContent)).toBe('La rotation est vide : la radio est hors ondes.')
+      expect(screen.queryByText(/^Modifiée par/)).not.toBeInTheDocument()
+    })
+
+    it('says when every set is skipped, so that the radio is off air, and lists them in the order of the rotation, without times', async () => {
+      const skipped = (set: RotationSet): RotationSet => ({ ...set, skipped: ['cancelled'], startsAt: null })
+      renderPage({ [ROTATION_URL]: { ...ROTATION, current: null, sets: [A, K, B, C].map(skipped) } })
+      await loaded()
+
+      expect(spaced(screen.getByText(/^Aucun set/).textContent)).toBe('Aucun set de la rotation ne peut être diffusé : la radio est hors ondes.')
+      expect(rows().map(performersOf)).toEqual(['Aurore', 'Kwame', 'Brume, Cyan', 'Écume'])
+      expect(rows()[0]).toContain('Pas diffusé : le set est annulé.')
+    })
+
+    it("says why the rotation can't be loaded, in place of the list, without « modifier »", async () => {
+      renderPage({ [ROTATION_URL]: { ok: false, error: 'Internal server error' } })
+
+      expect(spaced((await screen.findByRole('alert')).textContent)).toBe("La rotation n'a pas pu être chargée : Internal server error")
+      expect(screen.queryByRole('button', { name: 'modifier' })).not.toBeInTheDocument()
+      expect(document.querySelector('.rotation-sets')).not.toBeInTheDocument()
+    })
+
+    it("says that the radio can't read tracks until the credentials are entered, linking to the configuration", async () => {
+      renderPage({ [CREDENTIALS_URL]: { ok: true, credentials: null } })
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(/^La radio ne peut lire aucune piste sur SoundCloud tant que/)
+      expect(within(alert).getByRole('link', { name: 'configuration' })).toHaveAttribute('href', '/admin/configuration')
+      await loaded()
+    })
   })
 
-  it('shows tracks left out of the rotation in red, with why when hovered or clicked', async () => {
-    mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': onAir('b') })
-    render(<Rotation />)
-
-    const teaser = await screen.findByRole('button', { name: 'TEASER · 2026-09-01' })
-    expect(teaser.closest('li')).toHaveClass('radio-track-left-out')
-    const reason = 'Track marquée comme preview sur SoundCloud'
-    expect(teaser).toHaveAttribute('title', reason)
-    expect(screen.queryByText(reason)).not.toBeInTheDocument()
-
-    fireEvent.click(teaser)
-    expect(screen.getByText(reason)).toBeInTheDocument()
-    fireEvent.click(teaser)
-    expect(screen.queryByText(reason)).not.toBeInTheDocument()
-  })
-
-  it('shows tracks that SoundCloud describes unexpectedly by what is known of them', async () => {
-    const playlist = { ...ROTATION, tracks: [...ROTATION.tracks, { kind: 'unexpected' as const, title: 'soundcloud:tracks:99' }] }
-    mockFetch({ '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, playlist } }, '/api/radio?upcoming=0': onAir('b') })
-    render(<Rotation />)
-
-    const unexpected = await screen.findByRole('button', { name: 'soundcloud:tracks:99' })
-    expect(unexpected.closest('li')).toHaveClass('radio-track-left-out')
-    expect(unexpected).toHaveAttribute('title', 'Erreur lors de la lecture de la description')
-  })
-
-  it('introduces the tracks that begin on another day with that day', async () => {
-    const lateEvening = new Date(2026, 9, 1, 23, 30).getTime()
-    mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': onAir('b', lateEvening) })
-    render(<Rotation />)
-
-    await waitFor(() => expect(screen.getByText('en cours')).toBeInTheDocument())
-    expect(rows()).toEqual([
-      `${time(lateEvening)}B · 2026-09-13en cours`,
-      day(lateEvening + 65 * MINUTE),
-      `${time(lateEvening + 65 * MINUTE)}C · 2026-09-13`,
-      `${time(lateEvening + 95 * MINUTE)}A · 2026-09-13`,
-      'TEASER · 2026-09-01',
-    ])
-  })
-
-  it("shows when the playlist was chosen and when the tracks begin in Québec time, whatever the browser's time zone", async () => {
-    // Loaded again in Tokyo's time zone, since formatters keep the one they're created in, where B begins at 12:30 the
-    // next day.
-    vi.stubEnv('TZ', 'Asia/Tokyo')
-    vi.resetModules()
-    try {
-      const { Rotation: TokyoRotation } = await import('./rotation')
-      const lateEvening = Date.parse('2026-10-01T23:30:00-04:00')
-      mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': onAir('b', lateEvening) })
-      render(<TokyoRotation />)
-
-      await waitFor(() => expect(screen.getByText('en cours')).toBeInTheDocument())
-      expect(screen.getByText(/^Choisie par/)).toHaveTextContent('Choisie par someone@example.com le 30 septembre 2026 à 08 h 00.')
-      expect(rows().slice(0, 3)).toEqual(['23 h 30B · 2026-09-13en cours', 'vendredi 2 octobre', '00 h 35C · 2026-09-13'])
-    } finally {
-      vi.unstubAllEnvs()
+  describe('loading it again', () => {
+    // B ends at 00:05, and C then goes on air.
+    const NEXT: RadioRotation = {
+      ...ROTATION,
+      current: { setId: 'c', startedAt: C.startsAt! },
+      sets: [A, K, { ...B, startsAt: at(ON_AIR_AT + 125 * MINUTE) }, C],
     }
-  })
 
-  it('lists 10 tracks at first, and 25 more each time more are asked for', async () => {
-    const tracks = Array.from({ length: 40 }, (_, i) => onRadio(track(String(i), `T${i}`, 1)))
-    const playlist = { ...ROTATION, tracks }
-    mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, playlist } },
-      '/api/radio?upcoming=0': { ...onAir('b'), current: { track: track('0', 'T0', 1), startedAt: new Date(STARTED_AT).toISOString() } },
+    // With the timers too, or only the clock.
+    function fakeTime(now: number, { timers = true } = {}) {
+      vi.useFakeTimers(timers ? { toFake: ['Date', 'setTimeout', 'clearTimeout'], shouldAdvanceTime: true } : { toFake: ['Date'] })
+      vi.setSystemTime(now)
+    }
+
+    // The tab shown again a minute later, by which time the server answers with `rotation`.
+    async function shownAgain(rotation: Body) {
+      mockFetch({ [ROTATION_URL]: rotation, [CREDENTIALS_URL]: CREDENTIALS, [CANDIDATES_URL]: CANDIDATES })
+      vi.setSystemTime(Date.now() + 61 * 1000)
+      await act(() => document.dispatchEvent(new Event('visibilitychange')))
+    }
+
+    it('loads it again a couple of seconds after the set on air ends', async () => {
+      fakeTime(ON_AIR_AT + 60 * MINUTE)
+      renderPage()
+      await loaded()
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
+
+      mockFetch({ [ROTATION_URL]: NEXT, [CREDENTIALS_URL]: CREDENTIALS })
+      await act(() => vi.advanceTimersByTimeAsync(5 * MINUTE))
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(0)
+      await act(() => vi.advanceTimersByTimeAsync(2000))
+      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écumeen cours/))
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
     })
-    render(<Rotation />)
 
-    await waitFor(() => expect(rows()).toHaveLength(10))
-    fireEvent.click(screen.getByRole('button', { name: 'afficher plus' }))
-    expect(rows()).toHaveLength(35)
-    fireEvent.click(screen.getByRole('button', { name: 'afficher plus' }))
-    expect(rows()).toHaveLength(40)
-    expect(screen.queryByRole('button', { name: 'afficher plus' })).not.toBeInTheDocument()
-  })
+    it('waits 10 seconds when the set on air has ended by the browser’s clock, but not by the server’s', async () => {
+      fakeTime(ON_AIR_AT + 70 * MINUTE)
+      renderPage()
+      await loaded()
 
-  it('says when no playlist has been chosen yet', async () => {
-    mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: null },
-      '/api/radio?upcoming=0': { ok: false, error: 'No playlist has been chosen for the radio yet' },
+      await act(() => vi.advanceTimersByTimeAsync(9000))
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(2))
+      // The server still has B on air: 10 seconds more.
+      await act(() => vi.advanceTimersByTimeAsync(9000))
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(2)
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(3))
     })
-    render(<Rotation />)
 
-    expect(await screen.findByText("Aucune playlist n'a encore été choisie : la radio est hors ondes.")).toBeInTheDocument()
-  })
+    it("doesn't load it again on its own while the radio is off air", async () => {
+      fakeTime(ON_AIR_AT)
+      renderPage({ [ROTATION_URL]: { ...ROTATION, current: null, sets: [] } })
+      await loaded()
 
-  it('says that the radio cannot read any playlist until the credentials of the SoundCloud app are entered', async () => {
-    mockFetch({
-      '/api/admin/radio': { ...CURRENT, credentialsEntered: false, current: { ...CHOSEN, playlist: null } },
-      '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' },
+      await act(() => vi.advanceTimersByTimeAsync(60 * MINUTE))
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
     })
-    render(
-      <MemoryRouter>
-        <Rotation />
-      </MemoryRouter>,
-    )
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        "La radio ne peut lire aucune playlist sur SoundCloud tant que les identifiants de son application n'ont pas été entrés dans la configuration.",
-      ),
-    )
-    expect(within(screen.getByRole('alert')).getByRole('link', { name: 'configuration' })).toHaveAttribute('href', '/admin/configuration')
-  })
+    it('loads it again when the tab is shown again, at most once a minute', async () => {
+      fakeTime(ON_AIR_AT, { timers: false })
+      renderPage()
+      await loaded()
 
-  it('says why the playlist could not be read, and that the radio goes on with what it read before', async () => {
-    mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, error: 'SoundCloud shows no such playlist' } },
-      '/api/radio?upcoming=0': onAir('b'),
+      // Less than a minute after the page loaded it.
+      await act(() => document.dispatchEvent(new Event('visibilitychange')))
+      expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
+      await shownAgain(NEXT)
+      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écumeen cours/))
     })
-    render(<Rotation />)
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        "La playlist n'a pas pu être lue sur SoundCloud : SoundCloud shows no such playlist. La radio continue avec ce qui en avait été lu avant.",
-      ),
-    )
-    expect(rows()).toHaveLength(4)
-  })
+    it('keeps what it loaded last when loading it again fails, and says why', async () => {
+      fakeTime(ON_AIR_AT, { timers: false })
+      renderPage()
+      await loaded()
 
-  it('shows the title of the playlist when it could never be read, and that the radio is off air', async () => {
-    mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, playlist: null, error: 'SoundCloud responded with 500' } },
-      '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' },
+      await shownAgain({ ok: false, error: 'Internal server error' })
+
+      expect(spaced((await screen.findByRole('alert')).textContent)).toBe("La rotation n'a pas pu être chargée à nouveau : Internal server error")
+      expect(rows()[0]).toMatch(/^23 h 00Brume, Cyanen cours/)
+      expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument()
     })
-    render(<Rotation />)
 
-    await waitFor(() => expect(screen.getByText('Hors ondes : The radio is unavailable right now')).toBeInTheDocument())
-    expect(screen.getByRole('link', { name: 'Rotation' })).toHaveAttribute('href', ROTATION.url)
-    expect(screen.getByRole('alert')).toHaveTextContent("La playlist n'a pas pu être lue sur SoundCloud : SoundCloud responded with 500")
-    expect(screen.getByRole('alert')).not.toHaveTextContent('La radio continue')
-    expect(screen.queryByRole('list')).not.toBeInTheDocument()
-  })
+    it('loads it again while it is being changed, leaving the changes as they are', async () => {
+      fakeTime(ON_AIR_AT, { timers: false })
+      await modify()
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Aurore/ }))
 
-  it('lists the tracks from the top, without when they begin, when what is on air is unknown', async () => {
-    mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' } })
-    render(<Rotation />)
+      await shownAgain(NEXT)
+      await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1))
+      // C is now the one on air.
+      await waitFor(() => expect(draft()[1]).toMatch(/en cours$/))
+      expect(draft()).toEqual([`1 Brume, Cyan${SATURDAY}`, `2 Écume${SATURDAY}en cours`, `3 Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`])
 
-    await waitFor(() => expect(screen.getByText('Hors ondes : The radio is unavailable right now')).toBeInTheDocument())
-    expect(rows()).toEqual(['A · 2026-09-13', 'TEASER · 2026-09-01', 'B · 2026-09-13', 'C · 2026-09-13'])
-  })
-
-  it('previews a playlist, then chooses it', async () => {
-    mockFetch({
-      '/api/admin/radio': CURRENT,
-      '/api/radio?upcoming=0': onAir('b'),
-      '/api/admin/radio/preview': { ok: true, playlist: OTHER },
-      '/api/admin/radio/playlist': { ok: true },
+      // Once it's left as it is, the page shows it as it was loaded again.
+      fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+      expect(rows()[0]).toMatch(/^00 h 05Écumeen cours/)
     })
-    render(<Rotation />)
-    await waitFor(() => expect(screen.getByText('en cours')).toBeInTheDocument())
-
-    preview(LINK)
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'jouer cette playlist' })).toBeInTheDocument())
-    expect(within(previewBox()).getByRole('link', { name: 'Other' })).toHaveAttribute('href', LINK)
-    expect(within(previewBox()).getByText(/^Playlist privée de/)).toBeInTheDocument()
-    expect(rows(previewBox())).toEqual(['H · 2026-09-13', 'I · 2026-09-13'])
-    expect(
-      within(previewBox()).getByText('La radio passera tout de suite au début de cette playlist (sans couper les auditeurs en cours).'),
-    ).toBeInTheDocument()
-    expect(requestsTo('POST', '/api/admin/radio/preview').map(jsonBody)).toEqual([{ link: LINK }])
-
-    fireEvent.click(screen.getByRole('button', { name: 'jouer cette playlist' }))
-
-    await waitFor(() => expect(screen.getByText('La radio joue maintenant « Other ».')).toBeInTheDocument())
-    expect(requestsTo('POST', '/api/admin/radio/playlist').map(jsonBody)).toEqual([{ link: LINK }])
-    expect(screen.queryByRole('button', { name: 'jouer cette playlist' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Lien de la playlist')).toHaveValue('')
-    await waitFor(() => expect(requestsTo('GET', '/api/admin/radio')).toHaveLength(2))
-    expect(requestsTo('GET', '/api/radio?upcoming=0')).toHaveLength(2)
   })
 
-  it('does not let a playlist none of whose tracks can be played be chosen', async () => {
-    mockFetch({
-      '/api/admin/radio': CURRENT,
-      '/api/radio?upcoming=0': onAir('b'),
-      '/api/admin/radio/preview': { ok: true, playlist: { ...OTHER, tracks: [{ kind: 'left-out', track: track('h', 'H', 60), reason: 'blocked' }] } },
+  describe('changing it', () => {
+    it('lists the sets in the order shown, numbered, with the one on air and why the others are skipped, without times', async () => {
+      await modify()
+
+      expect(draft()).toEqual([
+        `1 Brume, Cyan${SATURDAY}en cours`,
+        `2 Écume${SATURDAY}`,
+        `3 Aurore${SATURDAY}`,
+        `4 Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`,
+      ])
+      // Where « modifier » was.
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: named(`réordonner Set de Brume et Cyan, ${SATURDAY}`) }))
+      expect(document.querySelector('.rotation-sets')).not.toBeInTheDocument()
+      expect(screen.getByText(/^On peut ajouter les sets/)).toBeInTheDocument()
     })
-    render(<Rotation />)
 
-    preview(LINK)
+    it('reorders the sets with the keyboard, takes them out, and adds others at the end, keeping the focus', async () => {
+      await modify()
 
-    await waitFor(() => expect(screen.getByText(/Aucune piste de cette playlist ne peut être jouée en entier/)).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: 'jouer cette playlist' })).not.toBeInTheDocument()
-  })
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -2)
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Écume/ }))
+      pick('Set de Gaïa')
+      expect(document.activeElement).toBe(picker())
 
-  it('drops the preview when the link changes, so that only what was previewed can be chosen', async () => {
-    mockFetch({
-      '/api/admin/radio': CURRENT,
-      '/api/radio?upcoming=0': onAir('b'),
-      '/api/admin/radio/preview': { ok: true, playlist: OTHER },
+      expect(draft().map(performersOf)).toEqual(['1 Aurore', '2 Brume, Cyan', '3 Kwame', '4 Gaïa'])
+      expect(draft()[3]).toBe('4 GaïaGUEST MIXES, dim. 2 août 2026')
     })
-    render(<Rotation />)
-    preview(LINK)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'jouer cette playlist' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByLabelText('Lien de la playlist'), { target: { value: `${LINK}x` } })
+    it('offers the sets that can be added, the most recent session first, then those taken out, whatever they are, and searches them', async () => {
+      await modify()
+      fireEvent.click(picker())
+      expect(options()).toEqual([`Set de Fréquence Boréale${SATURDAY}`, 'Set de GaïaGUEST MIXES, dim. 2 août 2026'])
+      fireEvent.keyDown(picker(), { key: 'Escape' })
 
-    expect(screen.queryByRole('button', { name: 'jouer cette playlist' })).not.toBeInTheDocument()
-  })
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Kwame/ }))
+      pick('Set de Fréquence')
+      fireEvent.click(picker())
+      expect(options()).toEqual(['Set de GaïaGUEST MIXES, dim. 2 août 2026', `Set de Kwame${SATURDAY}`])
+      fireEvent.keyDown(picker(), { key: 'Escape' })
 
-  it('says when the link is not to a playlist, without asking the server', async () => {
-    mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': onAir('b') })
-    render(<Rotation />)
+      // By performer, session title or day, whatever the case and the accents.
+      search('gaia')
+      expect(options()).toEqual(['Set de GaïaGUEST MIXES, dim. 2 août 2026'])
+      search('haute rive')
+      expect(options()).toEqual([`Set de Kwame${SATURDAY}`])
+      search('2 août')
+      expect(options()).toEqual(['Set de GaïaGUEST MIXES, dim. 2 août 2026'])
+      search('samedi')
+      expect(options()).toEqual([`Set de Kwame${SATURDAY}`])
 
-    preview('https://soundcloud.com/parkingdotradio')
-
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Ce n'est pas un lien vers une playlist SoundCloud."))
-    expect(requestsTo('POST', '/api/admin/radio/preview')).toHaveLength(0)
-  })
-
-  it('shows why a playlist could not be previewed', async () => {
-    mockFetch({
-      '/api/admin/radio': CURRENT,
-      '/api/radio?upcoming=0': onAir('b'),
-      '/api/admin/radio/preview': { ok: false, error: 'SoundCloud shows no playlist at this link' },
+      // Kwame's set, though skipped, goes back in, with why.
+      fireEvent.mouseDown(screen.getByRole('option', { name: /^Set de Kwame/ }))
+      expect(draft().at(-1)).toBe(`5 Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`)
     })
-    render(<Rotation />)
 
-    preview(LINK)
+    it("can't add a set when those that can be added can't be loaded, and says why", async () => {
+      renderPage({ [CANDIDATES_URL]: { ok: false, error: 'Internal server error' } })
+      fireEvent.click(await loaded())
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent("La playlist n'a pas pu être lue : SoundCloud shows no playlist at this link"),
-    )
+      expect(spaced((await screen.findByRole('alert')).textContent)).toBe("Les sets qu'on peut ajouter n'ont pas pu être chargés : Internal server error")
+      expect(picker()).toBeDisabled()
+      expect(picker()).toHaveAttribute('placeholder', "les sets n'ont pas pu être chargés")
+    })
+
+    it('leaves the rotation as it is with « annuler », and with « enregistrer » when nothing changed, giving the focus back to « modifier »', async () => {
+      await modify()
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Aurore/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+      expect(rows()).toHaveLength(5)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'modifier' }))
+
+      // Changed, then changed back.
+      fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -1)
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), 1)
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(screen.queryByText(/^Le changement s'applique/)).not.toBeInTheDocument()
+      expect(rows()).toHaveLength(5)
+      expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(0)
+    })
+  })
+
+  describe('confirming', () => {
+    const confirmation = () => Array.from(document.querySelectorAll('.rotation-confirm > p')).map((p) => spaced(p.textContent))
+
+    it('asks to confirm that the change applies on the radio right away, and goes back to the changes with « revenir »', async () => {
+      await modify()
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -1)
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio."])
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer' }))
+      // The list can't be changed meanwhile.
+      expect(screen.getByRole('button', { name: /^retirer Set de Aurore/ })).toBeDisabled()
+      expect(picker()).toBeDisabled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
+      expect(confirmation()).toEqual([])
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(screen.getByRole('button', { name: /^retirer Set de Aurore/ })).toBeEnabled()
+      expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(0)
+    })
+
+    it('says when the set on air is taken out, and when the rotation would be empty', async () => {
+      await modify()
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Brume/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'Le set en cours en sera retiré : la radio passera tout de suite au suivant.'])
+
+      fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
+      for (const name of ['Écume', 'Aurore', 'Kwame']) fireEvent.click(screen.getByRole('button', { name: new RegExp(`^retirer Set de ${name}`) }))
+      expect(document.activeElement).toBe(picker())
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'La rotation sera vide : la radio sera hors ondes.'])
+    })
+  })
+
+  describe('saving', () => {
+    async function changeAndConfirm(bodies: Record<string, Body | Promise<Body>>) {
+      await modify(bodies)
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Écume/ }))
+      pick('Set de Fréquence')
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      fireEvent.click(screen.getByRole('button', { name: 'confirmer' }))
+    }
+
+    it('sends the sets in the order shown, locks the list meanwhile, then shows the rotation as saved, and says so', async () => {
+      const answer = held()
+      await changeAndConfirm({ [`PUT ${ROTATION_URL}`]: answer.body })
+
+      const sending = screen.getByRole('button', { name: 'enregistrement…' })
+      expect(sending).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'revenir' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /^réordonner Set de Aurore/ })).toHaveAttribute('aria-disabled', 'true')
+      await waitFor(() => expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(1))
+      expect(jsonBody(requestsTo('PUT', ROTATION_URL)[0])).toEqual({ sets: ['b', 'a', 'k', 'f'] })
+
+      const savedF = rotationSet('f', ['Fréquence Boréale'], 60, { startsAt: at(ON_AIR_AT + 95 * MINUTE) })
+      await answer.answer({ ...ROTATION, updatedBy: 'admin@example.com', updatedAt: '2026-10-02T03:30:00.000Z', sets: [B, { ...A, startsAt: at(ON_AIR_AT + 65 * MINUTE) }, K, savedF] })
+      expect(screen.getByRole('status')).toHaveTextContent('La rotation a été enregistrée.')
+      expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par admin@example.com le 1 octobre 2026 à 23 h 30.')
+      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyanen cours', 'vendredi 2 octobre', '00 h 05Aurore', 'Kwame', '00 h 35Fréquence Boréale'])
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'modifier' }))
+
+      // Until the rotation is changed again.
+      fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+      expect(screen.queryByText('La rotation a été enregistrée.')).not.toBeInTheDocument()
+    })
+
+    it("says which set can't be added, and why, keeps the changes, and loads the sets that can be added again", async () => {
+      await changeAndConfirm({
+        [`PUT ${ROTATION_URL}`]: { ok: false, error: "This set can't be added to the rotation", setIndex: 3, reasons: ['not-announced', 'cancelled'] },
+      })
+
+      expect(spaced((await screen.findByRole('alert')).textContent)).toBe(
+        `Le set de Fréquence Boréale (${SATURDAY}) ne peut pas être ajouté à la rotation : la session n'est pas annoncée, le set est annulé.`,
+      )
+      expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Aurore', '3 Kwame', '4 Fréquence Boréale'])
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'enregistrer' }))
+      await waitFor(() => expect(requestsTo('GET', CANDIDATES_URL)).toHaveLength(2))
+    })
+
+    it('says which set no longer exists', async () => {
+      await changeAndConfirm({ [`PUT ${ROTATION_URL}`]: { ok: false, error: 'No such set', setIndex: 1 } })
+
+      expect(spaced((await screen.findByRole('alert')).textContent)).toBe(`Le set de Aurore (${SATURDAY}) n'existe plus : retirez-le de la rotation.`)
+      expect(draft()).toHaveLength(4)
+    })
+
+    it("says why it can't be saved otherwise", async () => {
+      await changeAndConfirm({ [`PUT ${ROTATION_URL}`]: { ok: false, error: 'Internal server error' } })
+
+      expect(spaced((await screen.findByRole('alert')).textContent)).toBe("La rotation n'a pas pu être enregistrée : Internal server error")
+      expect(draft()).toHaveLength(4)
+      expect(requestsTo('GET', CANDIDATES_URL)).toHaveLength(1)
+    })
   })
 })

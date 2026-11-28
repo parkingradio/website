@@ -1,37 +1,74 @@
 # Rotation radio
 
-At `/admin/rotation`: chooses the SoundCloud playlist the radio's rotation is read from (see
-[Radio](../../server/radio.md)). From top to bottom, it shows:
+At `/admin/rotation`: the radio's rotation of sets, in the order they come on air, and changing it (see
+[The rotation of sets](../../server/radio.md#the-rotation-of-sets)). The playlist the radio plays until it switches to
+the rotation is chosen in [Rotation radio (legacy)](rotation-legacy.md).
 
-- "À l'antenne": the playlist the rotation is read from.
-- "Changer de playlist": a field for the link to another playlist.
+## The rotation
 
-Until the credentials of the SoundCloud app have been entered, a line at the top says that the radio can't read any
-playlist until then, and links to [Configuration](configuration.md), where they're entered.
+Under the title, the page says which admin last changed the rotation, and when, e.g. « Modifiée par admin@example.com
+le 5 octobre 2026 à 23 h 30. », once it's been changed. Until the credentials of the SoundCloud app have been entered,
+a line says that the radio can't read any track on SoundCloud until then, and links to
+[Configuration](configuration.md), where they're entered.
 
-## À l'antenne
+The sets are listed in the order they come on air: from the one on air, marked « en cours », around the rotation, each
+one once. Each set that isn't skipped shows when it goes on air, or, for the set on air, when it went on air, with the
+day before it whenever it changes, as on [Rotation radio (legacy)](rotation-legacy.md). Each set shows its performers,
+each linking to their page, its session's title and day (see [Names, in Sessions](sessions.md#names)), linking to the
+session's page, its track's length once it's been read, e.g. « 1 h 02 », and links to its track and its video, named
+« SoundCloud » and « YouTube ».
 
-The chosen playlist's title (linking to it), whether it's private or public, the SoundCloud account it belongs to, and
-which admin chose it and when. Until a playlist has been chosen, it says that the radio is off air ("hors ondes").
-When the playlist couldn't be read, it says why, and that the radio goes on with what it read before, if anything.
-When what's on air can't be loaded, it says that the radio is off air, and why.
+Skipped sets stay in their place, faded out, without a time, and say why, in French, for each of their reasons (see
+[Which sets](../../server/radio.md#which-sets)). When the last read of a set's track failed, the set has a warning (see
+[Warnings](layout.md#warnings)) that says why, as the server says it, and, unless it was never read, that the radio goes
+on with what was read before.
 
-Under that, the playlist's tracks are listed in the order they come on air: from the one on air, marked "en cours",
-around the playlist and back. Each track of the rotation shows when it begins, with the day whenever it changes. The
-tracks left out of the rotation stand out, and say why. Only the first tracks are listed at first, and "afficher plus"
-lists more.
+When the rotation is empty, the page says « La rotation est vide : la radio est hors ondes. » When every set of the
+rotation is skipped, it says that no set can be played, so that the radio is off air, and lists the sets in the
+rotation's order, without times. When the rotation can't be loaded, the page says why in place of the list, without
+« modifier ».
 
-## Changer de playlist
+The page loads the rotation again when the set on air ends, a couple of seconds after it, though never sooner than 10
+seconds after it was last loaded, so that a browser whose clock is ahead doesn't load it again and again, and when the
+browser's tab is shown again, at most once a minute, also while the rotation is being changed. When it can't be loaded
+again, the page goes on showing what it loaded last, and says why above it.
 
-A link that isn't to a playlist is refused. "prévisualiser" shows the playlist as the radio would read it, its tracks
-listed from the first, and says that the radio will go to its start right away, without cutting off listeners (see
-[`POST /api/admin/radio/playlist`](../../server/radio.md#post-apiadminradioplaylist-admin)), then "jouer cette playlist"
-chooses it. Only the playlist previewed can be chosen, and not one with no track that can be played in full.
-Once it's chosen, the page says that the radio plays it, and shows it in "À l'antenne".
+## Changing the rotation
+
+« modifier » turns the list into one that can be changed, in the order it's shown, from the set on air: each set
+numbered, with a handle that moves it (see [Reordering](layout.md#reordering)) and a « × » that takes it out, like a
+set's performers (see [A set's form, in Sessions](sessions.md#a-sets-form)). The set on air is still marked
+« en cours », and skipped sets still say why, but times aren't shown, since they'd change with the order.
+
+Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus, so that several can be added one
+after the other. It offers the sets that can be added (see
+[`GET /api/admin/radio/rotation/candidates`](../../server/radio.md#get-apiadminradiorotationcandidates-admin)), loaded
+when « modifier » is clicked, the most recent session first, then those taken out of the list since then, whatever they
+are, since a set that's already in the rotation can stay in it (see
+[`PUT /api/admin/radio/rotation`](../../server/radio.md#put-apiadminradiorotation-admin)). Each one is named by its
+performers, with its session's title and day, and they're searched (see [Searching lists](layout.md#searching-lists)) by
+their performers, their session's title, and its day, written out (e.g. "samedi 14 novembre 2026"). A line under the
+field says which sets can be added. When they can't be loaded, the field can't be used, and the page says why.
+
+« annuler » leaves the rotation as it is. « enregistrer » only closes the list when it's as it was shown when
+« modifier » was clicked. Otherwise, it asks to confirm, next to it rather than in a dialog: « Le changement s'applique
+tout de suite à la radio. », followed, when the set on air is taken out, by « Le set en cours en sera retiré : la radio
+passera tout de suite au suivant. », or, when no set is left, by « La rotation sera vide : la radio sera hors ondes. »,
+then « confirmer », and « revenir », which goes back to changing the list. The rotation is saved in the order shown, so
+that the set on air comes first in the rotation's order, which changes nothing that's played. Whatever was saved in the
+meantime, e.g. by another admin, is replaced. While the page asks to confirm, and while the rotation is sent, which can
+take several seconds, since the server reads the tracks of the sets added, the list can't be changed, and while it's
+sent, the button reads « enregistrement… ».
+
+Once it's saved, the page shows the rotation as the server returns it, and says « La rotation a été enregistrée. »
+When it can't be saved, the list stays as it was being changed, and the page says why: for a set that can't be added,
+which one, and why, e.g. « Le set de Aurore (HAUTE RIVE TAKEOVER, sam. 14 nov. 2026) ne peut pas être ajouté à la
+rotation : la session n'est pas annoncée. », in which case the sets that can be added are loaded again; for a set that
+no longer exists, which one; or else the server's error.
 
 ## Endpoints
 
-- `GET /api/admin/radio`, for the chosen playlist and whether the credentials have been entered.
-- `GET /api/radio?upcoming=0`, for the track on air.
-- `POST /api/admin/radio/preview`, to show another playlist before choosing it.
-- `POST /api/admin/radio/playlist`, to choose it.
+- `GET /api/admin/radio/rotation`, for the rotation.
+- `GET /api/admin/radio/credentials`, for whether the credentials of the SoundCloud app have been entered.
+- `GET /api/admin/radio/rotation/candidates`, for the sets that can be added.
+- `PUT /api/admin/radio/rotation`, to save it.

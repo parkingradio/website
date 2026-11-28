@@ -16,17 +16,20 @@ const MODIFIERS = [withinList]
 // The list, e.g. an <ol> or a whole <table>, but not its <tbody>, since what screen readers read is rendered after it.
 // The items, by their `ids` in their order, are named by `nameOf`, from their index, in what screen readers announce.
 // `onMove` moves the item at `from` to `to`, once it's dropped there, and only if it's another place. While `disabled`,
-// e.g. while the list is sent, its items can't be dragged.
+// e.g. while the list is sent, its items can't be dragged. With `autoScroll`, for a list that can be longer than the
+// screen, e.g. the radio's rotation, the page scrolls while an item is dragged near the top or the bottom of the screen.
 export function SortableList({
   ids,
   nameOf,
   disabled = false,
+  autoScroll = false,
   onMove,
   children,
 }: {
   ids: string[]
   nameOf: (index: number) => string
   disabled?: boolean
+  autoScroll?: boolean
   onMove: (from: number, to: number) => void
   children: ReactNode
 }) {
@@ -70,9 +73,9 @@ export function SortableList({
       sensors={sensors}
       collisionDetection={closestVertically}
       modifiers={MODIFIERS}
-      // The lists are short, and the page scrolling under the dragged item would take it past their ends (see
-      // `withinList` in sortable-places.ts). The arrows still bring the place it's moved to into view.
-      autoScroll={false}
+      // Most lists are short, and don't need the page to scroll under the dragged item. The arrows still bring the place
+      // it's moved to into view.
+      autoScroll={autoScroll}
       accessibility={{ announcements, screenReaderInstructions: { draggable: INSTRUCTIONS } }}
       onDragEnd={({ active, over }) => {
         const from = ids.indexOf(String(active.id))

@@ -11,7 +11,8 @@ import { TURNSTILE_TOKEN } from '../seed.ts'
 //
 // Tests run side by side against the same server, seeded with the data of seed-data.ts (see global-setup.ts), so they
 // mustn't change what other tests see. A test that writes creates entities of its own, named uniquely, and never
-// changes or deletes seeded ones. No test assumes that the seeded entities are all there is, either.
+// changes or deletes seeded ones. No test assumes that the seeded entities are all there is, either. The radio's rotation
+// of sets is the exception: there's only one, which the tests of rotation.spec.ts change, then put back.
 //
 // In particular, feature flags apply to every visitor at once: tests assume they're all off, as they are until an admin
 // turns one on. A test that needs a flag on fakes it for its own page instead, with the configuration the server gives

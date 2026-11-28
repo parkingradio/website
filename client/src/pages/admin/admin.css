@@ -331,6 +331,46 @@
   margin-top: 0.75rem;
 }
 
+/* The radio's rotation of sets, as a schedule like a playlist's tracks: each set on lines of its own, its performers,
+   then its session, its length and its links, then why it's skipped, if it is. Skipped sets are faded out, and say why,
+   so that it isn't told by color alone. */
+.rotation-sets li:not(.radio-tracks-day) {
+  margin-top: 0.5rem;
+}
+
+.rotation-set {
+  min-width: 0;
+}
+
+.rotation-set p,
+.admin-ordered-detail p,
+.rotation-confirm p {
+  margin: 0;
+}
+
+.rotation-set-current .rotation-set-performers {
+  font-weight: 700;
+}
+
+.rotation-set-skipped {
+  opacity: 0.55;
+}
+
+/* Changing it: the list, then the field that adds a set, as wide as its options' labels and details need, then what
+   « enregistrer » asks to confirm. */
+.rotation-edit,
+.rotation-confirm {
+  margin-top: 1.5rem;
+}
+
+.rotation-add {
+  max-width: 600px;
+}
+
+.rotation-confirm .admin-toolbar {
+  margin-top: 0.75rem;
+}
+
 /* The playlist about to be chosen, boxed apart from the current one. Choosing it is the main thing to do
    then, so its button is black like a form's (see above). */
 .radio-preview {
@@ -933,6 +973,17 @@ dl.admin-record {
 
 .admin-ordered li {
   padding-left: 0;
+}
+
+/* An item's second line, if it has one, e.g. a set's session in the radio's rotation, smaller, like the details of
+   options. */
+.admin-ordered-text {
+  padding-block: 4px;
+}
+
+.admin-ordered-detail {
+  color: #666;
+  font-size: 12px;
 }
 
 /* The handle that drags an item to another place in its list (see sortable.tsx), as tall as the buttons beside it, but
