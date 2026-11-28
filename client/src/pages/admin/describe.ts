@@ -486,8 +486,8 @@ export function setName(set: Pick<StudioSet, 'performers'>, session?: Pick<Sessi
 }
 
 // A set as it's named within a sentence on its session's page, e.g. "le set de Aurore", or "le set" once its performers
-// are all deleted.
-export function setInSentence(set: Pick<StudioSet, 'performers'>): string {
+// are all deleted, or with `article`, e.g. "du set de Aurore".
+export function setInSentence(set: Pick<StudioSet, 'performers'>, article: 'le' | 'du' = 'le'): string {
   const names = set.performers.map((performer) => performer.name)
-  return `le set${names.length > 0 ? ` de ${enumerate(names)}` : ''}`
+  return `${article} set${names.length > 0 ? ` de ${enumerate(names)}` : ''}`
 }

@@ -16,17 +16,20 @@ const ROTATION = '/api/admin/radio/rotation'
 
 const getRotation = async (page: Page): Promise<Schemas['RadioRotation']> => (await page.request.get(ROTATION)).json()
 
-test("the radio's rotation of sets has the seeded sets that seed-data.ts puts in it, in order, the others can be added", async ({ page }, testInfo) => {
+test("the radio's rotation of sets has the seeded sets that seed-data.ts puts in it, in order, around, the others can be added", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'seeding is the same whatever the screen')
   await logIn(page)
   await expect(adminMenu(page)).toBeVisible()
   const sets = SEED_SESSIONS.flatMap((session) => session.sets).filter((set) => set.soundcloudTrack)
   const inRotation = sets.filter((set) => set.rotation)
-  // Told apart by their videos.
+  // Told apart by their videos, from the play head, which moves along with time: the seeded order, around.
   const rotation = await getRotation(page)
-  expect(rotation.sets.map((set) => set.youtubeVideo!.id)).toEqual(inRotation.map((set) => set.youtubeVideo))
+  const videos = inRotation.map((set) => set.youtubeVideo)
+  const at = videos.indexOf(rotation.sets[0].youtubeVideo!.id)
+  expect(rotation.sets.map((set) => set.youtubeVideo!.id)).toEqual([...videos.slice(at), ...videos.slice(0, at)])
   // Those whose track the stand-in for SoundCloud only lets a preview be played of are skipped.
-  expect(rotation.sets.map((set) => set.skipped)).toEqual(inRotation.map((set) => (set.soundcloudTrack!.endsWith(PREVIEW_SUFFIX) ? ['preview'] : [])))
+  const previews = new Set(inRotation.filter((set) => set.soundcloudTrack!.endsWith(PREVIEW_SUFFIX)).map((set) => set.youtubeVideo))
+  expect(rotation.sets.map((set) => set.skipped)).toEqual(rotation.sets.map((set) => (previews.has(set.youtubeVideo!.id) ? ['preview'] : [])))
   const candidates: { sets: Schemas['RotationCandidate'][] } = await (await page.request.get('/api/admin/radio/rotation/candidates')).json()
   expect(candidates.sets.map((set) => set.youtubeVideo!.id)).toEqual(expect.arrayContaining(sets.filter((set) => !set.rotation).map((set) => set.youtubeVideo)))
 })
@@ -63,6 +66,9 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     await page.getByRole('button', { name: 'modifier' }).click()
     const items = page.locator('.admin-ordered > li')
     await expect(items).toHaveCount(seeded.sets.length)
+    // The first set, which is on air, is the one on air once it's saved.
+    await expect(items.first()).toContainText('en ondes')
+    await expect(page.getByText('en ondes', { exact: true })).toHaveCount(1)
 
     // One of the sets that can be added, found by its performer, at the end.
     const picker = page.getByRole('combobox', { name: 'Ajouter un set' })
@@ -109,6 +115,49 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     await expect(shownSets(page).filter({ hasText: removed })).toHaveCount(0)
   } finally {
     // The seeded rotation, in its order, for the tests that come after.
+    const restored = await page.request.put(ROTATION, { data: { sets: seeded.sets.map((set) => set.id) } })
+    expect(restored.ok()).toBe(true)
+  }
+})
+
+// How the confirmation names a set within a sentence, with `article`, e.g. "le set de Aurore et Brume", as the page does
+// (see `setInSentence` in client/src/pages/admin/describe.ts, which can't be imported here).
+const inSentence = (set: Schemas['RotationSet'], article: string) => {
+  const names = set.performers.map((performer) => performer.name)
+  return `${article} set${names.length > 0 ? ` de ${names.length > 1 ? `${names.slice(0, -1).join(', ')} et ${names.at(-1)}` : names[0]}` : ''}`
+}
+
+test('another set, dragged first, goes on air right away once the rotation is saved', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'there is only one rotation, which the mobile project reads meanwhile')
+  await logIn(page, { at: '/admin/rotation' })
+  await expect(adminMenu(page)).toBeVisible()
+  const seeded = await getRotation(page)
+  try {
+    await page.getByRole('button', { name: 'modifier' }).click()
+    const items = page.locator('.admin-ordered > li')
+    await expect(items).toHaveCount(seeded.sets.length)
+    // The first set after the one on air that can be played, which comes next.
+    const next = seeded.sets.findIndex((set, i) => i > 0 && set.skipped.length === 0)
+    await expect(items.nth(next)).toContainText('à suivre')
+    await drag(page, items.nth(next).getByRole('button', { name: /^réordonner / }), items.first(), { touch: false })
+    expect(await performersOf(items.first())).toBe(seeded.sets[next].performers.map((performer) => performer.name).join(', '))
+    await expect(items.first()).toContainText('en ondes')
+
+    await page.getByRole('button', { name: 'enregistrer' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Enregistrer la rotation' })
+    await expect(dialog).toHaveAccessibleDescription(
+      `${inSentence(seeded.sets[next], 'Le')} passera tout de suite en ondes, à la place ${inSentence(seeded.sets[0], 'du')}.`,
+    )
+    await dialog.getByRole('button', { name: 'confirmer' }).click()
+    await expect(page.getByText('La rotation a été enregistrée.')).toBeVisible()
+
+    // On air, from its start, and first.
+    const saved = await getRotation(page)
+    expect(saved.current?.setId).toBe(seeded.sets[next].id)
+    expect(Date.parse(saved.current!.startedAt)).toBeGreaterThan(Date.parse(seeded.current!.startedAt))
+    await expect(shownSets(page).first()).toContainText('en cours')
+    await expect(shownSets(page).first()).toContainText(seeded.sets[next].performers[0].name)
+  } finally {
     const restored = await page.request.put(ROTATION, { data: { sets: seeded.sets.map((set) => set.id) } })
     expect(restored.ok()).toBe(true)
   }

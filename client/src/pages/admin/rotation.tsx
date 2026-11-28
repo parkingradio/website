@@ -13,7 +13,7 @@ import { OrderedList } from './ordered-list'
 import { sessionPath } from './session-errors'
 import { Performers, SetLinks } from './set-cells'
 
-// The radio's rotation of sets, from the set on air, and changing it (see docs/design/client/admin/rotation.md).
+// The radio's rotation of sets, from its play head, and changing it (see docs/design/client/admin/rotation.md).
 
 type RadioRotation = Schema<'RadioRotation'>
 type SkipReason = Schema<'RotationSkipReason'>
@@ -84,13 +84,6 @@ function useRotation(): { rotation: RadioRotation | null; error: string | null; 
     setLoaded({ rotation, error: null })
   }
   return { ...loaded, saved }
-}
-
-// The rotation's sets in the order they come on air: from the one on air, around the rotation, or in its order when the
-// radio is off air.
-function shownOrder({ current, sets }: RadioRotation): Schema<'RotationSet'>[] {
-  const at = current ? sets.findIndex((set) => set.id === current.setId) : -1
-  return at <= 0 ? sets : [...sets.slice(at), ...sets.slice(0, at)]
 }
 
 export function Rotation() {
@@ -168,13 +161,13 @@ export function Rotation() {
   )
 }
 
-// The rotation's sets, from the set on air, each one that isn't skipped with when it goes on air, and the day before it
-// whenever it changes, as on the legacy page.
+// The rotation's sets, from its play head, as the server gives them, each one that isn't skipped with when it goes on
+// air, and the day before it whenever it changes, as on the legacy page.
 function RotationSets({ rotation }: { rotation: RadioRotation }) {
   if (rotation.sets.length === 0) return <p className="admin-placeholder">La rotation est vide&nbsp;: la radio est hors ondes.</p>
   const rows: { set: Schema<'RotationSet'>; startsAt: number | null; day: string | null }[] = []
   let day: string | null = null
-  for (const set of shownOrder(rotation)) {
+  for (const set of rotation.sets) {
     const startsAt = set.startsAt === null ? null : Date.parse(set.startsAt)
     const startsOn = startsAt === null ? null : dayFormat.format(startsAt)
     rows.push({ set, startsAt, day: day !== null && startsOn !== day ? startsOn : null })
@@ -219,7 +212,14 @@ function RotationSet({ set, startsAt, onAir }: { set: Schema<'RotationSet'>; sta
   )
 }
 
-const OnAirTag = () => <span className="radio-track-tag">en cours</span>
+// What a set is on the radio, e.g. « en cours », quieter for the sets that come next.
+const Tag = ({ label, next = false }: { label: string; next?: boolean }) => <span className={next ? 'radio-track-tag rotation-next' : 'radio-track-tag'}>{label}</span>
+const OnAirTag = () => <Tag label="en cours" />
+
+// While the rotation is being changed, what its sets will be once it's saved: the first that can be played on air, and the
+// others that can be played next.
+const HEAD_MARK = 'en ondes'
+const NEXT_MARK = 'à suivre'
 
 // Why a set is skipped, if it is, and why the last read of its track failed, if it did.
 function SetState({ set }: { set: Listed & Partial<Pick<Schema<'RotationSet'>, 'readError'>> }) {
@@ -258,7 +258,7 @@ type Step = 'editing' | 'confirming' | 'sending'
 // The rotation's sets as they were shown when « modifier » was clicked, to reorder them, take them out, or add others,
 // then save them once that's confirmed.
 function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation; onCancel: () => void; onSaved: (rotation: RadioRotation) => void }) {
-  const [shown] = useState(() => shownOrder(rotation))
+  const [shown] = useState(rotation.sets)
   const [sets, setSets] = useState<Listed[]>(shown)
   const [step, setStep] = useState<Step>('editing')
   const [error, setError] = useState<string | null>(null)
@@ -308,16 +308,19 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
     return (options, query) => search(options, query, (option) => fields.get(option.key)!)
   }, [offered])
 
-  const onAir = rotation.current?.setId
+  // The set on air, as the rotation was last loaded, which gives it first, and the one that will be once it's saved: the
+  // first that can be played, the sets added counting as ones that can be, since saving reads their tracks (see "On air"
+  // in docs/design/server/radio.md).
+  const onAir = rotation.current ? rotation.sets[0] : undefined
+  const head = sets.find((set) => set.skipped.length === 0)
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
-  // What saving does to what's on air (see "On air" in docs/design/server/radio.md). The sets added count as ones that can
-  // be played, since saving reads their tracks.
+  // What saving does to what's on air.
   let consequence: string
   if (sets.length === 0) consequence = 'La rotation sera vide\u00a0: la radio sera hors ondes.'
-  else if (sets.every((set) => set.skipped.length > 0)) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
-  else if (!onAir) consequence = 'La radio reviendra tout de suite en ondes.'
-  else if (!sets.some((set) => set.id === onAir)) consequence = 'Le set en cours sera retiré de la rotation\u00a0: la radio passera tout de suite au set suivant.'
-  else consequence = "Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant."
+  else if (!head) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
+  else if (!onAir) consequence = `La radio reviendra tout de suite en ondes, avec ${setInSentence(head)}.`
+  else if (head.id === onAir.id) consequence = "Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant."
+  else consequence = `${capitalized(setInSentence(head))} passera tout de suite en ondes, à la place ${setInSentence(onAir, 'du')}.`
 
   const send = async () => {
     setStep('sending')
@@ -339,7 +342,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
           detail={(set) => (
             <>
               {sessionName(set.session)}
-              {set.id === onAir && <OnAirTag />}
+              {set === head ? <Tag label={HEAD_MARK} /> : set.skipped.length === 0 && <Tag label={NEXT_MARK} next />}
               <SetState set={set} />
             </>
           )}

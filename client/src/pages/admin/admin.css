@@ -356,6 +356,12 @@
   opacity: 0.55;
 }
 
+/* While it's changed, the sets that come after the one marked as on air are marked too, but quieter. */
+.radio-track-tag.rotation-next {
+  background: none;
+  color: #666;
+}
+
 /* Changing it: the list, then the field that adds a set, as wide as its options' labels and details need. */
 .rotation-edit {
   margin-top: 1.5rem;
