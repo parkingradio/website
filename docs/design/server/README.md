@@ -183,6 +183,7 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`GET /api/admin/radio/rotation`](radio.md#get-apiadminradiorotation-admin) | admin | The rotation of sets, from the play head, and the sets that are skipped, and why |
 | [`PUT /api/admin/radio/rotation`](radio.md#put-apiadminradiorotation-admin) | admin | Changing the rotation of sets, which changes what's on air right away |
 | [`GET /api/admin/radio/rotation/candidates`](radio.md#get-apiadminradiorotationcandidates-admin) | admin | The sets that can be added to the rotation of sets |
+| [`GET /api/admin/radio/rotation/candidates/:id`](radio.md#get-apiadminradiorotationcandidatesid-admin) | admin | A set that can be added to the rotation of sets, with its track read: its length, and whether it would be skipped |
 | [`GET /api/admin/radio`](radio.md#get-apiadminradio-admin) | admin | The playlist the radio's rotation is read from |
 | [`POST /api/admin/radio/preview`](radio.md#post-apiadminradiopreview-admin) | admin | What the radio would read from a playlist |
 | [`POST /api/admin/radio/playlist`](radio.md#post-apiadminradioplaylist-admin) | admin | Choosing the playlist the rotation is read from |

@@ -34,7 +34,7 @@ describe('the tools of the API', () => {
     expect(tools.map(({ name }) => name).sort()).toEqual(
       [
         ...['list_ra_events', 'get_playlist_on_air', 'get_radio_playlist', 'preview_playlist', 'choose_playlist', 'get_soundcloud_app'],
-        ...['get_on_air', 'get_rotation', 'update_rotation_sets', 'list_rotation_candidates'],
+        ...['get_on_air', 'get_rotation', 'update_rotation_sets', 'list_rotation_candidates', 'get_rotation_candidate'],
         'get_youtube_credentials',
         ...['list_artists', 'get_artist', 'create_artist', 'update_artist', 'delete_artist_photo', 'delete_artist'],
         ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective_photo', 'delete_collective'],
@@ -67,7 +67,7 @@ describe('the tools of the API', () => {
     }
     const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `([\w-]+)`/.exec(description)![1]]))
     expect(areas).toMatchObject({
-      ...{ get_on_air: 'radio', get_playlist_on_air: 'radio', update_rotation_sets: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
+      ...{ get_on_air: 'radio', get_playlist_on_air: 'radio', update_rotation_sets: 'radio', get_rotation_candidate: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
       ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar', refresh_calendar_feeds: 'calendar' },
       get_calendar: 'calendar',
     })

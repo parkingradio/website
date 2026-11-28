@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { api } from '../../api/client'
@@ -8,7 +8,7 @@ import { useTabShownCount } from '../../api/use-tab-shown'
 import { Combobox } from '../../combobox'
 import type { ComboboxFilter, ComboboxOption } from '../../combobox'
 import { QUEBEC_TIME_ZONE } from '../../quebec-time'
-import { byWhom, capitalized, formatDuration, sessionLongDay, sessionName, setInSentence, setName } from './describe'
+import { byWhom, capitalized, formatDuration, formatQuebecDayInYear, sessionLongDay, sessionName, setInSentence, setName } from './describe'
 import { search } from './list'
 import { OrderedList } from './ordered-list'
 import { sessionPath } from './session-errors'
@@ -18,8 +18,11 @@ import { Performers } from './set-cells'
 
 type RadioRotation = Schema<'RadioRotation'>
 type SkipReason = Schema<'RotationSkipReason'>
-// A set of the rotation, or one that can be added to it, with why it's skipped (never, for one that can be added).
+// A set of the rotation, or one that can be added to it, with why it's skipped (never, for one that can be added, until
+// its track is read).
 type Listed = Schema<'RotationCandidate'> & Pick<Schema<'RotationSet'>, 'skipped'>
+// A set that can be added, as it would be once added, with what was read of its track.
+type WithTrack = Schema<'RotationCandidateWithTrack'>
 
 // When the sets go on air, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md),
 // as on the legacy page (see rotation-legacy.tsx).
@@ -166,14 +169,8 @@ export function Rotation() {
 // air, and the day before it whenever it changes, as on the legacy page.
 function RotationSets({ rotation }: { rotation: RadioRotation }) {
   if (rotation.sets.length === 0) return <p className="admin-placeholder">La rotation est vide&nbsp;: la radio est hors ondes.</p>
-  const rows: { set: Schema<'RotationSet'>; startsAt: number | null; day: string | null }[] = []
-  let day: string | null = null
-  for (const set of rotation.sets) {
-    const startsAt = set.startsAt === null ? null : Date.parse(set.startsAt)
-    const startsOn = startsAt === null ? null : dayFormat.format(startsAt)
-    rows.push({ set, startsAt, day: day !== null && startsOn !== day ? startsOn : null })
-    day = startsOn ?? day
-  }
+  const times = rotation.sets.map((set) => (set.startsAt === null ? null : Date.parse(set.startsAt)))
+  const days = daysChanging(times, (time) => dayFormat.format(time))
   const { current } = rotation
   const onAir = current ? rotation.sets.findIndex((set) => set.id === current.setId) : -1
   return (
@@ -183,16 +180,28 @@ function RotationSets({ rotation }: { rotation: RadioRotation }) {
       )}
       <PlayHead rows="[data-set]" index={onAir === -1 ? null : onAir}>
         <ol className="rotation-sets">
-          {rows.map(({ set, startsAt, day }, i) => (
+          {rotation.sets.map((set, i) => (
             <Fragment key={set.id}>
-              {day && <li className="rotation-day">{day}</li>}
-              <RotationSet set={set} startsAt={startsAt} onAir={i === onAir ? Date.parse(current!.startedAt) : null} />
+              {days[i] && <li className="rotation-day">{days[i]}</li>}
+              <RotationSet set={set} startsAt={times[i]} onAir={i === onAir ? Date.parse(current!.startedAt) : null} />
             </Fragment>
           ))}
         </ol>
       </PlayHead>
     </>
   )
+}
+
+// The day of each of `times`, as `format` writes it, where it isn't that of the time before it that there is, and isn't the
+// first, or else null, e.g. for a list's sets, which say the day whenever it changes.
+function daysChanging(times: (number | null)[], format: (time: number) => string): (string | null)[] {
+  let day: string | null = null
+  return times.map((time) => {
+    if (time === null) return null
+    const previous = day
+    day = format(time)
+    return previous !== null && day !== previous ? day : null
+  })
 }
 
 // A set's length, as the rows say it, e.g. "1 h 05", to the nearest minute.
@@ -274,15 +283,34 @@ function clock(ms: number): string {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds % 60)}` : `${minutes}:${pad(seconds % 60)}`
 }
 
+// The browser's clock, to the second, read once for what's being done, e.g. a render, until it's done, so that React
+// gets the same snapshot each time it asks during a render, as it expects.
+let reading: number | null = null
+const toTheSecond = () => {
+  if (reading === null) {
+    reading = Math.floor(Date.now() / 1000) * 1000
+    queueMicrotask(() => (reading = null))
+  }
+  return reading
+}
+const everySecond = (onTick: () => void) => {
+  const timer = setInterval(() => {
+    // Read again on each tick, even when several of them run in a row, e.g. with fake timers.
+    reading = null
+    onTick()
+  }, 1000)
+  return () => clearInterval(timer)
+}
+const never = () => () => {}
+
+// The browser's clock, to the second, as of each time the component is drawn, which is every second while `ticking`, so
+// that what depends on it moves on.
+const useClock = (ticking: boolean): number => useSyncExternalStore(ticking ? everySecond : never, toTheSecond)
+
 // How far into the set under the play head the radio is, out of `durationMs`: since `startedAt`, by the browser's clock,
 // every second, or at its start without it. It keeps its own time, so that only it is drawn again every second.
 function Progress({ startedAt, durationMs }: { startedAt: number | null; durationMs: number }) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (startedAt === null) return
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [startedAt])
+  const now = useClock(startedAt !== null)
   const elapsed = startedAt === null ? 0 : Math.min(Math.max(now - startedAt, 0), durationMs)
   return (
     <div className="rotation-progress">
@@ -320,7 +348,8 @@ function SetState({ set }: { set: Listed & Partial<Pick<Schema<'RotationSet'>, '
   )
 }
 
-// How long a set lasts, in milliseconds, once its track has been read, which a set that can be added never has been.
+// How long a set lasts, in milliseconds, once its track has been read, which a set that can be added hasn't been until
+// what reading it answered is known.
 const lengthOf = (set: Listed): number | null => ('durationMs' in set && typeof set.durationMs === 'number' ? set.durationMs : null)
 
 // What a set's performers are called, e.g. "Aurore, Brume", or "Set" once they're all deleted.
@@ -339,6 +368,20 @@ function saveError(error: { error: string; setIndex?: number; reasons?: SkipReas
   return `${named} ne peut pas être ajouté à la rotation\u00a0: ${reasonsText(error.reasons)}.`
 }
 
+// When each of `sets` would go on air once they're saved, or null when it's skipped, or that isn't known: the first that
+// can be played, which is under the play head, at `start`, then each one after it that can be played as the one before it
+// ends, up to the first whose length isn't known (see "Changing the rotation" in docs/design/client/admin/rotation.md).
+function startTimes(sets: Listed[], start: number): (number | null)[] {
+  let next: number | null = start
+  return sets.map((set) => {
+    if (set.skipped.length > 0 || next === null) return null
+    const startsAt = next
+    const length = lengthOf(set)
+    next = length === null ? null : startsAt + length
+    return startsAt
+  })
+}
+
 type Step = 'editing' | 'confirming' | 'sending'
 
 // The rotation's sets as they were shown when « modifier » was clicked, to reorder them, take them out, or add others,
@@ -348,6 +391,11 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   const [sets, setSets] = useState<Listed[]>(shown)
   const [step, setStep] = useState<Step>('editing')
   const [error, setError] = useState<string | null>(null)
+  // What reading their tracks last answered for the sets added that weren't in the rotation, by id, which their rows show
+  // in their place, wherever they're moved, even once they're taken out and added again.
+  const [answers, setAnswers] = useState<ReadonlyMap<string, WithTrack>>(new Map())
+  // The last request for each of them, so that an answer to an earlier one doesn't replace that of a later one.
+  const asked = useRef(new Map<string, number>())
   // Loaded again once saving says that a set can't be added, which may no longer be the only one.
   const [candidatesVersion, setCandidatesVersion] = useState(0)
   const candidates = useApi('/api/admin/radio/rotation/candidates', { version: candidatesVersion })
@@ -381,8 +429,8 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
 
   // The sets that can be added, then those taken out of the list, each once, unless they're in it.
   const offered = useMemo(() => {
-    const listed = new Set(sets.map((set) => set.id))
-    const removed = shown.filter((set) => !listed.has(set.id))
+    const ids = new Set(sets.map((set) => set.id))
+    const removed = shown.filter((set) => !ids.has(set.id))
     const taken = new Set([...sets, ...shown].map((set) => set.id))
     const addable = candidates.kind === 'loaded' ? candidates.value.sets.filter((set) => !taken.has(set.id)) : []
     return [...addable.map((set): Listed => ({ ...set, skipped: [] })), ...removed]
@@ -394,11 +442,29 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
     return (options, query) => search(options, query, (option) => fields.get(option.key)!)
   }, [offered])
 
+  // Reads the track of `id`, a set that wasn't in the rotation, as it's added (see "Changing the rotation" in
+  // docs/design/client/admin/rotation.md). Without an answer, the set stays as it was offered.
+  const readTrack = (id: string) => {
+    const request = (asked.current.get(id) ?? 0) + 1
+    asked.current.set(id, request)
+    api.GET('/api/admin/radio/rotation/candidates/{id}', { params: { path: { id } } }).then((result) => {
+      if (result.ok && asked.current.get(id) === request) setAnswers((answers) => new Map(answers).set(id, result.set))
+    })
+  }
+  // The same from one render to the next, e.g. while the clock ticks, unless they change.
+  const listed = useMemo(() => sets.map((set) => answers.get(set.id) ?? set), [sets, answers])
+
   // The set on air, as the rotation was last loaded, and the one that will be once it's saved: the first that can be
-  // played, the sets added counting as ones that can be, since saving reads their tracks (see "On air" in
-  // docs/design/server/radio.md).
+  // played, the sets added whose tracks haven't been read yet counting as ones that can be, since saving reads them (see
+  // "On air" in docs/design/server/radio.md). An answer that comes while saving is confirmed changes what it says it does.
   const onAir = rotation.current && rotation.sets.find((set) => set.id === rotation.current!.setId)
-  const head = sets.find((set) => set.skipped.length === 0)
+  const head = listed.find((set) => set.skipped.length === 0)
+  // When each set would go on air: the set under the play head goes on, if it's the set on air, or else starts now, by
+  // the browser's clock.
+  const headStartedAt = head !== undefined && head.id === onAir?.id ? Date.parse(rotation.current!.startedAt) : null
+  const now = useClock(head !== undefined && headStartedAt === null)
+  const times = startTimes(listed, headStartedAt ?? now)
+  const days = daysChanging(times, formatQuebecDayInYear)
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
   // What saving does to what's on air.
   let consequence: string
@@ -420,23 +486,31 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   return (
     <>
       <div ref={list} className="rotation-edit">
-        <PlayHead rows="[data-item]" index={head ? sets.indexOf(head) : null}>
+        <PlayHead rows="[data-item]" index={head ? listed.indexOf(head) : null}>
           <OrderedList
-            items={sets}
+            items={listed}
             keyOf={(set) => set.id}
             label={performerNames}
             name={(set) => setName(set, set.session)}
-            detail={(set) => (
-              <>
-                {set === head && <span className="visually-hidden">en ondes </span>}
-                {sessionName(set.session)}
-                {/* The set on air goes on, and another starts from its start, if its length is known. */}
-                {set === head && lengthOf(set) !== null && (
-                  <Progress startedAt={set.id === onAir?.id ? Date.parse(rotation.current!.startedAt) : null} durationMs={lengthOf(set)!} />
-                )}
-                <SetState set={set} />
-              </>
+            lead={(_, i) => (
+              <span className="rotation-set-time">
+                {days[i] && <span className="rotation-edit-day">{days[i]}</span>}
+                {times[i] !== null && timeFormat.format(times[i])}
+              </span>
             )}
+            detail={(set) => {
+              const length = lengthOf(set)
+              return (
+                <>
+                  {set === head && <span className="visually-hidden">en ondes </span>}
+                  {sessionName(set.session)}
+                  {length !== null && ` · ${lengthText(length)}`}
+                  {/* The set on air goes on, and another starts from its start, if its length is known. */}
+                  {set === head && length !== null && <Progress startedAt={headStartedAt} durationMs={length} />}
+                  <SetState set={set} />
+                </>
+              )
+            }}
             onChange={setSets}
             nextFocus={pickerId}
             disabled={locked}
@@ -455,7 +529,9 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
             selected={null}
             onSelect={(id) => {
               const set = offered.find((set) => set.id === id)
-              if (set) setSets([...sets, set])
+              if (!set) return
+              setSets([...sets, set])
+              if (!shown.some((other) => other.id === id)) readTrack(id)
             }}
             filter={filter}
             placeholder={

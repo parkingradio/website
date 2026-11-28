@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import { SEED_SESSIONS } from '../seed-data.ts'
 import { PREVIEW_SUFFIX } from '../../server/src/radio/stand-in-tracks.ts'
 import { drag } from './drag.ts'
-import { test, expect, adminMenu, logIn } from './fixtures.ts'
+import { test, expect, adminMenu, logIn, scrollsSideways } from './fixtures.ts'
 import type { Schemas } from './fixtures.ts'
 
 // The radio's rotation of sets, which global-setup.ts seeds. There's only one, so every test that reads it or saves it is
@@ -64,6 +64,34 @@ test('Rotation radio lists the sets from the one on air, with why the skipped on
 // What a set being changed is called: its performers.
 const performersOf = (item: Locator) => item.locator('.admin-ordered-text').evaluate((text) => text.firstChild!.textContent!)
 
+// For each of the rows `rows`, when its set goes on air, or would once the rotation being changed is saved, without the
+// day before it whenever it changes, or '' when it has no time, and whether it's skipped, which it says.
+const timesOf = (rows: Locator) =>
+  rows.evaluateAll((rows) =>
+    rows.map((row) => ({
+      time: Array.from(row.querySelector('.rotation-set-time')!.childNodes)
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent)
+        .join(''),
+      skipped: row.textContent!.includes('Pas diffusé'),
+    })),
+  )
+const A_TIME = /^\d\d\s*h\s*\d\d$/
+
+test('while the rotation is changed, each set that can be played says when it would go on air, at phone width', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'the desktop project checks the times against those of the rotation once saved')
+  await logIn(page, { at: '/admin/rotation' })
+  await page.getByRole('button', { name: 'modifier' }).click()
+  const items = page.locator('.admin-ordered > li')
+  await expect(items.first()).toBeVisible()
+  // Every set that isn't skipped has been read, so it has its length, and so a time.
+  const times = await timesOf(items)
+  expect(times.map(({ time }) => time)).toEqual(times.map(({ skipped }) => (skipped ? '' : expect.stringMatching(A_TIME))))
+  expect(await timesOf(items.filter({ hasText: 'Kwame Asante' }))).toEqual([{ time: '', skipped: true }])
+  expect(await scrollsSideways(page)).toBe(false)
+  await page.getByRole('button', { name: 'annuler' }).click()
+})
+
 test('a set is added, one taken out, and another moved, then the rotation is saved once confirmed', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'there is only one rotation, which the mobile project reads meanwhile')
   await logIn(page, { at: '/admin/rotation' })
@@ -85,6 +113,9 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     await expect(items).toHaveCount(seeded.sets.length + 1)
     await expect(picker).toBeFocused()
     expect(await performersOf(items.last())).toBe('ORVAL')
+    // Its track, read as it's added, which the stand-in for SoundCloud gives as it is on SoundCloud (see
+    // server/src/radio/stand-in-tracks.ts), lasts 56:35.
+    await expect(items.last()).toContainText(' · 57\u00a0min')
 
     // Neither the set on air, which is first, nor the skipped one, which the mobile project checks.
     let out = 1
@@ -98,6 +129,11 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     await drag(page, items.nth(last).getByRole('button', { name: /^réordonner Set de ORVAL/ }), items.nth(last - 1), { touch: false })
     expect(await performersOf(items.nth(last - 1))).toBe('ORVAL')
     const changed = await Promise.all((await items.all()).map(performersOf))
+
+    // When each set would go on air: each one that can be played, ORVAL's included, whose length is known once its track
+    // is read.
+    const projected = await timesOf(items)
+    expect(projected.map(({ time }) => time)).toEqual(projected.map(({ skipped }) => (skipped ? '' : expect.stringMatching(A_TIME))))
 
     await page.getByRole('button', { name: 'enregistrer' }).click()
     // In a dialog over the page, which Escape closes, going back to the list.
@@ -120,6 +156,9 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     await expect(shownSets(page)).toHaveCount(seeded.sets.length)
     await expect(shownSets(page).filter({ hasText: 'ORVAL' })).toHaveCount(1)
     await expect(shownSets(page).filter({ hasText: removed })).toHaveCount(0)
+    // When each set goes on air, as it was worked out while it was changed, the set on air having gone on.
+    const shown = await timesOf(shownSets(page))
+    expect(shown).toEqual(projected)
   } finally {
     // The seeded rotation, in its order, for the tests that come after.
     const restored = await page.request.put(ROTATION, { data: { sets: seeded.sets.map((set) => set.id) } })

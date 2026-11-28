@@ -32,20 +32,32 @@ rotation can't be loaded, the page says why in place of the list, without « mod
 The page loads the rotation again shortly after the set on air ends, though never sooner than several seconds after it
 last loaded it, so that a browser whose clock is ahead doesn't load it again and again, and when the browser's tab is
 shown again, at most once a minute. It does so even while the rotation is being changed, which leaves the list being
-changed as it is, but can change what saving it says it does. When it can't be loaded again, the page goes on showing
-what it loaded last, and says why above it.
+changed as it is, but can change what saving it says it does, and when its sets would go on air, e.g. once the set on
+air ends. When it can't be loaded again, the page goes on showing what it loaded last, and says why above it.
 
 ## Changing the rotation
 
 « modifier » turns the list, in the order shown, into one that can be changed like a set's performers (see
 [A set's form, in Sessions](sessions.md#a-sets-form)): numbered, with handles that move the sets (see
-[Reordering](layout.md#reordering)), and a « × » that takes one out. It says why sets are skipped, with their
-warnings, but without times. The play head is over the first set that isn't skipped, the sets added counting as ones
-that can be played, since saving reads their tracks: saving puts that set on air (see
+[Reordering](layout.md#reordering)), and a « × » that takes one out. It says why sets are skipped, with their warnings,
+and the length of each set whose track has been read. Each time a set that wasn't in the rotation is added, its track is
+read (see
+[`GET /api/admin/radio/rotation/candidates/:id`](../../server/radio.md#get-apiadminradiorotationcandidatesid-admin)):
+once that answers, the set is shown as the answer says, with its length, why it's skipped, if it is, and its warning,
+like the others. Until it answers, or when it can't, the set is shown as its last answer since « modifier » was clicked
+said, if there's one, or else its length isn't known, and it counts as one that can be played, since saving reads its
+track. The play head is over the first set that isn't skipped: saving puts that set on air (see
 [On air](../../server/radio.md#on-air)), so moving another set there puts it on air. The list moves under it, rather
 than it moving with a set. Its bar goes on moving when it's the set on air, and otherwise shows « 0:00 » and its length,
-since saving starts it from its start, or no bar while its length isn't known, e.g. for a set just added. With no set
-that can be played, there's no play head.
+since saving starts it from its start, or no bar while its length isn't known. With no set that can be played, there's
+no play head.
+
+Each set that can be played shows when it would go on air once the list is saved (see
+[On air](../../server/radio.md#on-air)): the set under the play head shows when it went on air, if it's the set on air,
+or else now, by the browser's clock, so that the times move on with it; then each set after it that can be played shows
+when the one before it ends. A set whose length isn't known shows none, and the sets after the first of these have no
+time. Skipped sets have none either, as when the rotation isn't being changed. The day shows whenever it changes, in the
+row of the first set of that day, since the rows move.
 
 Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus. It offers the sets that can be
 added (see
@@ -80,4 +92,6 @@ no longer exists, naming the set (see [Names, in Sessions](sessions.md#names)), 
 - `GET /api/admin/radio/credentials`, for whether the credentials of the SoundCloud app have been entered.
 - `GET /api/admin/radio/rotation/candidates`, for the sets that can be added, each time « modifier » is clicked, and
   again when saving says that a set can't be added.
+- `GET /api/admin/radio/rotation/candidates/:id`, for what a set's track says of it, each time a set that wasn't in the
+  rotation is added.
 - `PUT /api/admin/radio/rotation`, to save it.

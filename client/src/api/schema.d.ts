@@ -979,7 +979,7 @@ export interface paths {
         };
         /** The radio's rotation of sets, in order, from the set on air, or, off air, from where the radio comes back on air, with when each set goes on air next, and the sets that are skipped, and why */
         get: operations["get_rotation"];
-        /** Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds, which can put the first of them on air then, and returns the rotation */
+        /** Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds that are due to be read, e.g. those not read within the hour by `get_rotation_candidate`. That can put the first of them on air then. Returns the rotation */
         put: operations["update_rotation_sets"];
         post?: never;
         delete?: never;
@@ -997,6 +997,23 @@ export interface paths {
         };
         /** The sets that can be added to the radio's rotation of sets, and aren't in it, the most recent session first */
         get: operations["list_rotation_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/radio/rotation/candidates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A set that can be added to the radio's rotation of sets, as it would be once added: its track's length, and why it would be skipped, if it would. First reads its track from SoundCloud when it's due to be read, e.g. when it hasn't been read within the hour, which can take a few seconds */
+        get: operations["get_rotation_candidate"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4678,6 +4695,25 @@ export interface components {
                 start: string | null;
             };
         };
+        RotationCandidateWithTrack: {
+            id: string;
+            /** @description The artists who played, in order */
+            performers: components["schemas"]["Reference"][];
+            /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
+            soundcloudTrack: components["schemas"]["SessionLink"] | null;
+            youtubeVideo: components["schemas"]["SessionLink"] | null;
+            session: {
+                id: string;
+                title: string;
+                start: string | null;
+            };
+            /** @description Its track's length, in milliseconds, as last read, or null when it hasn't been read */
+            durationMs: number | null;
+            /** @description Why the last read of its track failed, or null */
+            readError: string | null;
+            /** @description Why it's skipped, or empty when it isn't */
+            skipped: components["schemas"]["RotationSkipReason"][];
+        };
         RotationError: {
             /** @constant */
             ok: false;
@@ -5415,6 +5451,68 @@ export interface operations {
             };
             /** @description Default Response */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_rotation_candidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        set: components["schemas"]["RotationCandidateWithTrack"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

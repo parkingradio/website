@@ -8,7 +8,7 @@ import { SetBody, link, soundcloudTrackLink } from '../sessions/routes.js'
 import type { StoredSession, StoredSet } from '../sessions/store.js'
 import { SKIP_REASONS, fromHead, isOnAir, upcoming } from './rotation.js'
 import { RotationRefused } from './rotation-store.js'
-import type { Rotation, RotationStore } from './rotation-store.js'
+import type { Rotation, RotationStore, SetWithTrack } from './rotation-store.js'
 import type { SoundCloudApp } from './soundcloud-app.js'
 import type { TrackStreams } from './streams.js'
 import type { TrackReads } from './track-reads.js'
@@ -19,7 +19,7 @@ import type { TrackReads } from './track-reads.js'
 // How many of the sets that come next `GET /api/on-air` gives at most.
 const MAX_UPCOMING = 1000
 // How long changing the rotation waits for the tracks that are due to be read, e.g. those of the sets it adds, before it
-// responds.
+// responds, and asking for a set that can be added waits for its track.
 const READ_NEW_TRACKS_MS = 8 * 1000
 
 const SkipReason = z.enum(SKIP_REASONS).meta({ id: 'RotationSkipReason' })
@@ -53,10 +53,15 @@ const RotationCandidate = SetBody.pick({ id: true, performers: true, soundcloudT
   .meta({ id: 'RotationCandidate' })
 type RotationCandidate = z.infer<typeof RotationCandidate>
 
-const RotationSet = RotationCandidate.extend({
+// One of them, with what was read of its track: as it is in the rotation, or as it would be once added.
+const RotationCandidateWithTrack = RotationCandidate.extend({
   durationMs: z.number().int().positive().nullable().meta({ description: "Its track's length, in milliseconds, as last read, or null when it hasn't been read" }),
   readError: z.string().nullable().meta({ description: 'Why the last read of its track failed, or null' }),
   skipped: z.array(SkipReason).meta({ description: "Why it's skipped, or empty when it isn't" }),
+}).meta({ id: 'RotationCandidateWithTrack' })
+type RotationCandidateWithTrack = z.infer<typeof RotationCandidateWithTrack>
+
+const RotationSet = RotationCandidateWithTrack.extend({
   startsAt: Timestamp.nullable().meta({
     description: 'When it goes on air next, if nothing changes until then, or, for the set on air, when it went on air. Null when it is skipped, or the radio is off air',
   }),
@@ -92,6 +97,7 @@ const RotationError = ApiError.extend({
 
 const UPCOMING_ERROR = `\`upcoming\` must be a whole number from 0 to ${MAX_UPCOMING}`
 const NOT_IN_ROTATION = { ok: false as const, error: 'Not a set of the rotation that can be played' }
+const NOT_A_CANDIDATE = { ok: false as const, error: 'Not a set that can be added to the rotation' }
 
 function onAirSet({ set, session }: { set: StoredSet; session: StoredSession }): OnAirSet {
   // Its session is announced, so it has a start (see `sessions_announced` in db/schema.ts).
@@ -107,6 +113,11 @@ function candidate({ set, session }: { set: StoredSet; session: StoredSession })
     youtubeVideo: link(set.youtubeVideoId, youtubeVideoUrl),
     session: { id: session.id, title: sessionTitle(session), start: session.startAt?.toISOString() ?? null },
   }
+}
+
+// A set of the rotation, or one that can be added to it, with what was read of its track.
+function withTrack(entry: SetWithTrack): RotationCandidateWithTrack {
+  return { ...candidate(entry), durationMs: entry.durationMs, readError: entry.read?.error ?? null, skipped: [...entry.skipped] }
 }
 
 const iso = (time: number) => new Date(time).toISOString()
@@ -125,10 +136,7 @@ function rotationResponse(rotation: Rotation): RadioRotation {
     updatedAt: rotation.updatedAt?.toISOString() ?? null,
     current: isOnAir(saved) ? { setId: saved.setId, startedAt: iso(saved.startedAt) } : null,
     sets: fromHead(rotation.entries, saved).map((entry) => ({
-      ...candidate(entry),
-      durationMs: entry.durationMs,
-      readError: entry.read?.error ?? null,
-      skipped: [...entry.skipped],
+      ...withTrack(entry),
       startsAt: startsAt.has(entry.set.id) ? iso(startsAt.get(entry.set.id)!) : null,
     })),
   }
@@ -233,7 +241,7 @@ export async function rotationRoutes(app: FastifyInstance, { soundcloud, store, 
       schema: {
         operationId: 'update_rotation_sets',
         summary:
-          "Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds, which can put the first of them on air then, and returns the rotation",
+          "Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds that are due to be read, e.g. those not read within the hour by `get_rotation_candidate`. That can put the first of them on air then. Returns the rotation",
         tags: ['Radio'],
         body: RotationRequest,
         response: { 200: RadioRotation, 400: RotationError, 409: RotationError },
@@ -269,6 +277,29 @@ export async function rotationRoutes(app: FastifyInstance, { soundcloud, store, 
     async () => {
       const sets = (await store.candidates()).map(candidate)
       return { ok: true as const, total: sets.length, sets }
+    },
+  )
+
+  api.get(
+    '/api/admin/radio/rotation/candidates/:id',
+    {
+      config: { admin: true, tool: { title: "Voir un set qu'on peut ajouter à la rotation" } },
+      schema: {
+        operationId: 'get_rotation_candidate',
+        summary:
+          "A set that can be added to the radio's rotation of sets, as it would be once added: its track's length, and why it would be skipped, if it would. First reads its track from SoundCloud when it's due to be read, e.g. when it hasn't been read within the hour, which can take a few seconds",
+        tags: ['Radio'],
+        params: z.object({ id: SetId }),
+        response: { 200: z.object({ ok: z.literal(true), set: RotationCandidateWithTrack }), 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const found = await store.candidate(request.params.id)
+      if (!found) return reply.status(404).send(NOT_A_CANDIDATE)
+      await reads.readIfDue(found.track, READ_NEW_TRACKS_MS)
+      // As it is once its track is read, unless it can't be added anymore meanwhile, e.g. because it was just added.
+      const read = await store.candidate(request.params.id)
+      return read ? { ok: true as const, set: withTrack(read) } : reply.status(404).send(NOT_A_CANDIDATE)
     },
   )
 }

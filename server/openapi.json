@@ -3593,6 +3593,108 @@
         ],
         "additionalProperties": false
       },
+      "RotationCandidateWithTrack": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "performers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "The artists who played, in order"
+          },
+          "soundcloudTrack": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public"
+          },
+          "youtubeVideo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "start"
+            ],
+            "additionalProperties": false
+          },
+          "durationMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its track's length, in milliseconds, as last read, or null when it hasn't been read"
+          },
+          "readError": {
+            "description": "Why the last read of its track failed, or null",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RotationSkipReason"
+            },
+            "description": "Why it's skipped, or empty when it isn't"
+          }
+        },
+        "required": [
+          "id",
+          "performers",
+          "soundcloudTrack",
+          "youtubeVideo",
+          "session",
+          "durationMs",
+          "readError",
+          "skipped"
+        ],
+        "additionalProperties": false
+      },
       "RotationError": {
         "type": "object",
         "properties": {
@@ -5928,7 +6030,7 @@
       },
       "put": {
         "operationId": "update_rotation_sets",
-        "summary": "Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds, which can put the first of them on air then, and returns the rotation",
+        "summary": "Makes the radio's rotation of sets these sets, in this order, from the set to have on air: the first that isn't skipped goes on air right away, from its start, unless it's the set already on air, which goes on. So the rotation, as `get_rotation` gives it, changes nothing, and taking out its first set puts the next one on air. Read it again just before changing it: the set on air moves along as sets end, and sending a rotation read before then puts its first set back on air, from its start. Then reads the tracks of the sets it adds that are due to be read, e.g. those not read within the hour by `get_rotation_candidate`. That can put the first of them on air then. Returns the rotation",
         "tags": [
           "Radio"
         ],
@@ -6064,6 +6166,93 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/radio/rotation/candidates/{id}": {
+      "get": {
+        "operationId": "get_rotation_candidate",
+        "summary": "A set that can be added to the radio's rotation of sets, as it would be once added: its track's length, and why it would be skipped, if it would. First reads its track from SoundCloud when it's due to be read, e.g. when it hasn't been read within the hour, which can take a few seconds",
+        "tags": [
+          "Radio"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "set": {
+                      "$ref": "#/components/schemas/RotationCandidateWithTrack"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "set"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "Default Response",
             "content": {
               "application/json": {

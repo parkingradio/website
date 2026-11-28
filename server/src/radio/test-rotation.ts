@@ -13,6 +13,7 @@ import { sessionsRoutes } from '../sessions/routes.js'
 import { sessionsStore } from '../sessions/store.js'
 import { rotationRoutes } from './rotation-routes.js'
 import { rotationStore } from './rotation-store.js'
+import { NoSoundCloudCredentials } from './soundcloud-app.js'
 import type { SoundCloudApp } from './soundcloud-app.js'
 import type { SoundCloudClient } from './soundcloud.js'
 import { trackStreams } from './streams.js'
@@ -21,11 +22,12 @@ import type { TrackReads } from './track-reads.js'
 
 // For the tests of the rotation of sets against a real database (*.db.test.ts): a database of their own, and an app with
 // the routes of the rotation, and those of sessions and artists, which its sets are added and changed through, and a fake
-// SoundCloud, which reads tracks with `readTrack`. Each link is its own track, whose id is the link without its secret.
+// SoundCloud, which reads tracks with `readTrack` while `entered` says that the credentials of the SoundCloud app are
+// entered. Each link is its own track, whose id is the link without its secret.
 
 export type RotationTestApp = { database: TestDatabase; app: FastifyInstance; reads: TrackReads }
 
-export async function rotationTestApp(readTrack: SoundCloudClient['readTrack']): Promise<RotationTestApp> {
+export async function rotationTestApp(readTrack: SoundCloudClient['readTrack'], entered = () => true): Promise<RotationTestApp> {
   process.env.JWT_SECRET = 'test-secret'
   const database = await testDatabase()
   const app = Fastify()
@@ -36,7 +38,12 @@ export async function rotationTestApp(readTrack: SoundCloudClient['readTrack']):
   await app.register(sessionsRoutes, { store: sessionsStore(database.db), photos: NO_PHOTOS, resolveTrack })
   await app.register(artistsRoutes, { store: artistsStore(database.db), photos: NO_PHOTOS })
   const client = { readTrack, hlsStream: async (trackId: string) => ({ url: `https://cdn.test/${encodeURIComponent(trackId)}.m3u8`, expiresAt: Date.now() + 7_200_000 }) }
-  const soundcloud = { client: async () => client } as unknown as SoundCloudApp
+  const soundcloud = {
+    client: async () => {
+      if (!entered()) throw new NoSoundCloudCredentials()
+      return client
+    },
+  } as unknown as SoundCloudApp
   const store = rotationStore(database.db)
   const reads = trackReads({ store, soundcloud, log: app.log })
   await app.register(rotationRoutes, { soundcloud, store, reads, streams: trackStreams() })

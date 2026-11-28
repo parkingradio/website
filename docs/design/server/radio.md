@@ -28,7 +28,7 @@ conditions, or while its track can't be played in full. The rotation says why, a
 | `no-soundcloud-track` | It has no track on SoundCloud |
 | `no-youtube-video` | It has no video on YouTube |
 | `not-announced` | Its session isn't announced |
-| `unread` | Its track hasn't been read from SoundCloud yet, since it was added or its link changed (see [Reading the tracks](#reading-the-tracks)) |
+| `unread` | Its track hasn't been read from SoundCloud through the set's link, e.g. because it was just added, or its link changed (see [Reading the tracks](#reading-the-tracks)) |
 | `missing` | SoundCloud shows no track at the set's link anymore, e.g. because it was deleted, made private, or its private link was reset |
 | `unexpected` | SoundCloud describes the track unexpectedly |
 | `preview` | Only a 30 second preview of the track can be played |
@@ -72,8 +72,11 @@ was when the server restarts, or while SoundCloud can't be reached. It reads:
 - every minute, the tracks of the rotation that haven't been read through the link their set has, e.g. those of the sets
   that were just added, or whose link changed, and those whose last read failed a minute ago or more,
 - every hour, every track of the rotation, since a track can be deleted, made private, or blocked on SoundCloud,
-- and when the rotation is changed, right away, those that are due to be read as above, so that the sets added to it
-  are read then, unless they were read within the hour.
+- when the rotation is changed, right away, those that are due to be read as above, so that the sets added to it are
+  read then, unless they were read within the hour,
+- and when one of the sets that can be added is asked for (see
+  [`GET /api/admin/radio/rotation/candidates/:id`](#get-apiadminradiorotationcandidatesid-admin)), its track, if it's
+  due to be read as above, so that its length, and whether it would be skipped, are known before it's added.
 
 When a read fails, e.g. because SoundCloud can't be reached, the radio goes on with what was read before, and admins see
 why it failed. Until the credentials of the SoundCloud app are entered, no track can be read, so the sets that haven't
@@ -117,11 +120,11 @@ pattern is used whole as the artist, with no event or date.
 
 ## The SoundCloud app
 
-The server reads playlists, and the tracks of the rotation's sets, gets the streams of their tracks, and resolves the
-links to the tracks of [sets](sessions.md#links), through a SoundCloud app, whose credentials (a client ID and a secret)
-are found in the apps of the SoundCloud account it belongs to. They're kept in the database rather than set when the
-site is deployed, so that they can be changed without deploying it again. Its secret is never sent back once it's
-entered: it can only be replaced. It never appears in the logs, or in any error.
+The server reads playlists, and the tracks of the rotation's sets and of the sets that can be added to it, gets the
+streams of the tracks it plays, and resolves the links to the tracks of [sets](sessions.md#links), through a SoundCloud
+app, whose credentials (a client ID and a secret) are found in the apps of the SoundCloud account it belongs to. They're
+kept in the database rather than set when the site is deployed, so that they can be changed without deploying it again.
+Its secret is never sent back once it's entered: it can only be replaced. It never appears in the logs, or in any error.
 
 The server checks credentials with SoundCloud before it saves them, so that a typo can't take the radio off air, and
 the radio reads its playlist through them right away, and the tracks of the rotation of sets within a minute.
@@ -210,9 +213,9 @@ isn't in the rotation yet can only be added when it meets the conditions of [Whi
 already is stays, even when it doesn't meet them anymore, skipped. Then reads the tracks that are due to be read (see
 [Reading the tracks](#reading-the-tracks)), for up to about 8 seconds, those that aren't read by then being read later,
 as they would anyway. When that makes another of the sets the first that can be played, e.g. a set just added at the
-play head, it goes on air then, as if the rotation were given again, unless it has been changed again meanwhile. Then
-responds like [`GET /api/admin/radio/rotation`](#get-apiadminradiorotation-admin). It sets `updatedBy` and `updatedAt`,
-even when nothing changes.
+play head whose track hadn't been read, it goes on air then, as if the rotation were given again, unless it has been
+changed again meanwhile. Then responds like [`GET /api/admin/radio/rotation`](#get-apiadminradiorotation-admin). It sets
+`updatedBy` and `updatedAt`, even when nothing changes.
 
 Fails with:
 
@@ -230,6 +233,20 @@ The errors about one of the sets have `setIndex`, its place in `sets`, from 0. W
 | `ok` | `true` | |
 | `total` | number | How many sets `sets` has (see [Conventions](README.md#conventions)) |
 | `sets` | list of objects | The sets that can be added to the rotation (see [Which sets](#which-sets)), and aren't in it, each with its `id`, `performers`, `soundcloudTrack`, `youtubeVideo` and `session`, as the rotation's sets have them. The most recent session first (by `start`), then in the session's order |
+
+## `GET /api/admin/radio/rotation/candidates/:id` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `set` | object | The set, as [`GET /api/admin/radio/rotation/candidates`](#get-apiadminradiorotationcandidates-admin) gives it, with `durationMs`, `readError` and `skipped`, as the rotation's sets have them: what it would be once added |
+
+A set that can be added to the rotation, with what its track says of it. First reads its track, when it's due to be read
+(see [Reading the tracks](#reading-the-tracks)), waiting up to about 8 seconds, like changing the rotation: a read that
+hasn't ended by then goes on, and what it reads is kept once it ends. So `skipped` has its track's reasons, if any, e.g.
+`preview`, or `unread` while its track has never been read through its link, e.g. because the read failed or hasn't
+ended. Fails with 404 when it isn't one of the sets that can be added, before or once its track is read, e.g. because
+it's in the rotation already.
 
 ## `GET /api/radio[?upcoming=N]`
 

@@ -110,6 +110,24 @@ describe('reading the tracks of the rotation', () => {
     expect(saved).toEqual([{ trackId: '1', link: LINK, outcome: { read: PLAYABLE } }])
   })
 
+  it('reads a track that is due, e.g. that of a set that can be added, sharing a read under way, until the time is up', async () => {
+    const { reads, readTrack, saved } = setUp({ reads: [null] })
+    await reads.readIfDue({ trackId: '1', link: LINK, read: stored() }, 10)
+    await reads.readIfDue({ trackId: '1', link: LINK, read: stored({ state: null, error: 'x', attemptedAt: new Date(NOW - RETRY_AFTER_MS + 1) }) }, 10)
+    expect(readTrack).not.toHaveBeenCalled()
+
+    let answer!: (read: TrackRead) => void
+    readTrack.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    await reads.readIfDue({ trackId: '1', link: LINK, read: stored({ link: 'https://soundcloud.com/parkingdotradio/before' }) }, 10)
+    expect(saved).toEqual([])
+    // The rotation's reads share it.
+    const due = reads.readDue()
+    answer(PLAYABLE)
+    await due
+    expect(readTrack).toHaveBeenCalledTimes(1)
+    expect(saved).toEqual([{ trackId: '1', link: LINK, outcome: { read: PLAYABLE } }])
+  })
+
   it('stops reading, and cuts short the reads under way', async () => {
     const { reads, readTrack, saved } = setUp({ reads: [null, null, null, null, null, null] })
     readTrack.mockImplementation(
