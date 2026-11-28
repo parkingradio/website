@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { Announcements } from '@dnd-kit/core'
@@ -43,6 +43,17 @@ export function SortableList({
 
   // dnd-kit says the item is over its own place as soon as it's picked up, which would cut what's announced then.
   const pickedUp = useRef(false)
+
+  // Where the page was scrolled to when an item was dropped in another place, which is put back once the move is
+  // rendered, if it changed meanwhile: WebKit, in a list within a container of container queries (e.g. the radio's
+  // rotation, see `.rotation-frame` in admin.css), lays the page out shorter for a moment while the move is rendered, and
+  // so scrolls it up, by as much as the item moved, when it's scrolled near its bottom.
+  const scrollAtDrop = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const y = scrollAtDrop.current
+    scrollAtDrop.current = null
+    if (y !== null && window.scrollY !== y) window.scrollTo(window.scrollX, y)
+  })
   // An item can leave the list while it's dragged, e.g. once the server answers for another change: nothing is said of
   // it, and it isn't moved.
   const listed = (...items: (string | number)[]) => items.every((id) => ids.includes(String(id)))
@@ -80,7 +91,9 @@ export function SortableList({
       onDragEnd={({ active, over }) => {
         const from = ids.indexOf(String(active.id))
         const to = over ? ids.indexOf(String(over.id)) : from
-        if (from >= 0 && to >= 0 && from !== to) onMove(from, to)
+        if (from < 0 || to < 0 || from === to) return
+        scrollAtDrop.current = window.scrollY
+        onMove(from, to)
       }}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>

@@ -48,7 +48,7 @@ const OnAirNow = z
 const SetStream = z.object({ ok: z.literal(true), url: z.string(), expiresAt: Timestamp }).meta({ id: 'SetStream' })
 
 // A set of the rotation, or one that can be added to it, as the admin endpoints give it.
-const RotationCandidate = SetBody.pick({ id: true, performers: true, soundcloudTrack: true, youtubeVideo: true })
+const RotationCandidate = SetBody.pick({ id: true, performers: true, genres: true, soundcloudTrack: true, youtubeVideo: true })
   .extend({ session: z.object({ id: z.string(), title: z.string(), start: Timestamp.nullable() }) })
   .meta({ id: 'RotationCandidate' })
 type RotationCandidate = z.infer<typeof RotationCandidate>
@@ -109,6 +109,7 @@ function candidate({ set, session }: { set: StoredSet; session: StoredSession })
   return {
     id: set.id,
     performers: set.performers,
+    genres: set.genres,
     soundcloudTrack: soundcloudTrackLink(set),
     youtubeVideo: link(set.youtubeVideoId, youtubeVideoUrl),
     session: { id: session.id, title: sessionTitle(session), start: session.startAt?.toISOString() ?? null },

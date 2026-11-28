@@ -333,8 +333,8 @@
 
 /* The radio's rotation of sets, as a schedule, its rows set apart like the rows of the admin pages' tables (see
    `.admin-table`), in columns: when each set begins, then its performers, its session, and why it's skipped, if it is,
-   then its length. The day before the sets that begin on another day is a row of its own. Skipped sets are faded out,
-   and say why, so that it isn't told by color alone. */
+   with its genres beside them, then its length. The day before the sets that begin on another day is a row of its own.
+   Skipped sets are faded out, and say why, so that it isn't told by color alone. */
 .rotation-sets {
   margin: 1.5rem 0 0;
   padding: 0;
@@ -365,12 +365,76 @@
   white-space: nowrap;
 }
 
+/* As wide whatever the length, e.g. « 30 min » or « 10 h 05 », so that the genres before it line up from row to row. */
+.rotation-set-length {
+  min-width: 7ch;
+  text-align: right;
+}
+
+/* What a set is: its performers, its session, then how far into it the radio is and why it's skipped, if it is, with its
+   genres in a column on the right, as wide whatever they are, so that they line up from row to row: two genres, e.g.
+   « tech house, deep house ». Its last line takes what the genres need beyond the first two, so that the session stays
+   under the performers. The same while the rotation is changed (see `SetLines` in rotation.tsx). When the list has no
+   room for that column beside a readable text, in the editor too, e.g. on phones, the genres go under the session. */
 .rotation-set {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 23ch;
+  grid-template-rows: auto auto 1fr;
+  column-gap: 1rem;
   min-width: 0;
 }
 
+@container (width < 44rem) {
+  .rotation-set {
+    display: block;
+  }
+}
+
+.rotation-set > * {
+  grid-column: 1;
+}
+
+.rotation-set > .rotation-genres {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: start;
+}
+
+/* A set's genres, in order (see `Genres` in rotation.tsx): small grey labels, filled rather than outlined like buttons,
+   since they can't be clicked, each one whole. Screen readers read them as text, with
+   the commas between them, which are only hidden from view, as `.visually-hidden` hides (see index.css). Without
+   `.rotation-genres-tags`, they're written out, e.g. « house, techno », lines only breaking after the commas. */
+.rotation-genres {
+  color: #555;
+  font-size: 12px;
+}
+
+.rotation-genre {
+  white-space: nowrap;
+}
+
+.rotation-genres-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-block: 3px;
+}
+
+.rotation-genres-tags .rotation-genre {
+  padding: 0 5px;
+  background: #eee;
+}
+
+.rotation-genres-tags .rotation-genres-sep {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .rotation-set p,
-.admin-ordered-detail p,
 .rotation-confirm p {
   margin: 0;
 }
@@ -385,9 +449,11 @@
 
 /* The play head: a red line across the list, the frame's rather than a row's, at the top of the row under it, with
    « ▶ en ondes » on it, at its left end, and a tint over that row (see `PlayHead` in rotation.tsx). Red like the
-   environment's stamp (see layout.css). */
+   environment's stamp (see layout.css). Its width says whether there's room for the column of genres (see
+   `.rotation-set`), so it's the containing block of what's fixed in it, e.g. a tooltip. */
 .rotation-frame {
   position: relative;
+  container-type: inline-size;
 }
 
 .rotation-head {
@@ -427,9 +493,11 @@
   transform: translateY(-100%);
 }
 
-/* How far into the set under the play head the radio is: a thin bar, then the time played and the set's length. */
+/* How far into the set under the play head the radio is: a thin bar, then the time played and the set's length, under it
+   when there's no room beside it, e.g. while the rotation is changed on the narrowest phones. */
 .rotation-progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   max-width: 24rem;
@@ -468,6 +536,19 @@
 .rotation-edit .admin-ordered-text {
   flex: 1;
   min-width: 0;
+}
+
+/* Its performers and its session are tighter than in the list, like the other picks in order, and what's under the
+   performers smaller, like the details of options, but for the genres, which are as in the list. */
+.rotation-edit .rotation-set-performers,
+.rotation-edit .rotation-set-session {
+  line-height: normal;
+}
+
+.rotation-edit .rotation-set-session,
+.rotation-edit .rotation-set-more {
+  color: #666;
+  font-size: 12px;
 }
 
 /* Numbers as wide whatever their digits, so that the times after them line up. */
@@ -1118,15 +1199,9 @@ dl.admin-record {
   padding-left: 0;
 }
 
-/* An item's second line, if it has one, e.g. a set's session in the radio's rotation, smaller, like the details of
-   options. */
+/* An item's text, when it's more than its label, e.g. a set of the radio's rotation, with its session. */
 .admin-ordered-text {
   padding-block: 4px;
-}
-
-.admin-ordered-detail {
-  color: #666;
-  font-size: 12px;
 }
 
 /* The handle that drags an item to another place in its list (see sortable.tsx), as tall as the buttons beside it, but

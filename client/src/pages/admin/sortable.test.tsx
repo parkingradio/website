@@ -121,6 +121,29 @@ describe('A list reordered by dragging', () => {
     fireEvent.keyDown(handle('A'), { key: 'Escape', code: 'Escape' })
   })
 
+  it('puts the page back where it was scrolled to when an item was dropped, if the browser scrolled it while the move was rendered', async () => {
+    // Scrolled near the bottom of the page, which the browser, as WebKit does, scrolls up as the move is rendered.
+    let scrollY = 500
+    vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => scrollY)
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    const scrolledUp = (by: number) => () => {
+      scrollTo.mockClear()
+      scrollY -= by
+    }
+    const { unmount } = render(<Letters onMove={scrolledUp(80)} />)
+
+    await moveWithKeyboard(handle('D'), -2)
+    expect(letters()).toEqual(['A', 'D', 'B', 'C'])
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(0, 500)
+    unmount()
+
+    // Not when it stays where it was, nor when the item isn't moved.
+    render(<Letters onMove={scrolledUp(0)} />)
+    await moveWithKeyboard(handle('D'), -2)
+    await moveWithKeyboard(handle('D'), 1, { cancel: true })
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
   it('puts the item back when its handle loses the focus, so that keys pressed elsewhere do not drop it', async () => {
     const onMove = vi.fn()
     render(<Letters onMove={onMove} />)

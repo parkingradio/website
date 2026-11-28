@@ -185,6 +185,20 @@ describe('the rotation of sets', () => {
     expect(moved.sets.map(({ id }: { id: string }) => id)).toEqual([b, a])
   })
 
+  it("gives each set's genres, in order, in the rotation, among the sets that can be added, and for one of them", async () => {
+    const [a] = setIds(await createSession(1, { fields: { genres: ['ambient', 'techno'] } }))
+    const [b] = setIds(await createSession(1, { day: 2, fields: { genres: [] } }))
+    const [c] = setIds(await createSession(1, { day: 3, fields: { genres: ['deep-house', 'house'] } }))
+    await putRotation([a, b])
+
+    expect((await rotation()).sets.map(({ id, genres }: { id: string; genres: string[] }) => [id, genres])).toEqual([
+      [a, ['ambient', 'techno']],
+      [b, []],
+    ])
+    expect(await ok('GET', '/api/admin/radio/rotation/candidates')).toMatchObject({ sets: [{ id: c, genres: ['deep-house', 'house'] }] })
+    expect((await ok('GET', `/api/admin/radio/rotation/candidates/${c}`)).set).toMatchObject({ id: c, genres: ['deep-house', 'house'] })
+  })
+
   it('refuses a set twice, a set that does not exist, and one that cannot be added, saying why, and changes nothing then', async () => {
     const [a, b] = setIds(await createSession(2))
     const [hidden] = setIds(await createSession(1, { announced: false, day: 2, fields: { youtubeVideo: null } }))
@@ -417,6 +431,7 @@ describe('a set that can be added to the rotation', () => {
       set: {
         id: x,
         performers: [{ id: expect.any(String), name: `Artist ${created}` }],
+        genres: ['techno'],
         soundcloudTrack: { id: added.sets[0].soundcloudTrack!.id, url: linkOf(added, 0) },
         youtubeVideo: { id: video(created), url: `https://www.youtube.com/watch?v=${video(created)}` },
         session: { id: added.id, title: 'GUEST MIXES', start: '2026-10-02T21:00:00-04:00' },

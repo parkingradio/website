@@ -3534,6 +3534,58 @@
             },
             "description": "The artists who played, in order"
           },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "house",
+                "deep-house",
+                "tech-house",
+                "afro-house",
+                "amapiano",
+                "disco",
+                "nu-disco",
+                "italo",
+                "techno",
+                "hard-techno",
+                "minimal",
+                "acid",
+                "electro",
+                "trance",
+                "ebm-industrial",
+                "drum-and-bass",
+                "jungle",
+                "breakbeat",
+                "uk-garage",
+                "dubstep",
+                "bass",
+                "footwork-juke",
+                "baile-funk",
+                "hip-hop",
+                "rap",
+                "trap",
+                "rnb",
+                "funk-soul",
+                "jazz",
+                "reggae-dub",
+                "dancehall",
+                "reggaeton-latin",
+                "afrobeat",
+                "cumbia",
+                "ambient",
+                "downtempo",
+                "experimental",
+                "noise",
+                "leftfield",
+                "pop",
+                "indie-rock",
+                "punk",
+                "synthwave",
+                "hardcore-gabber"
+              ]
+            }
+          },
           "soundcloudTrack": {
             "anyOf": [
               {
@@ -3587,6 +3639,7 @@
         "required": [
           "id",
           "performers",
+          "genres",
           "soundcloudTrack",
           "youtubeVideo",
           "session"
@@ -3605,6 +3658,58 @@
               "$ref": "#/components/schemas/Reference"
             },
             "description": "The artists who played, in order"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "house",
+                "deep-house",
+                "tech-house",
+                "afro-house",
+                "amapiano",
+                "disco",
+                "nu-disco",
+                "italo",
+                "techno",
+                "hard-techno",
+                "minimal",
+                "acid",
+                "electro",
+                "trance",
+                "ebm-industrial",
+                "drum-and-bass",
+                "jungle",
+                "breakbeat",
+                "uk-garage",
+                "dubstep",
+                "bass",
+                "footwork-juke",
+                "baile-funk",
+                "hip-hop",
+                "rap",
+                "trap",
+                "rnb",
+                "funk-soul",
+                "jazz",
+                "reggae-dub",
+                "dancehall",
+                "reggaeton-latin",
+                "afrobeat",
+                "cumbia",
+                "ambient",
+                "downtempo",
+                "experimental",
+                "noise",
+                "leftfield",
+                "pop",
+                "indie-rock",
+                "punk",
+                "synthwave",
+                "hardcore-gabber"
+              ]
+            }
           },
           "soundcloudTrack": {
             "anyOf": [
@@ -3686,6 +3791,7 @@
         "required": [
           "id",
           "performers",
+          "genres",
           "soundcloudTrack",
           "youtubeVideo",
           "session",
@@ -3737,6 +3843,58 @@
               "$ref": "#/components/schemas/Reference"
             },
             "description": "The artists who played, in order"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "house",
+                "deep-house",
+                "tech-house",
+                "afro-house",
+                "amapiano",
+                "disco",
+                "nu-disco",
+                "italo",
+                "techno",
+                "hard-techno",
+                "minimal",
+                "acid",
+                "electro",
+                "trance",
+                "ebm-industrial",
+                "drum-and-bass",
+                "jungle",
+                "breakbeat",
+                "uk-garage",
+                "dubstep",
+                "bass",
+                "footwork-juke",
+                "baile-funk",
+                "hip-hop",
+                "rap",
+                "trap",
+                "rnb",
+                "funk-soul",
+                "jazz",
+                "reggae-dub",
+                "dancehall",
+                "reggaeton-latin",
+                "afrobeat",
+                "cumbia",
+                "ambient",
+                "downtempo",
+                "experimental",
+                "noise",
+                "leftfield",
+                "pop",
+                "indie-rock",
+                "punk",
+                "synthwave",
+                "hardcore-gabber"
+              ]
+            }
           },
           "soundcloudTrack": {
             "anyOf": [
@@ -3830,6 +3988,7 @@
         "required": [
           "id",
           "performers",
+          "genres",
           "soundcloudTrack",
           "youtubeVideo",
           "session",

@@ -4686,6 +4686,7 @@ export interface components {
             id: string;
             /** @description The artists who played, in order */
             performers: components["schemas"]["Reference"][];
+            genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
             /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
             soundcloudTrack: components["schemas"]["SessionLink"] | null;
             youtubeVideo: components["schemas"]["SessionLink"] | null;
@@ -4699,6 +4700,7 @@ export interface components {
             id: string;
             /** @description The artists who played, in order */
             performers: components["schemas"]["Reference"][];
+            genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
             /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
             soundcloudTrack: components["schemas"]["SessionLink"] | null;
             youtubeVideo: components["schemas"]["SessionLink"] | null;
@@ -4727,6 +4729,7 @@ export interface components {
             id: string;
             /** @description The artists who played, in order */
             performers: components["schemas"]["Reference"][];
+            genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
             /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
             soundcloudTrack: components["schemas"]["SessionLink"] | null;
             youtubeVideo: components["schemas"]["SessionLink"] | null;

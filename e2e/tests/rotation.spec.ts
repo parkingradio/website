@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import { SEED_SESSIONS } from '../seed-data.ts'
 import { PREVIEW_SUFFIX } from '../../server/src/radio/stand-in-tracks.ts'
 import { drag } from './drag.ts'
-import { test, expect, adminMenu, logIn, scrollsSideways } from './fixtures.ts'
+import { test, expect, adminMenu, logIn, NARROW, scrollsSideways } from './fixtures.ts'
 import type { Schemas } from './fixtures.ts'
 
 // The radio's rotation of sets, which global-setup.ts seeds. There's only one, so every test that reads it or saves it is
@@ -61,8 +61,97 @@ test('Rotation radio lists the sets from the one on air, with why the skipped on
   await expect(page).toHaveURL('/admin/rotation-legacy')
 })
 
+// How far apart what's laid out side by side, or one under the other, can be found, in pixels, for rounding.
+const TOLERANCE = 2
+
+type Box = { x: number; y: number; width: number; height: number }
+// Where the elements of the row `row` that `selectors` select, the first of each, are drawn, read at once, so that they're
+// of the same render, even if the set on air ends meanwhile.
+const boxesIn = (row: Locator, selectors: string[]): Promise<Box[]> =>
+  row.evaluate(
+    (row, selectors) =>
+      selectors.map((selector) => {
+        const { x, y, width, height } = row.querySelector(selector)!.getBoundingClientRect()
+        return { x, y, width, height }
+      }),
+    selectors,
+  )
+
+const genresOf = (row: Locator) => row.locator('.rotation-genres')
+
+// That the genres of the row `row` are in a column of their own, after its session and before what `after` selects, and
+// where they are.
+async function beside(row: Locator, after: string) {
+  const [session, genres, next] = await boxesIn(row, ['.rotation-set-session', '.rotation-genres', after])
+  expect(session.x + session.width).toBeLessThanOrEqual(genres.x + TOLERANCE)
+  expect(genres.x + genres.width).toBeLessThanOrEqual(next.x + TOLERANCE)
+  return genres
+}
+
+test("Rotation radio shows each set's genres in a column of their own, after what the set is, also while it's changed", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'phones show them under the session, which the mobile project checks')
+  await logIn(page, { at: '/admin/rotation' })
+  const clementine = shownSets(page).filter({ hasText: 'Clémentine Brûlée' })
+  // Screen readers read them as text, with the commas that aren't shown.
+  await expect(genresOf(clementine)).toHaveText('techno, acid')
+  const genres = await beside(clementine, '.rotation-set-length')
+
+  // Lined up from row to row, two of them fitting on a line.
+  const talia = shownSets(page).filter({ hasText: 'Talia' })
+  const [taliaGenres, tech, deep] = await boxesIn(talia, ['.rotation-genres', '.rotation-genre:first-child', '.rotation-genre:last-child'])
+  expect(Math.abs(taliaGenres.x - genres.x)).toBeLessThanOrEqual(TOLERANCE)
+  expect(Math.abs(tech.y - deep.y)).toBeLessThanOrEqual(TOLERANCE)
+  // More go on more lines, which leave the session under the performers.
+  const miro = shownSets(page).filter({ hasText: 'MIRO VELANE' })
+  await expect(miro.locator('.rotation-genre')).toHaveCount(4)
+  const [performers, session, miroGenres, first, last] = await boxesIn(miro, [
+    '.rotation-set-performers',
+    '.rotation-set-session',
+    '.rotation-genres',
+    '.rotation-genre:first-child',
+    '.rotation-genre:last-child',
+  ])
+  expect(last.y).toBeGreaterThan(first.y + TOLERANCE)
+  expect(session.y - (performers.y + performers.height)).toBeLessThanOrEqual(TOLERANCE)
+  expect(session.y + session.height).toBeLessThan(miroGenres.y + miroGenres.height)
+
+  // The same while the rotation is changed, before the « × » that takes the set out.
+  await page.getByRole('button', { name: 'modifier' }).click()
+  const item = page.locator('.admin-ordered > li').filter({ hasText: 'Clémentine Brûlée' })
+  await expect(genresOf(item)).toHaveText('techno, acid')
+  await beside(item, '[data-action="remove"]')
+
+  // The sets that can be added, found by their genres, which they show after their session, alone or with other fields.
+  const picker = page.getByRole('combobox', { name: 'Ajouter un set' })
+  await picker.click()
+  await picker.fill('ambient')
+  await expect(page.getByRole('option')).toHaveText([/^Set de ORVALGUEST MIXES, .* · ambient, techno$/])
+  await picker.fill('house guest')
+  await expect(page.getByRole('option')).toHaveText([/^Set de KALMARGUEST MIXES, .* · house, minimal$/])
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'annuler' }).click()
+})
+
+test("on phones, a set's genres are under its session, in the list and while it's changed, within the screen", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'wider screens show them in a column of their own')
+  await page.setViewportSize(NARROW)
+  await logIn(page, { at: '/admin/rotation' })
+  // Kwame's set, which is skipped, so that saving the rotation, which the desktop project does meanwhile, leaves it.
+  const under = async (row: Locator) => {
+    await expect(genresOf(row)).toHaveText('afro house, amapiano')
+    const [session, genres] = await boxesIn(row, ['.rotation-set-session', '.rotation-genres'])
+    expect(genres.y).toBeGreaterThanOrEqual(session.y + session.height - TOLERANCE)
+    expect(Math.abs(genres.x - session.x)).toBeLessThanOrEqual(TOLERANCE)
+    expect(await scrollsSideways(page)).toBe(false)
+  }
+  await under(shownSets(page).filter({ hasText: 'Kwame Asante' }))
+  await page.getByRole('button', { name: 'modifier' }).click()
+  await under(page.locator('.admin-ordered > li').filter({ hasText: 'Kwame Asante' }))
+  await page.getByRole('button', { name: 'annuler' }).click()
+})
+
 // What a set being changed is called: its performers.
-const performersOf = (item: Locator) => item.locator('.admin-ordered-text').evaluate((text) => text.firstChild!.textContent!)
+const performersOf = (item: Locator) => item.locator('.rotation-set-performers').evaluate((performers) => performers.textContent!)
 
 // For each of the rows `rows`, when its set goes on air, or would once the rotation being changed is saved, without the
 // day before it whenever it changes, or '' when it has no time, and whether it's skipped, which it says.
