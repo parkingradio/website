@@ -51,11 +51,13 @@ their performers, their session's title, and its day, written out (e.g. "samedi 
 field says which sets can be added. When they can't be loaded, the field can't be used, and the page says why.
 
 « annuler » leaves the rotation as it is. « enregistrer » only closes the list when it's as it was shown when
-« modifier » was clicked. Otherwise, it asks to confirm, next to it rather than in a dialog: « Le changement s'applique
-tout de suite à la radio. », followed, when no set is left, by « La rotation sera vide : la radio sera hors ondes. »,
-or, when every set left is skipped, by « Aucun set de la rotation ne pourra être diffusé : la radio sera hors ondes. »,
-or else, when the set on air is taken out, by « Le set en cours en sera retiré : la radio passera tout de suite au
-suivant. », then « confirmer », and « revenir », which goes back to changing the list. The rotation is saved in the
+« modifier » was clicked. Otherwise, it asks to confirm, next to it rather than in a dialog, with a sentence that says
+what saving does to what's on air (see [On air](../../server/radio.md#on-air)), the first of these that applies: that
+the radio will be off air, when the rotation would be empty, or when every set in it would be skipped, the sets added
+counting as ones that can be played, since saving reads their tracks; that it will come back on air right away, when it's
+off air; that it will go on to the next set right away, when the set on air is taken out; or else that the set on air
+goes on, and the changes apply from the next one, e.g. « Le set en cours continue : les changements s'appliquent dès le
+set suivant. ». Then come « confirmer », and « revenir », which goes back to changing the list. The rotation is saved in the
 order shown, so that the set on air comes first in the rotation's order, which changes nothing that's played. Whatever
 was saved in the meantime, e.g. by another admin, is replaced. While the page asks to confirm, and while the rotation is
 sent, which can take several seconds, since the server reads the tracks of the sets added, the list can't be changed,

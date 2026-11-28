@@ -388,14 +388,14 @@ describe('Rotation', () => {
   describe('confirming', () => {
     const confirmation = () => Array.from(document.querySelectorAll('.rotation-confirm p')).map((p) => spaced(p.textContent))
 
-    it('asks to confirm that the change applies on the radio right away, and goes back to the changes with « revenir »', async () => {
+    it('asks to confirm what the change does on the radio, here that the set on air goes on, and goes back to the changes with « revenir »', async () => {
       await modify()
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -1)
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio."])
+      expect(confirmation()).toEqual(["Le set en cours continue : les changements s'appliquent dès le set suivant."])
       // Which screen readers read along with it, as it gets the focus.
-      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer', description: "Le changement s'applique tout de suite à la radio." }))
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer', description: named("Le set en cours continue : les changements s'appliquent dès le set suivant.") }))
       // The list can't be changed meanwhile.
       expect(screen.getByRole('button', { name: /^retirer Set de Aurore/ })).toBeDisabled()
       expect(picker()).toBeDisabled()
@@ -412,19 +412,34 @@ describe('Rotation', () => {
       const remove = (...names: string[]) => names.forEach((name) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^retirer Set de ${name}`) })))
       remove('Brume')
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'Le set en cours en sera retiré : la radio passera tout de suite au suivant.'])
+      expect(confirmation()).toEqual(['Le set en cours sera retiré de la rotation : la radio passera tout de suite au set suivant.'])
 
       // Only Kwame's set, which is skipped.
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
       remove('Écume', 'Aurore')
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'Aucun set de la rotation ne pourra être diffusé : la radio sera hors ondes.'])
+      expect(confirmation()).toEqual(['Aucun set de la rotation ne pourra être diffusé : la radio sera hors ondes.'])
 
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
       remove('Kwame')
       expect(document.activeElement).toBe(picker())
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-      expect(confirmation()).toEqual(["Le changement s'applique tout de suite à la radio.", 'La rotation sera vide : la radio sera hors ondes.'])
+      expect(confirmation()).toEqual(['La rotation sera vide : la radio sera hors ondes.'])
+    })
+
+    it('says when the radio, off air, comes back on air, with a set added, which counts as one that can be played', async () => {
+      const skipped = (set: RotationSet): RotationSet => ({ ...set, skipped: ['cancelled'], startsAt: null })
+      await modify({ [ROTATION_URL]: { ...ROTATION, current: null, sets: [A, K, B, C].map(skipped) } })
+      pick('Set de Fréquence')
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(['La radio reviendra tout de suite en ondes.'])
+
+      // Without it, none can.
+      fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Fréquence/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Aurore/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(['Aucun set de la rotation ne pourra être diffusé : la radio sera hors ondes.'])
     })
   })
 

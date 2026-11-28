@@ -87,7 +87,8 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     const changed = await Promise.all((await items.all()).map(performersOf))
 
     await page.getByRole('button', { name: 'enregistrer' }).click()
-    await expect(page.getByText("Le changement s'applique tout de suite à la radio.")).toBeVisible()
+    // The set on air stays: it goes on.
+    await expect(page.getByRole('button', { name: 'confirmer' })).toHaveAccessibleDescription("Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant.")
     await page.getByRole('button', { name: 'confirmer' }).click()
     await expect(page.getByText('La rotation a été enregistrée.')).toBeVisible()
 

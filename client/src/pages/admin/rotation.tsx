@@ -302,10 +302,14 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
 
   const onAir = rotation.current?.setId
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
-  let consequence: string | null = null
+  // What saving does to what's on air (see "On air" in docs/design/server/radio.md). The sets added count as ones that can
+  // be played, since saving reads their tracks.
+  let consequence: string
   if (sets.length === 0) consequence = 'La rotation sera vide\u00a0: la radio sera hors ondes.'
   else if (sets.every((set) => set.skipped.length > 0)) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
-  else if (onAir && !sets.some((set) => set.id === onAir)) consequence = 'Le set en cours en sera retiré\u00a0: la radio passera tout de suite au suivant.'
+  else if (!onAir) consequence = 'La radio reviendra tout de suite en ondes.'
+  else if (!sets.some((set) => set.id === onAir)) consequence = 'Le set en cours sera retiré de la rotation\u00a0: la radio passera tout de suite au set suivant.'
+  else consequence = "Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant."
 
   const send = async () => {
     setStep('sending')
@@ -393,10 +397,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
         </div>
       ) : (
         <div className="admin-notice rotation-confirm">
-          <div id={confirmationId}>
-            <p>Le changement s'applique tout de suite à la radio.</p>
-            {consequence && <p>{consequence}</p>}
-          </div>
+          <p id={confirmationId}>{consequence}</p>
           <div className="admin-toolbar">
             <button ref={confirm} type="button" className="admin-primary" aria-describedby={confirmationId} disabled={step === 'sending'} onClick={send}>
               {step === 'sending' ? 'enregistrement…' : 'confirmer'}
