@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Checks the credentials of the SoundCloud app the radio reads playlists through, against a real database. Saving them
-# takes credentials SoundCloud accepts, which these tests don't have, so this only checks what comes before that:
+# Checks the credentials of the SoundCloud app the radio reads playlists through, against a real database. Saving them is
+# checked by 033-rotation.sh, with the stand-in for SoundCloud, so this only checks what comes before that:
 # - the endpoints require a session
 # - there are none until they're entered
 # - credentials that aren't valid are refused before SoundCloud is asked about them
@@ -23,6 +23,8 @@ expect_status 200
 cookie="$(session_cookie)"
 
 echo "  there are no credentials until they're entered"
+# Which other checks may have entered (e.g. 033-rotation.sh).
+sql "delete from soundcloud_credentials" >/dev/null
 request --header "Cookie: ${cookie}" "$URL"
 expect_status 200
 expect_body_contains '{"ok":true,"credentials":null}'

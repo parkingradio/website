@@ -79,7 +79,9 @@ It goes through the server's API, as an admin of its own, `seed@example.com`, wh
 who is then listed among the admins. You still log in as your own admin. Seeding again only adds the artists and the
 collectives that aren't there, by their email, or by their name for those without one, so to seed an artist or a
 collective again, delete them first. It only seeds the sessions while there are none, so to seed them again, delete them
-all first. It doesn't change any setting, e.g. feature flags.
+all first. It doesn't change any setting, e.g. feature flags. With `SOUNDCLOUD_STAND_IN` (see "SoundCloud" below), it
+also gives the sets their tracks, entering the stand-in's credentials if none are entered, and fills the radio's
+rotation of sets.
 
 It logs in, and a few artists and collectives apply through the "Appliquer" form, with the token that the Turnstile test
 keys from `.env.example` accept, which needs Cloudflare to be reachable. It refuses to seed when `MAIL_DOMAIN` is set,
@@ -91,6 +93,14 @@ since the server would then send emails.
 accepts any Discord credentials in the right format on the Configuration page, and gives them made-up names. The
 integration and browser tests use it too. To check credentials with Discord itself, e.g. with a bot on a test server of
 your own, remove it from `.env` (see "Discord" in [docs/deployment.md](docs/deployment.md#discord)).
+
+### SoundCloud
+
+`SOUNDCLOUD_STAND_IN`, which `.env.example` sets, has the server use a stand-in for SoundCloud, so that nothing reaches
+it: it accepts any credentials, knows the tracks of `server/src/radio/stand-in-tracks.ts`, and makes up any other, of
+which only a preview plays when its name ends with `-preview`. It has no playlists and no streams, so nothing plays. The
+integration and browser tests use it too. To read SoundCloud itself, remove it from `.env`, and enter a SoundCloud app's
+credentials on the Configuration page.
 
 ### Several checkouts
 

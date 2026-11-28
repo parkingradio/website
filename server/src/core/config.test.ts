@@ -106,6 +106,17 @@ describe('config', () => {
     })
   })
 
+  describe('soundcloudStandIn', () => {
+    it('is on only when SOUNDCLOUD_STAND_IN is true', () => {
+      process.env.SOUNDCLOUD_STAND_IN = 'true'
+      expect(config.soundcloudStandIn).toBe(true)
+      process.env.SOUNDCLOUD_STAND_IN = 'false'
+      expect(config.soundcloudStandIn).toBe(false)
+      delete process.env.SOUNDCLOUD_STAND_IN
+      expect(config.soundcloudStandIn).toBe(false)
+    })
+  })
+
   describe('siteOrigin', () => {
     it('is the deployment when MAIL_DOMAIN is set', () => {
       process.env.MAIL_DOMAIN = 'parking.example.test'

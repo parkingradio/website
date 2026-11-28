@@ -128,6 +128,10 @@ Their `error` is why the radio's last read of its playlist failed, which is the 
 Previewing a playlist doesn't change it. It's only kept in memory, so it's null after the server restarts, until a read
 fails.
 
+In development and in tests, `SOUNDCLOUD_STAND_IN` has the server use a stand-in for SoundCloud instead, so that nothing
+reaches it (see "SoundCloud" in the [README](../../../README.md#soundcloud)): it accepts any credentials, and shows a
+track at any link to one, but no playlist, and gives no streams.
+
 ## Tracks
 
 A track of the playlist has:

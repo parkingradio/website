@@ -25,6 +25,7 @@ type SessionsResponse = paths['/api/admin/sessions']['get']['responses'][200]['c
 type SessionResponse = paths['/api/admin/sessions']['post']['responses'][200]['content']['application/json']
 type NewSession = paths['/api/admin/sessions']['post']['requestBody']['content']['multipart/form-data']['session']
 type NewSet = paths['/api/admin/sessions/{id}/sets']['post']['requestBody']['content']['application/json']
+type CredentialsResponse = paths['/api/admin/radio/credentials']['get']['responses'][200]['content']['application/json']
 type ApiError = components['schemas']['ApiError']
 
 export type SeedOptions = {
@@ -32,6 +33,9 @@ export type SeedOptions = {
   url: string
   // The admin to log in as.
   credentials: Credentials
+  // Whether the server uses the stand-in for SoundCloud (see "SoundCloud" in the README), which finds the sets' tracks
+  // there, so that they can have them, and be in the radio's rotation of sets.
+  soundcloud?: boolean
 }
 
 // Where the seed's requests come from, as far as the server's rate limits are concerned (see
@@ -52,7 +56,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
 // artist is there when another one has their email, whatever its case, or, for an artist without one, when another one
 // without an email has their name, whatever its case, and likewise for a collective. Sessions are seeded only while
 // there are none, since their days, counted from the day they're seeded, would otherwise overlap those seeded before.
-export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded: string[]; skipped: string[]; sessions: number }> {
+// With `soundcloud`, the sessions' sets have their tracks, for which it first enters credentials for the stand-in for
+// SoundCloud, unless some are entered, and the radio's rotation of sets is then made those that are in it.
+export async function seed({ url, credentials, soundcloud = false }: SeedOptions): Promise<{ seeded: string[]; skipped: string[]; sessions: number }> {
   const server = await logIn(url, credentials)
   const there = new Set((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map(seedKey))
   const seeded: string[] = []
@@ -115,13 +121,19 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
   const collectiveIds = new Map(allCollectives.map((collective) => [seedKey(collective), collective.id]))
   // Including those the collectives were seeded with.
   const performerIds = new Map(artists.map((artist) => [seedKey(artist), artist.id]))
+  if (soundcloud && !(await server.call<CredentialsResponse>('GET', '/api/admin/radio/credentials')).credentials) {
+    await server.call('PUT', '/api/admin/radio/credentials', { clientId: 'stand-in', clientSecret: 'stand-in' })
+  }
+  // The ids of the sets of the rotation, in its order.
+  const rotation: string[] = []
   for (const [i, session] of SEED_SESSIONS.entries()) {
     try {
-      await addSession(server, session, performerIds, collectiveIds)
+      rotation.push(...(await addSession(server, session, performerIds, collectiveIds, soundcloud)))
     } catch (error) {
       throw new Error(`${messageOf(error)}\nOnly ${i} of the sessions were seeded. To seed them again, delete them first.`, { cause: error })
     }
   }
+  if (soundcloud) await server.call('PUT', '/api/admin/radio/rotation', { sets: rotation })
   return { seeded, skipped, sessions: SEED_SESSIONS.length }
 }
 
@@ -279,8 +291,15 @@ async function performersApplication(server: Server, performers: { id: string }[
 // its sets' performers, in `artistIds`, each by their email, or else, for those without one, by their name (see
 // `seedKey`), and the applications they come from, unless they can't be found (see `applicationWithDays`). Each set is
 // given its status once it's added, and the session once its sets are, since a cancelled session can't be added to, then
-// it's announced, if it is.
-async function addSession(server: Server, session: SeedSession, artistIds: Map<string, string>, collectiveIds: Map<string, string>): Promise<void> {
+// it's announced, if it is. With `soundcloud`, its sets have their tracks. Returns the ids of those that are in the
+// rotation, in their order.
+async function addSession(
+  server: Server,
+  session: SeedSession,
+  artistIds: Map<string, string>,
+  collectiveIds: Map<string, string>,
+  soundcloud: boolean,
+): Promise<string[]> {
   const takeover = session.takeover === undefined ? null : collectiveIds.get(seedKeyOf(session.takeover))
   if (takeover === undefined) throw new Error(`A session's takeover, ${session.takeover}, isn't a collective that was seeded`)
   const application = takeover && session.application ? await applicationWithDays(server, { collective: takeover }, session.application) : null
@@ -308,6 +327,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
   const { id } = (await server.call<SessionResponse>('POST', '/api/admin/sessions', form)).session
 
   const added = new Set<string>()
+  const rotation: string[] = []
   for (const set of session.sets) {
     const performers = set.performers.map((key) => {
       const id = artistIds.get(seedKeyOf(key))
@@ -320,7 +340,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
       performanceTypes: set.performanceTypes ?? [],
       otherPerformanceType: set.otherPerformanceType ?? '',
       genres: set.genres ?? [],
-      soundcloudTrack: null,
+      soundcloudTrack: (soundcloud && set.soundcloudTrack) || null,
       youtubeVideo: set.youtubeVideo ?? null,
       application: set.application ? await performersApplication(server, performers, set.application) : null,
     }
@@ -328,10 +348,12 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
     // The set just added, the one that wasn't there before.
     const setId = sets.find((other) => !added.has(other.id))!.id
     added.add(setId)
+    if (set.rotation) rotation.push(setId)
     if (set.status !== 'planned') await server.call('PUT', `/api/admin/sets/${setId}/status`, { status: set.status })
   }
   if (session.status !== 'planned') await server.call('PUT', `/api/admin/sessions/${id}/status`, { status: session.status })
   if (session.announced) await server.call('PUT', `/api/admin/sessions/${id}/announced`, { announced: true })
+  return rotation
 }
 
 function applicationFields({ days, timeSlots, performanceTypes, otherPerformanceType, details }: SeedApplication) {
@@ -416,9 +438,12 @@ if (import.meta.main) {
     process.exit(1)
   }
   try {
-    const { seeded, skipped, sessions } = await seed({ url, credentials: await seedAdmin(url) })
+    // The sets only have their tracks on SoundCloud with the stand-in, which finds them (see "SoundCloud" in the README).
+    const soundcloud = process.env.SOUNDCLOUD_STAND_IN === 'true'
+    const { seeded, skipped, sessions } = await seed({ url, credentials: await seedAdmin(url), soundcloud })
     console.log(`Seeded ${seeded.length} artists and collectives, and skipped ${skipped.length} that were already there.`)
     console.log(sessions > 0 ? `Seeded ${sessions} sessions, with their sets.` : 'Seeded no sessions, since there were some already.')
+    if (sessions > 0 && !soundcloud) console.log("Their sets have no tracks on SoundCloud, and the radio's rotation of sets is empty, since .env has no SOUNDCLOUD_STAND_IN.")
   } catch (error) {
     console.error(`seed: ${messageOf(error)}`)
     process.exitCode = 1

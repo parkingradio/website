@@ -132,8 +132,8 @@ test('pages are reached by their URL too', async ({ page }) => {
   }
 })
 
-// The player's button, which every page has. The radio is off air here, since there's no SoundCloud app to read its
-// playlist through.
+// The player's button, which every page has. The radio is off air here, since no playlist is chosen, and the stand-in for
+// SoundCloud shows none.
 test('the navigation bar says that the radio is off air', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('nav').getByRole('button', { name: 'hors ondes' })).toBeDisabled()

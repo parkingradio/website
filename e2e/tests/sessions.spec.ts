@@ -529,8 +529,6 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await newSet.getByRole('option', { name: mine.artist.name }).click()
   await newSet.getByLabel('DJ').check()
   await newSet.getByLabel('YouTube').fill(`https://youtu.be/${youtubeVideo}`)
-  // SoundCloud can't be asked, since the SoundCloud app's credentials aren't entered in the tests' server.
-  await newSet.getByLabel('SoundCloud').fill('https://soundcloud.com/parkingdotradio/e2e')
   await newSet.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(listed.getByRole('row')).toHaveCount(2)
   await page.getByRole('button', { name: 'ajouter un set' }).click()
@@ -540,9 +538,9 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await newSet.getByLabel('YouTube').fill(youtubeVideo)
   await newSet.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(listed.getByRole('row')).toHaveCount(3)
-  // The first one moved after the second one, which has no SoundCloud link, with the keyboard, its handle keeping the
-  // focus, though the browser loses it as the row is put back in the page. They're told apart by what the first one's
-  // performer does, in the cell after the handle's, the duration's and the performers'.
+  // The first one moved after the second one with the keyboard, its handle keeping the focus, though the browser loses
+  // it as the row is put back in the page. They're told apart by what the first one's performer does, in the cell after
+  // the handle's, the duration's and the performers'.
   const performance = (row: number) => listed.getByRole('row').nth(row).getByRole('cell').nth(3)
   await expect(performance(1)).toHaveText('DJ')
   // On touch screens, the handles, big enough for a finger, stay within their rows, so that they never overlap, and are
@@ -569,14 +567,6 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(listed.getByRole('row').nth(2).getByRole('button', { name: /^réordonner : / })).toBeFocused()
 
   // The server refuses the set it can't add, which the error names, and nothing is saved until it can add them all.
-  await page.getByRole('button', { name: 'ajouter la session' }).click()
-  await expect(page.getByRole('alert')).toHaveText(
-    `Le set de ${mine.artist.name} n'a pas pu être ajouté : The credentials of the SoundCloud app have not been entered yet`,
-  )
-  await listed.getByRole('row').nth(2).getByRole('button', { name: /^modifier : / }).click()
-  const listedSet = page.getByRole('region', { name: `Set de ${mine.artist.name}` })
-  await listedSet.getByLabel('SoundCloud').fill('')
-  await listedSet.getByRole('button', { name: 'enregistrer' }).click()
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('alert')).toHaveText(
     `Le set de ${mine.artist.name} n'a pas pu être ajouté : This YouTube video is another set's (Set de ${mine.artist.name})`,

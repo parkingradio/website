@@ -1,4 +1,5 @@
 import type { components } from '../client/src/api/schema.d.ts'
+import { PREVIEW_SUFFIX, STAND_IN_TRACKS } from '../server/src/radio/stand-in-tracks.ts'
 
 // The data seed.ts fills a database with: artists, some with a photo, and their applications, collectives of some of
 // them, with their applications, and sessions and their sets, with the variety the admin pages have to handle. It's the
@@ -467,6 +468,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
     },
     applications: [application([141], 'new', { receivedDaysAgo: 9 })],
   },
+  // The guests of past guest mixes, whose sets are on SoundCloud and YouTube, known only by name.
+  ...['DENEB', 'BOOMY', 'CRISSEMARQUEUR', 'esile', 'Chloe Lallouz', 'SIMULAT3D HUMAN', 'OMIZS', 'PALMEER', 'CHVCK'].map((name) => ({
+    profile: { name, ...LEFT_OUT },
+    applications: [],
+  })),
 ]
 
 // A collective's profile, as the server returns it, without its members.
@@ -618,6 +624,18 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     members: [{ name: 'Grillage' }, { name: 'Pied-de-Biche' }],
     applications: [],
   },
+  // Collectives known only by name, from their past takeovers, whose sets are on SoundCloud and YouTube, with their
+  // artists, known by name too.
+  {
+    profile: { name: 'Fence Hop', country: '', city: '', description: '', links: {}, email: null, phone: '' },
+    members: [{ name: 'JEY SYANO' }, { name: 'LEX FERENDA' }, { name: 'SOFTWAREWOLFE' }],
+    applications: [],
+  },
+  {
+    profile: { name: 'PUNKDT', country: '', city: '', description: '', links: {}, email: null, phone: '' },
+    members: [{ name: 'Queenie Jr' }, { name: 'Vayia' }, { name: 'Erick Mizen' }],
+    applications: [],
+  },
 ]
 
 type Status = components['schemas']['SessionStatus']
@@ -629,9 +647,13 @@ export type SeedSet = Pick<SetFields, 'durationMinutes'> &
     // The artists who played it, in order: artists of SEED_ARTISTS by their email, or artists without one, e.g. those of
     // a collective, by their name.
     performers: string[]
-    // The video's id on YouTube, which isn't checked against YouTube. Sets have no SoundCloud track, which the server
-    // would have to find on SoundCloud.
+    // The video's id on YouTube, which isn't checked against YouTube.
     youtubeVideo?: string
+    // The link to its track, which only the stand-in for SoundCloud finds (see `seed` in seed.ts): one of its real tracks
+    // (see `recorded`), or one it makes up, which only has a preview when it ends with PREVIEW_SUFFIX.
+    soundcloudTrack?: string
+    // Whether it's in the radio's rotation of sets, in the order the sets come in here.
+    rotation?: boolean
     // The application the set comes from, one of its performers', by its days (see `SeedApplication`), which tell it from
     // their other applications.
     application?: number[]
@@ -668,6 +690,28 @@ export type SeedSession = {
   sets: SeedSet[]
 }
 
+// A set of an hour of a past session, as a DJ, with its track, one of the real ones the stand-in for SoundCloud knows,
+// e.g. "deneb" for "https://soundcloud.com/parkingdotradio/deneb", and its video on YouTube.
+function recorded(performer: string, track: string, youtubeVideo: string): SeedSet {
+  const soundcloudTrack = `https://soundcloud.com/parkingdotradio/${track}`
+  if (!STAND_IN_TRACKS.some(({ link }) => link === soundcloudTrack)) throw new Error(`${soundcloudTrack} isn't one of STAND_IN_TRACKS`)
+  return { performers: [performer], durationMinutes: 60, performanceTypes: ['dj'], youtubeVideo, soundcloudTrack, status: 'done' }
+}
+
+// A past session of 3 hours, announced, at 20:00 `day` days ago, guest mixes or else `takeover`'s, with its `sets`, in
+// the radio's rotation of sets unless it's said otherwise.
+function played(day: number, sets: SeedSet[], { takeover, rotation = true }: { takeover?: string; rotation?: boolean } = {}): SeedSession {
+  return {
+    type: takeover ? 'takeover' : 'guest-mixes',
+    takeover,
+    announced: true,
+    when: { day: -day, start: '20:00' },
+    durationMinutes: 180,
+    status: 'done',
+    sets: sets.map((set) => ({ ...set, rotation })),
+  }
+}
+
 // The sessions start and end clear of 2:00 to 3:00, when clocks change: on those nights, their times could be skipped or
 // happen twice.
 export const SEED_SESSIONS: SeedSession[] = [
@@ -690,13 +734,45 @@ export const SEED_SESSIONS: SeedSession[] = [
         performanceTypes: ['dj'],
         genres: ['techno', 'acid'],
         youtubeVideo: 'oNdEcOmMuN1',
+        // Private, so its link never reaches the public.
+        soundcloudTrack: 'https://soundcloud.com/parkingdotradio/onde-commune-clementine-brulee/s-StandIn42',
+        rotation: true,
         application: [-30],
         status: 'done',
       },
-      { performers: ['boreale@example.com'], durationMinutes: 60, performanceTypes: ['vinyl'], genres: ['house'], youtubeVideo: 'oNdEcOmMuN2', status: 'done' },
-      { performers: ['kwame@example.com'], durationMinutes: 60, performanceTypes: ['dj'], youtubeVideo: 'oNdEcOmMuN3', status: 'done' },
+      // One that can be added to the rotation, but isn't in it.
+      {
+        performers: ['boreale@example.com'],
+        durationMinutes: 60,
+        performanceTypes: ['vinyl'],
+        genres: ['house'],
+        youtubeVideo: 'oNdEcOmMuN2',
+        soundcloudTrack: 'https://soundcloud.com/parkingdotradio/onde-commune-frequence-boreale',
+        status: 'done',
+      },
+      // In the rotation, but skipped, since only a preview of its track can be played.
+      {
+        performers: ['kwame@example.com'],
+        durationMinutes: 60,
+        performanceTypes: ['dj'],
+        youtubeVideo: 'oNdEcOmMuN3',
+        soundcloudTrack: `https://soundcloud.com/parkingdotradio/onde-commune-kwame-asante${PREVIEW_SUFFIX}`,
+        rotation: true,
+        status: 'done',
+      },
     ],
   },
+  // Past sessions whose sets are on SoundCloud, with Parking Radio's real tracks, and on YouTube.
+  played(80, [recorded('JEY SYANO', 'jeysyano', 'ktTsEHfsQdA'), recorded('LEX FERENDA', 'lexferenda', '00hn04sElAs'), recorded('SOFTWAREWOLFE', 'softwarewolfe', '1HUqys2m2fU')], {
+    takeover: 'Fence Hop',
+  }),
+  played(52, [recorded('DENEB', 'deneb', 'JZSPYmZZ_1U'), recorded('BOOMY', 'boomy', 'I40svMNkmdM'), recorded('CRISSEMARQUEUR', 'crissemarqueur', '6Cyve922ib4')]),
+  played(44, [recorded('esile', 'esile', 'ZRyaKC8S4aI'), recorded('Chloe Lallouz', 'chloelallouz', 'imjJl6feoM0'), recorded('SIMULAT3D HUMAN', 'simulat3dhuman', 'fKOHZ10XrIQ')]),
+  // Whose sets can be added to the rotation, but aren't in it.
+  played(43, [recorded('OMIZS', 'omizs', 'iyiDOPQH6AA'), recorded('PALMEER', 'palmeer', 'PmFA8bW89W8'), recorded('CHVCK', 'chvck', 'SnMkR1Rwz7o')], { rotation: false }),
+  played(33, [recorded('Queenie Jr', 'queeniejr-20261029', 'kLcswPJayeo'), recorded('Vayia', 'vayia', '9LRBWCfX5iY'), recorded('Erick Mizen', 'mizen', 'IT57ovDzKzo')], {
+    takeover: 'PUNKDT',
+  }),
   // Collectif Béton's takeover, which comes from its application, with a name of its own: a guest who isn't one of its
   // artists, then two of its artists together, until after midnight.
   {
