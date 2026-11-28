@@ -52,7 +52,7 @@ export async function rotationTestApp(readTrack: SoundCloudClient['readTrack'], 
 
 // Empties the database of sessions, artists and what was read of tracks, and the rotation, as it is at first.
 export async function resetRotation({ database }: RotationTestApp) {
-  await database.db.execute(sql`truncate sessions, artists, soundcloud_track_reads cascade`)
+  await database.db.execute(sql`truncate sessions, artists cascade`)
   await database.db.execute(
     sql`update radio_rotation set updated_by = null, updated_at = null, on_air_set_id = null, on_air_track_id = null, on_air_started_at = null, on_air_position = null`,
   )

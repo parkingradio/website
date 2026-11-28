@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean, primaryKey, foreignKey } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_DECISIONS } from '../applications/fields.js'
 import type { ApplicationDecision, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
@@ -356,6 +356,8 @@ export const sets = pgTable(
     // A track, or a video, belongs to at most one set.
     uniqueIndex('sets_soundcloud_track_id_idx').on(table.soundcloudTrackId),
     uniqueIndex('sets_youtube_video_id_idx').on(table.youtubeVideoId),
+    // Only so that what was read of a set's track can refer to the set with its link (see "set_track_reads" below).
+    uniqueIndex('sets_id_soundcloud_track_url_idx').on(table.id, table.soundcloudTrackUrl),
     check('sets_position', sql`${table.position} >= 0`),
     check('sets_duration', sql`${table.durationMinutes} >= 1`),
     check('sets_soundcloud_track', sql`(${table.soundcloudTrackId} is null) = (${table.soundcloudTrackUrl} is null)`),
@@ -425,13 +427,15 @@ export const radioRotation = pgTable(
   ],
 )
 
-// What was read from SoundCloud of the tracks of the rotation's sets, and of sets that can be added to it, by SoundCloud's
-// id for the track, through the link of the set that has it (see "Reading the tracks" in docs/design/server/radio.md). A
-// read only counts for a set that still has that link.
-export const soundcloudTrackReads = pgTable(
-  'soundcloud_track_reads',
+// What was last read from SoundCloud of each set's track, in the radio's rotation or not, through the link the set has (see
+// "Reading the tracks" in docs/design/server/radio.md). It's the set's, through that link only: its foreign key deletes
+// it with the set, and keeps the set's link from changing while it's there, so the server deletes it first, when the
+// link changes or the track is removed (see `updateSet` in sessions/store.ts), and a read that ends once the set has
+// another link, or is gone, can't be kept.
+export const setTrackReads = pgTable(
+  'set_track_reads',
   {
-    trackId: text('track_id').primaryKey(),
+    setId: uuid('set_id').primaryKey(),
     // The set's link it was read through, as sets.soundcloud_track_url has it.
     link: text('link').notNull(),
     // What SoundCloud said of the track, as of the last read that got an answer: "playable", or why it isn't (see
@@ -447,8 +451,9 @@ export const soundcloudTrackReads = pgTable(
     error: text('error'),
   },
   (table) => [
-    check('soundcloud_track_reads_state', oneOf(table.state, TRACK_STATES)),
-    check('soundcloud_track_reads_duration', sql`${table.durationMs} > 0`),
+    foreignKey({ name: 'set_track_reads_set_fk', columns: [table.setId, table.link], foreignColumns: [sets.id, sets.soundcloudTrackUrl] }).onDelete('cascade'),
+    check('set_track_reads_state', oneOf(table.state, TRACK_STATES)),
+    check('set_track_reads_duration', sql`${table.durationMs} > 0`),
   ],
 )
 

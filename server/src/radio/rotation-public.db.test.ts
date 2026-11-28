@@ -118,7 +118,7 @@ async function run(world: World, op: Operation) {
     case 'track':
       states.set(world.links[op.set], op.state)
       // Every track is due to be read again.
-      await database.db.execute(sql`update soundcloud_track_reads set read_at = read_at - interval '2 hours'`)
+      await database.db.execute(sql`update set_track_reads set read_at = read_at - interval '2 hours'`)
       await reads.readDue()
       return null
     case 'time':
@@ -133,7 +133,7 @@ async function playable(): Promise<Set<string>> {
     select sets.id from rotation_sets
       join sets on sets.id = rotation_sets.set_id
       join sessions on sessions.id = sets.session_id
-      join soundcloud_track_reads reads on reads.track_id = sets.soundcloud_track_id and reads.link = sets.soundcloud_track_url
+      join set_track_reads reads on reads.set_id = sets.id
     where sets.status <> 'cancelled' and sets.youtube_video_id is not null and sessions.announced and reads.state = 'playable'`)
   return new Set(rows.map(({ id }) => id))
 }

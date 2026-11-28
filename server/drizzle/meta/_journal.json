@@ -169,6 +169,13 @@
       "when": 1795814511388,
       "tag": "0023_rotation_sets",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795882340018,
+      "tag": "0024_set_track_reads",
+      "breakpoints": true
     }
   ]
 }

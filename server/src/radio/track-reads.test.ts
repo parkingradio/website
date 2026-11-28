@@ -17,7 +17,7 @@ const PLAYABLE: TrackRead = { state: 'playable', durationMs: 3_600_000, secretTo
 
 function stored(fields: Partial<StoredTrackRead> = {}): StoredTrackRead {
   const at = new Date(NOW - 1000)
-  return { trackId: '1', link: LINK, state: 'playable', durationMs: 3_600_000, secretToken: null, readAt: at, attemptedAt: at, error: null, ...fields }
+  return { setId: 's1', link: LINK, state: 'playable', durationMs: 3_600_000, secretToken: null, readAt: at, attemptedAt: at, error: null, ...fields }
 }
 
 function setUp({ reads = [] as (StoredTrackRead | null)[], entered = true } = {}) {
@@ -29,10 +29,11 @@ function setUp({ reads = [] as (StoredTrackRead | null)[], entered = true } = {}
       return client
     },
   } as unknown as SoundCloudApp
-  const saved: { trackId: string; link: string; outcome: ReadOutcome }[] = []
+  // The set `s1` has the track `1`, and so on.
+  const saved: { setId: string; link: string; outcome: ReadOutcome }[] = []
   const store = {
-    tracks: async () => reads.map((read, i) => ({ trackId: String(i + 1), link: LINK, read: read && { ...read, trackId: String(i + 1) } })),
-    saveRead: async (trackId: string, link: string, outcome: ReadOutcome) => void saved.push({ trackId, link, outcome }),
+    tracks: async () => reads.map((read, i) => ({ setId: `s${i + 1}`, trackId: String(i + 1), link: LINK, read: read && { ...read, setId: `s${i + 1}` } })),
+    saveRead: async (setId: string, link: string, outcome: ReadOutcome) => void saved.push({ setId, link, outcome }),
   } as unknown as RotationStore
   const lines: string[] = []
   const log = pino({}, { write: (line: string) => lines.push(line) }) as unknown as FastifyBaseLogger
@@ -44,7 +45,6 @@ describe('reading the tracks of the rotation', () => {
     const { reads, readTrack, saved } = setUp({
       reads: [
         null,
-        stored({ link: 'https://soundcloud.com/parkingdotradio/before' }),
         stored({ state: null, error: 'x', attemptedAt: new Date(NOW - RETRY_AFTER_MS) }),
         stored({ state: null, error: 'x', attemptedAt: new Date(NOW - RETRY_AFTER_MS + 1) }),
         stored({ error: 'x', attemptedAt: new Date(NOW - RETRY_AFTER_MS) }),
@@ -53,8 +53,8 @@ describe('reading the tracks of the rotation', () => {
       ],
     })
     await reads.readDue()
-    expect(readTrack.mock.calls.map(([link, trackId]) => [link, trackId])).toEqual(['1', '2', '3', '5', '6'].map((id) => [LINK, id]))
-    expect(saved.map(({ trackId }) => trackId).sort()).toEqual(['1', '2', '3', '5', '6'])
+    expect(readTrack.mock.calls.map(([link, trackId]) => [link, trackId])).toEqual(['1', '2', '4', '5'].map((id) => [LINK, id]))
+    expect(saved.map(({ setId }) => setId).sort()).toEqual(['s1', 's2', 's4', 's5'])
     expect(saved[0].outcome).toEqual({ read: PLAYABLE })
   })
 
@@ -93,7 +93,7 @@ describe('reading the tracks of the rotation', () => {
     const { reads, readTrack, saved } = setUp({ reads: [null], entered: false })
     await reads.readDue()
     expect(readTrack).not.toHaveBeenCalled()
-    expect(saved).toEqual([{ trackId: '1', link: LINK, outcome: { error: NO_CREDENTIALS } }])
+    expect(saved).toEqual([{ setId: 's1', link: LINK, outcome: { error: NO_CREDENTIALS } }])
   })
 
   it('responds once the time is up, while the reads go on and keep what they read once they end', async () => {
@@ -107,25 +107,26 @@ describe('reading the tracks of the rotation', () => {
     answer(PLAYABLE)
     await again
     expect(readTrack).toHaveBeenCalledTimes(1)
-    expect(saved).toEqual([{ trackId: '1', link: LINK, outcome: { read: PLAYABLE } }])
+    expect(saved).toEqual([{ setId: 's1', link: LINK, outcome: { read: PLAYABLE } }])
   })
 
   it('reads a track that is due, e.g. that of a set that can be added, sharing a read under way, until the time is up', async () => {
     const { reads, readTrack, saved } = setUp({ reads: [null] })
-    await reads.readIfDue({ trackId: '1', link: LINK, read: stored() }, 10)
-    await reads.readIfDue({ trackId: '1', link: LINK, read: stored({ state: null, error: 'x', attemptedAt: new Date(NOW - RETRY_AFTER_MS + 1) }) }, 10)
+    const track = { setId: 's1', trackId: '1', link: LINK }
+    await reads.readIfDue({ ...track, read: stored() }, 10)
+    await reads.readIfDue({ ...track, read: stored({ state: null, error: 'x', attemptedAt: new Date(NOW - RETRY_AFTER_MS + 1) }) }, 10)
     expect(readTrack).not.toHaveBeenCalled()
 
     let answer!: (read: TrackRead) => void
     readTrack.mockReturnValue(new Promise((resolve) => (answer = resolve)))
-    await reads.readIfDue({ trackId: '1', link: LINK, read: stored({ link: 'https://soundcloud.com/parkingdotradio/before' }) }, 10)
+    await reads.readIfDue({ ...track, read: null }, 10)
     expect(saved).toEqual([])
     // The rotation's reads share it.
     const due = reads.readDue()
     answer(PLAYABLE)
     await due
     expect(readTrack).toHaveBeenCalledTimes(1)
-    expect(saved).toEqual([{ trackId: '1', link: LINK, outcome: { read: PLAYABLE } }])
+    expect(saved).toEqual([{ setId: 's1', link: LINK, outcome: { read: PLAYABLE } }])
   })
 
   it('stops reading, and cuts short the reads under way', async () => {

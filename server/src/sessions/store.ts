@@ -6,7 +6,7 @@ import { REJECTED_APPLICATION } from '../applications/fields.js'
 import type { ApplicationDecision } from '../applications/fields.js'
 import type { NewPhoto } from '../artists/store.js'
 import type { Queryable } from '../db/connection.js'
-import { applications, artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
+import { applications, artists, collectives, sessions, setPerformers, sets, setTrackReads } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
 import {
   NOT_THE_SESSIONS_APPLICATION,
@@ -725,8 +725,14 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        const [before] = await tx.select().from(sets).where(eq(sets.id, id))
+        // Locked, so that a read of its track that ends meanwhile can't be kept between deleting what was read of it and
+        // changing its link below, which would then fail.
+        const [before] = await tx.select().from(sets).where(eq(sets.id, id)).for('update')
         if (!before) return null
+        // What was read of its track through the link it has goes with that link (see "set_track_reads" in db/schema.ts).
+        if (changes.soundcloudTrackUrl !== undefined && changes.soundcloudTrackUrl !== before.soundcloudTrackUrl) {
+          await tx.delete(setTrackReads).where(eq(setTrackReads.setId, id))
+        }
         // The rules are about the set as it will be, with the fields that aren't changed as they are, its performers
         // included, which stay as they are when they're left out.
         const set = changed(before, changes)

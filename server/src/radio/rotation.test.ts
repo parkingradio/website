@@ -21,13 +21,13 @@ function rotation(ids: string, skipped = ''): Entry[] {
 const onAir = (setId: string, startedAt: number, position: number): OnAir => ({ setId, trackId: `t${setId}`, startedAt, position })
 
 describe('which sets', () => {
-  const set = { status: 'done' as const, soundcloudTrackId: '1', soundcloudTrackUrl: 'https://soundcloud.com/a/b', youtubeVideoId: 'abcdefghijk' }
+  const set = { status: 'done' as const, soundcloudTrackId: '1', youtubeVideoId: 'abcdefghijk' }
   const announced = { announced: true }
 
   it('can be added: not cancelled, with a track and a video, whose session is announced', () => {
     expect(ineligibility(set, announced)).toEqual([])
     expect(ineligibility({ ...set, status: 'planned' }, announced)).toEqual([])
-    expect(ineligibility({ ...set, status: 'cancelled', soundcloudTrackId: null, soundcloudTrackUrl: null, youtubeVideoId: null }, { announced: false })).toEqual([
+    expect(ineligibility({ ...set, status: 'cancelled', soundcloudTrackId: null, youtubeVideoId: null }, { announced: false })).toEqual([
       'cancelled',
       'no-soundcloud-track',
       'no-youtube-video',
@@ -35,17 +35,15 @@ describe('which sets', () => {
     ])
   })
 
-  it('are skipped while their track was not read through their link, or cannot be played in full', () => {
-    const read = { link: set.soundcloudTrackUrl, state: 'playable' as const, durationMs: HOUR }
+  it('are skipped while their track was not read, or cannot be played in full', () => {
+    const read = { state: 'playable' as const, durationMs: HOUR }
     expect(skipReasons(set, announced, read)).toEqual([])
     expect(skipReasons(set, announced, null)).toEqual(['unread'])
     expect(skipReasons(set, announced, { ...read, state: null, durationMs: null })).toEqual(['unread'])
-    // Read through the link the set had before.
-    expect(skipReasons(set, announced, { ...read, link: 'https://soundcloud.com/a/c' })).toEqual(['unread'])
     expect(skipReasons(set, announced, { ...read, state: 'preview' })).toEqual(['preview'])
     expect(skipReasons({ ...set, status: 'cancelled' }, { announced: false }, { ...read, state: 'missing' })).toEqual(['cancelled', 'not-announced', 'missing'])
     // A set without a track has nothing to read.
-    expect(skipReasons({ ...set, soundcloudTrackId: null, soundcloudTrackUrl: null }, announced, null)).toEqual(['no-soundcloud-track'])
+    expect(skipReasons({ ...set, soundcloudTrackId: null }, announced, null)).toEqual(['no-soundcloud-track'])
   })
 })
 
