@@ -120,10 +120,6 @@ are found in the apps of the SoundCloud account it belongs to. They're kept in t
 site is deployed, so that they can be changed without deploying it again. Its secret is never sent back once it's
 entered: it can only be replaced. It never appears in the logs, or in any error.
 
-In development and in tests, `SOUNDCLOUD_STAND_IN` has the server use a stand-in for SoundCloud instead, so that nothing
-reaches it (see "SoundCloud" in the [README](../../../README.md#soundcloud)): it accepts any credentials, and shows a
-track at any link to one, but no playlist, and gives no streams.
-
 The server checks credentials with SoundCloud before it saves them, so that a typo can't take the radio off air, and
 the radio reads its playlist through them right away, and the tracks of the rotation of sets within a minute.
 
@@ -131,6 +127,10 @@ Their `error` is why the radio's last read of its playlist failed, which is the 
 [`GET /api/admin/radio`](#get-apiadminradio-admin)), or null when that read succeeded, or while no playlist is chosen.
 Previewing a playlist doesn't change it. It's only kept in memory, so it's null after the server restarts, until a read
 fails.
+
+In development and in tests, `SOUNDCLOUD_STAND_IN` has the server use a stand-in for SoundCloud instead, so that nothing
+reaches it (see "SoundCloud" in the [README](../../../README.md#soundcloud)): it accepts any credentials, and shows a
+track at any link to one, but no playlist, and gives no streams.
 
 ## Tracks
 

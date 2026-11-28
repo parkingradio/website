@@ -79,11 +79,12 @@ It goes through the server's API, as an admin of its own, `seed@example.com`, wh
 who is then listed among the admins. You still log in as your own admin. Seeding again only adds the artists and the
 collectives that aren't there, by their email, or by their name for those without one, so to seed an artist or a
 collective again, delete them first. It only seeds the sessions while there are none, so to seed them again, delete them
-all first. It doesn't change any setting, e.g. feature flags, except that while `.env` has `SOUNDCLOUD_STAND_IN` (see
-"SoundCloud" below), it enters credentials for the stand-in for SoundCloud, unless some are entered, before it seeds the
-sessions, whose sets then have their tracks on SoundCloud, and fills the radio's rotation of sets with some of them.
-Without it, sets have no tracks, and the rotation stays as it is. So to give their tracks to the sets of a database
-seeded before, delete the sessions, and seed again.
+all first. It doesn't change any setting, e.g. feature flags, except the SoundCloud app's credentials (see below).
+
+While `.env` has `SOUNDCLOUD_STAND_IN` (see "SoundCloud" below), the sessions' sets have their tracks, and the seed
+fills the radio's rotation of sets with some of them. For that, it first enters credentials for the stand-in, unless
+some are entered. Without it, sets have no tracks, and the rotation stays empty. To give their tracks to the sets of a
+database seeded before, delete the sessions, and seed again.
 
 It logs in, and a few artists and collectives apply through the "Appliquer" form, with the token that the Turnstile test
 keys from `.env.example` accept, which needs Cloudflare to be reachable. It refuses to seed when `MAIL_DOMAIN` is set,
@@ -101,11 +102,11 @@ your own, remove it from `.env` (see "Discord" in [docs/deployment.md](docs/depl
 `SOUNDCLOUD_STAND_IN`, which `.env.example` sets, has the server use a stand-in for SoundCloud, so that nothing reaches
 it: it accepts any SoundCloud credentials on the Configuration page, and shows a track at any link to one, so that sets
 can be given their tracks, and added to the radio's rotation of sets. It knows a sample of real tracks, those of
-`server/src/radio/stand-in-tracks.ts`, as they are on SoundCloud, and makes up the id and the length of any other. It
+`server/src/radio/stand-in-tracks.ts`, as they are on SoundCloud, and makes up the id and the length of any other, and
+only lets a preview be played of one whose name ends with `-preview`, e.g. to make a set of the rotation skipped. It
 shows no playlist, and gives no streams, so nothing can be played. The integration and browser tests use it too. To read
-SoundCloud itself, remove it from `.env`, then enter the credentials of a SoundCloud app on the Configuration page: what
-was saved with the stand-in stays, its credentials, which SoundCloud refuses, and the ids it made up for the tracks of
-sets, which lead nowhere.
+SoundCloud itself, remove it from `.env`. The stand-in's credentials, which SoundCloud refuses, stay until real ones are
+entered on the Configuration page, and the track ids it made up stay too, and lead nowhere.
 
 ### Several checkouts
 

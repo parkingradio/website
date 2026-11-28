@@ -4,7 +4,7 @@
 # use (SOUNDCLOUD_STAND_IN), which accepts any credentials, and shows a track at any link to one, but gives no streams:
 # - any credentials are saved
 # - sets are given their tracks, private ones included
-# - a set can only be added once its session is announced, and is then a candidate
+# - once its session is announced, a set can be added to the rotation
 # - the rotation is changed, its tracks read, the set whose track only has a preview skipped, and the other on air
 # - what's on air never has a private link, and its streams can't be had
 # The rules of the rotation are tested against a real database by the server's own tests (server/src/radio/*.db.test.ts).
@@ -42,13 +42,7 @@ expect_body "\"soundcloudTrack\":\\{\"id\":\"[0-9]+\",\"url\":\"${PRIVATE_TRACK}
 playable="$(sql "select id from sets where youtube_video_id = 'rOtAtIoN001'")"
 preview="$(sql "select id from sets where youtube_video_id = 'rOtAtIoN002'")"
 
-echo "  a set can only be added to the rotation once its session is announced"
-json GET "${BASE_URL}/api/admin/radio/rotation/candidates"
-expect_status 200
-expect_body_lacks "$playable"
-json PUT "${BASE_URL}/api/admin/radio/rotation" "{\"sets\":[\"${playable}\"]}"
-expect_status 409
-expect_body_contains '"setIndex":0,"reasons":["not-announced"]'
+echo "  once its session is announced, a set can be added to the rotation"
 json PUT "${BASE_URL}/api/admin/sessions/${session}/announced" '{"announced":true}'
 expect_status 200
 json GET "${BASE_URL}/api/admin/radio/rotation/candidates"

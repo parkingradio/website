@@ -23,6 +23,8 @@ expect_status 200
 cookie="$(session_cookie)"
 
 echo "  there are no credentials until they're entered"
+# Which other checks may have entered (e.g. 033-rotation.sh).
+sql "delete from soundcloud_credentials" >/dev/null
 request --header "Cookie: ${cookie}" "$URL"
 expect_status 200
 expect_body_contains '{"ok":true,"credentials":null}'

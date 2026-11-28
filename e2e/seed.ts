@@ -133,7 +133,7 @@ export async function seed({ url, credentials, soundcloud = false }: SeedOptions
       throw new Error(`${messageOf(error)}\nOnly ${i} of the sessions were seeded. To seed them again, delete them first.`, { cause: error })
     }
   }
-  if (soundcloud && rotation.length > 0) await server.call('PUT', '/api/admin/radio/rotation', { sets: rotation })
+  if (soundcloud) await server.call('PUT', '/api/admin/radio/rotation', { sets: rotation })
   return { seeded, skipped, sessions: SEED_SESSIONS.length }
 }
 
