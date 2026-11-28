@@ -156,6 +156,8 @@ describe('what the rotation of sets makes public', () => {
           expect(current !== null, JSON.stringify(op)).toBe(allowed.size > 0)
           const rotation = (await request('GET', '/api/admin/radio/rotation')).json()
           expect(rotation.current?.setId ?? null).toBe(current?.set.id ?? null)
+          // From the play head.
+          if (current) expect(rotation.sets[0].id).toBe(current.set.id)
         }
       }),
       { numRuns: numberFromEnv('FC_NUM_RUNS') ?? 20, seed: numberFromEnv('FC_SEED'), path: process.env.FC_PATH },

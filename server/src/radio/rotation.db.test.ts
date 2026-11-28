@@ -173,7 +173,10 @@ describe('the rotation of sets', () => {
     await putRotation([a, b])
     await rewind(HOUR + MINUTE)
     expect(await onAirId()).toBe(b)
-    expect((await rotation()).current.setId).toBe(b)
+    const moved = await rotation()
+    expect(moved.current.setId).toBe(b)
+    // From the set on air.
+    expect(moved.sets.map(({ id }: { id: string }) => id)).toEqual([b, a])
   })
 
   it('refuses a set twice, a set that does not exist, and one that cannot be added, saying why, and changes nothing then', async () => {
@@ -209,14 +212,22 @@ describe('the rotation of sets', () => {
     const session = await createSession(3)
     const [a, b, c] = setIds(session)
     await putRotation([a, b, c])
-    await ok('PUT', `/api/admin/sessions/${session.id}/announced`, { announced: false })
+    const announced = (value: boolean) => ok('PUT', `/api/admin/sessions/${session.id}/announced`, { announced: value })
+    await announced(false)
     // Nothing is public anymore.
     expect(await onAir()).toEqual({ ok: true, current: null, upcoming: [] })
-    expect((await rotation()).sets.map(({ skipped }: { skipped: string[] }) => skipped)).toEqual([['not-announced'], ['not-announced'], ['not-announced']])
-    // The rotation can still be changed without taking them out.
+    // From where it comes back on air: after a, the set that was on air last.
+    expect((await rotation()).sets.map(({ id, skipped }: { id: string; skipped: string[] }) => [id, skipped])).toEqual([
+      [b, ['not-announced']],
+      [c, ['not-announced']],
+      [a, ['not-announced']],
+    ])
+    await announced(true)
+    expect(await onAirId()).toBe(b)
+    await announced(false)
+    // The rotation can still be changed without taking them out, and comes back at its first set.
     expect((await putRotation([c, b, a])).statusCode).toBe(200)
-    await ok('PUT', `/api/admin/sessions/${session.id}/announced`, { announced: true })
-    // It comes back after the place of the set that was on air last, a, now last.
+    await announced(true)
     expect(await onAirId()).toBe(c)
 
     await ok('PUT', `/api/admin/sets/${c}/status`, { status: 'cancelled' })
@@ -224,9 +235,9 @@ describe('the rotation of sets', () => {
     await ok('PATCH', `/api/admin/sets/${b}`, { youtubeVideo: null })
     expect(await onAirId()).toBe(a)
     expect((await rotation()).sets.map(({ id, skipped, startsAt }: { id: string; skipped: string[]; startsAt: string | null }) => [id, skipped, startsAt !== null])).toEqual([
+      [a, [], true],
       [c, ['cancelled'], false],
       [b, ['no-youtube-video'], false],
-      [a, [], true],
     ])
   })
 
@@ -242,13 +253,37 @@ describe('the rotation of sets', () => {
     expect((await rotation()).sets.map(({ id }: { id: string }) => id)).toEqual([b])
   })
 
-  it('keeps the set on air on air when it moves, and puts the next one on air when it is taken out', async () => {
+  it('keeps the set on air on air when it stays first, and puts another first set on air from its start', async () => {
     const [a, b, c, d] = setIds(await createSession(4))
     await putRotation([a, b, c, d])
     const { startedAt } = (await rotation()).current
-    expect((await putRotation([d, c, a])).json().current).toEqual({ setId: a, startedAt })
-    // Taken out: what came after it, in the rotation as it was, is d, which wasn't skipped.
-    expect((await putRotation([b, c, d])).json().current.setId).toBe(d)
+    expect((await putRotation([a, d, c])).json().current).toEqual({ setId: a, startedAt })
+    // Given back as it's given, nothing changes.
+    const given = await rotation()
+    expect((await putRotation(given.sets.map(({ id }: { id: string }) => id))).json()).toMatchObject({ current: { setId: a, startedAt }, sets: given.sets })
+    const before = Date.now()
+    const other = (await putRotation([c, a, d])).json()
+    expect(other.current.setId).toBe(c)
+    expect(Date.parse(other.current.startedAt)).toBeGreaterThanOrEqual(Math.floor(before / 1000) * 1000)
+    // Taken out: the set after it goes on air.
+    expect((await putRotation([a, d])).json().current.setId).toBe(a)
+  })
+
+  it('puts a set just added first on air once its track is read, by the time it responds', async () => {
+    const [a, b] = setIds(await createSession(2))
+    const [x, y] = setIds(await createSession(2, { day: 2 }))
+    await putRotation([a, b])
+    // a, which comes after it, stays on air until x is read.
+    const added = (await putRotation([x, a, b])).json()
+    expect(added.current.setId).toBe(x)
+    expect(added.sets.map(({ id, skipped }: { id: string; skipped: string[] }) => [id, skipped])).toEqual([
+      [x, []],
+      [a, []],
+      [b, []],
+    ])
+    // b, which comes after it, goes on air until y is read.
+    expect((await putRotation([y, b, a, x])).json().current.setId).toBe(y)
+    expect(await onAirId()).toBe(y)
   })
 
   it('skips a set whose track cannot be played in full, or has not been read through its new link, and only streams the others', async () => {
@@ -257,7 +292,11 @@ describe('the rotation of sets', () => {
     const [c] = setIds(await createSession(1, { day: 2 }))
     answers.set(linkOf(session, 0), { state: 'preview', durationMs: 30_000, secretToken: 's-SeCrEt' })
     await putRotation([a, b])
-    expect((await rotation()).sets.map(({ skipped }: { skipped: string[] }) => skipped)).toEqual([['preview'], []])
+    // From b, on air.
+    expect((await rotation()).sets.map(({ id, skipped }: { id: string; skipped: string[] }) => [id, skipped])).toEqual([
+      [b, []],
+      [a, ['preview']],
+    ])
 
     expect((await request('GET', `/api/radio/sets/${a}/stream`)).statusCode).toBe(404)
     expect((await request('GET', `/api/radio/sets/${c}/stream`)).statusCode).toBe(404)
@@ -276,6 +315,24 @@ describe('the rotation of sets', () => {
     expect(failed).toMatchObject({ skipped: ['unread'], readError: "SoundCloud can't be reached, or answered unexpectedly" })
     expect(JSON.stringify(await rotation())).not.toContain('Something quoting')
     expect(await onAir()).toEqual({ ok: true, current: null, upcoming: [] })
+  })
+
+  it('goes on as it does anyway once the tracks of a change are read, when it has been changed again meanwhile', async () => {
+    const [a, b] = setIds(await createSession(2))
+    const [x] = setIds(await createSession(1, { day: 2 }))
+    await putRotation([a, b])
+    const store = rotationStore(database.db)
+    const t1 = Date.now()
+    // x, first, is unread, so a goes on.
+    const first = await store.replace([x, a], 'admin@example.com', () => t1)
+    expect(first.saved).toMatchObject({ setId: a })
+    // Then b is put first, before x is read.
+    const t2 = t1 + 1000
+    expect((await store.replace([b, x, a], 'admin@example.com', () => t2)).saved).toMatchObject({ setId: b, startedAt: t2 })
+    await reads.readDue()
+    // Once the first change's reads are done, b has ended: x comes after it, rather than b going on air again.
+    const { saved } = await store.afterReads(first, t2 + HOUR + 1)
+    expect(saved).toMatchObject({ setId: x, startedAt: t2 + HOUR })
   })
 
   it('changes the rotation at a time taken once nothing else can change what is on air', async () => {

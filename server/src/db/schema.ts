@@ -409,8 +409,8 @@ export const radioRotation = pgTable(
     // The set on air, with the track it went on air with, when it went on air, and its place in the rotation, from which
     // the radio goes on when the set isn't in the rotation anymore, or is skipped (see `Saved` in radio/rotation.ts). Once
     // the radio goes off air, the set that was on air last, without when it went on air. All null until a set has been on
-    // air. The set has no foreign key, since it stays here once it's deleted, and so that deleting it never waits for this
-    // row.
+    // air, and once the rotation is changed so that none can be played. The set has no foreign key, since it stays here
+    // once it's deleted, and so that deleting it never waits for this row.
     onAirSetId: uuid('on_air_set_id'),
     onAirTrackId: text('on_air_track_id'),
     onAirStartedAt: timestamp('on_air_started_at', { withTimezone: true }),

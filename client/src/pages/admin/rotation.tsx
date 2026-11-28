@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { api } from '../../api/client'
 import type { Schema } from '../../api/client'
@@ -11,9 +12,9 @@ import { byWhom, capitalized, formatDuration, sessionLongDay, sessionName, setIn
 import { search } from './list'
 import { OrderedList } from './ordered-list'
 import { sessionPath } from './session-errors'
-import { Performers, SetLinks } from './set-cells'
+import { Performers } from './set-cells'
 
-// The radio's rotation of sets, from the set on air, and changing it (see docs/design/client/admin/rotation.md).
+// The radio's rotation of sets, from its play head, and changing it (see docs/design/client/admin/rotation.md).
 
 type RadioRotation = Schema<'RadioRotation'>
 type SkipReason = Schema<'RotationSkipReason'>
@@ -84,13 +85,6 @@ function useRotation(): { rotation: RadioRotation | null; error: string | null; 
     setLoaded({ rotation, error: null })
   }
   return { ...loaded, saved }
-}
-
-// The rotation's sets in the order they come on air: from the one on air, around the rotation, or in its order when the
-// radio is off air.
-function shownOrder({ current, sets }: RadioRotation): Schema<'RotationSet'>[] {
-  const at = current ? sets.findIndex((set) => set.id === current.setId) : -1
-  return at <= 0 ? sets : [...sets.slice(at), ...sets.slice(0, at)]
 }
 
 export function Rotation() {
@@ -168,58 +162,147 @@ export function Rotation() {
   )
 }
 
-// The rotation's sets, from the set on air, each one that isn't skipped with when it goes on air, and the day before it
-// whenever it changes, as on the legacy page.
+// The rotation's sets, from its play head, as the server gives them, each one that isn't skipped with when it goes on
+// air, and the day before it whenever it changes, as on the legacy page.
 function RotationSets({ rotation }: { rotation: RadioRotation }) {
   if (rotation.sets.length === 0) return <p className="admin-placeholder">La rotation est vide&nbsp;: la radio est hors ondes.</p>
   const rows: { set: Schema<'RotationSet'>; startsAt: number | null; day: string | null }[] = []
   let day: string | null = null
-  for (const set of shownOrder(rotation)) {
+  for (const set of rotation.sets) {
     const startsAt = set.startsAt === null ? null : Date.parse(set.startsAt)
     const startsOn = startsAt === null ? null : dayFormat.format(startsAt)
     rows.push({ set, startsAt, day: day !== null && startsOn !== day ? startsOn : null })
     day = startsOn ?? day
   }
+  const { current } = rotation
+  const onAir = current ? rotation.sets.findIndex((set) => set.id === current.setId) : -1
   return (
     <>
       {rotation.sets.every((set) => set.skipped.length > 0) && (
         <p className="admin-placeholder">Aucun set de la rotation ne peut être diffusé&nbsp;: la radio est hors ondes.</p>
       )}
-      <ol className="radio-tracks rotation-sets">
-        {rows.map(({ set, startsAt, day }) => (
-          <Fragment key={set.id}>
-            {day && <li className="radio-tracks-day">{day}</li>}
-            <RotationSet set={set} startsAt={startsAt} onAir={set.id === rotation.current?.setId} />
-          </Fragment>
-        ))}
-      </ol>
+      <PlayHead rows="[data-set]" index={onAir === -1 ? null : onAir}>
+        <ol className="rotation-sets">
+          {rows.map(({ set, startsAt, day }, i) => (
+            <Fragment key={set.id}>
+              {day && <li className="rotation-day">{day}</li>}
+              <RotationSet set={set} startsAt={startsAt} onAir={i === onAir ? Date.parse(current!.startedAt) : null} />
+            </Fragment>
+          ))}
+        </ol>
+      </PlayHead>
     </>
   )
 }
 
-function RotationSet({ set, startsAt, onAir }: { set: Schema<'RotationSet'>; startsAt: number | null; onAir: boolean }) {
+// A set's length, as the rows say it, e.g. "1 h 05", to the nearest minute.
+const lengthText = (ms: number) => formatDuration(Math.round(ms / 60000))
+
+// A set of the rotation, in columns: when it goes on air, or, for the set on air, when it went on air, `onAir`, in
+// milliseconds since the epoch, then what it is, then its length. The set on air shows how far into it the radio is, and
+// says it's on air to screen readers, which the play head isn't drawn for.
+function RotationSet({ set, startsAt, onAir }: { set: Schema<'RotationSet'>; startsAt: number | null; onAir: number | null }) {
   const skipped = set.skipped.length > 0
   return (
-    <li className={skipped ? 'rotation-set-skipped' : onAir ? 'rotation-set-current' : undefined}>
-      <span className="radio-track-time">{startsAt === null ? '' : timeFormat.format(startsAt)}</span>
+    <li data-set className={skipped ? 'rotation-set-skipped' : onAir !== null ? 'rotation-set-current' : undefined}>
+      <span className="rotation-set-time">{startsAt === null ? '' : timeFormat.format(startsAt)}</span>
       <div className="rotation-set">
         <p className="rotation-set-performers">
           {set.performers.length > 0 ? <Performers performers={set.performers} /> : 'Set'}
-          {onAir && <OnAirTag />}
+          {onAir !== null && <span className="visually-hidden"> en ondes</span>}
         </p>
         <p>
           <Link to={sessionPath(set.session)}>{sessionName(set.session)}</Link>
-          {set.durationMs !== null && ` · ${formatDuration(Math.round(set.durationMs / 60000))}`}
-          {(set.soundcloudTrack || set.youtubeVideo) && ' · '}
-          <SetLinks set={{ ...set, application: null }} />
         </p>
+        {onAir !== null && set.durationMs !== null && <Progress startedAt={onAir} durationMs={set.durationMs} />}
         <SetState set={set} />
       </div>
+      <span className="rotation-set-length">{set.durationMs !== null && lengthText(set.durationMs)}</span>
     </li>
   )
 }
 
-const OnAirTag = () => <span className="radio-track-tag">en cours</span>
+// The play head, drawn over the list `children` on its row `index`, among the rows that `rows` selects, or none when
+// `index` is null: a line at the top of the row, with « ▶ en ondes » on it, and a tint over the row, as wide as it. It's the frame's
+// rather than the row's, so that the rows move under it, e.g. while one is dragged. It's placed where the row is laid
+// out, rather than where it's drawn, which moves while it's dragged, again on every render, and when the list's size
+// changes, e.g. once the page's font is loaded, or, without ResizeObserver, when the window is resized.
+function PlayHead({ rows, index, children }: { rows: string; index: number | null; children: ReactNode }) {
+  const frame = useRef<HTMLDivElement>(null)
+  const head = useRef<HTMLDivElement>(null)
+  const tint = useRef<HTMLDivElement>(null)
+  const place = useRef(() => {})
+  useLayoutEffect(() => {
+    place.current = () => {
+      const row = index === null ? undefined : frame.current?.querySelectorAll<HTMLElement>(rows)[index]
+      if (!head.current || !tint.current || !row) return
+      head.current.style.top = `${row.offsetTop}px`
+      head.current.style.height = `${row.offsetHeight}px`
+      tint.current.style.left = `${row.offsetLeft}px`
+      tint.current.style.width = `${row.offsetWidth}px`
+    }
+    place.current()
+  })
+  useEffect(() => {
+    const placeAgain = () => place.current()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', placeAgain)
+      return () => window.removeEventListener('resize', placeAgain)
+    }
+    const observer = new ResizeObserver(placeAgain)
+    observer.observe(frame.current!)
+    return () => observer.disconnect()
+  }, [])
+  return (
+    <div ref={frame} className="rotation-frame">
+      {children}
+      {index !== null && (
+        <div ref={head} className="rotation-head" aria-hidden="true">
+          <div ref={tint} className="rotation-head-tint" />
+          <span>▶ en ondes</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// How long `ms` lasts, as a clock shows it, e.g. "23:14", or "1:02:05".
+function clock(ms: number): string {
+  const seconds = Math.floor(ms / 1000)
+  const [hours, minutes] = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60]
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds % 60)}` : `${minutes}:${pad(seconds % 60)}`
+}
+
+// How far into the set under the play head the radio is, out of `durationMs`: since `startedAt`, by the browser's clock,
+// every second, or at its start without it. It keeps its own time, so that only it is drawn again every second.
+function Progress({ startedAt, durationMs }: { startedAt: number | null; durationMs: number }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (startedAt === null) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [startedAt])
+  const elapsed = startedAt === null ? 0 : Math.min(Math.max(now - startedAt, 0), durationMs)
+  return (
+    <div className="rotation-progress">
+      <div
+        role="progressbar"
+        aria-label="Avancement du set"
+        aria-valuemin={0}
+        aria-valuemax={Math.floor(durationMs / 1000)}
+        aria-valuenow={Math.floor(elapsed / 1000)}
+        aria-valuetext={`${formatDuration(Math.floor(elapsed / 60000))} sur ${lengthText(durationMs)}`}
+        className="rotation-progress-bar"
+      >
+        <div style={{ width: `${(elapsed / durationMs) * 100}%` }} />
+      </div>
+      <span className="rotation-progress-time" aria-hidden="true">
+        {clock(elapsed)} / {clock(durationMs)}
+      </span>
+    </div>
+  )
+}
 
 // Why a set is skipped, if it is, and why the last read of its track failed, if it did.
 function SetState({ set }: { set: Listed & Partial<Pick<Schema<'RotationSet'>, 'readError'>> }) {
@@ -236,6 +319,9 @@ function SetState({ set }: { set: Listed & Partial<Pick<Schema<'RotationSet'>, '
     </>
   )
 }
+
+// How long a set lasts, in milliseconds, once its track has been read, which a set that can be added never has been.
+const lengthOf = (set: Listed): number | null => ('durationMs' in set && typeof set.durationMs === 'number' ? set.durationMs : null)
 
 // What a set's performers are called, e.g. "Aurore, Brume", or "Set" once they're all deleted.
 const performerNames = (set: Listed) => set.performers.map((performer) => performer.name).join(', ') || 'Set'
@@ -258,7 +344,7 @@ type Step = 'editing' | 'confirming' | 'sending'
 // The rotation's sets as they were shown when « modifier » was clicked, to reorder them, take them out, or add others,
 // then save them once that's confirmed.
 function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation; onCancel: () => void; onSaved: (rotation: RadioRotation) => void }) {
-  const [shown] = useState(() => shownOrder(rotation))
+  const [shown] = useState(rotation.sets)
   const [sets, setSets] = useState<Listed[]>(shown)
   const [step, setStep] = useState<Step>('editing')
   const [error, setError] = useState<string | null>(null)
@@ -308,16 +394,19 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
     return (options, query) => search(options, query, (option) => fields.get(option.key)!)
   }, [offered])
 
-  const onAir = rotation.current?.setId
+  // The set on air, as the rotation was last loaded, and the one that will be once it's saved: the first that can be
+  // played, the sets added counting as ones that can be, since saving reads their tracks (see "On air" in
+  // docs/design/server/radio.md).
+  const onAir = rotation.current && rotation.sets.find((set) => set.id === rotation.current!.setId)
+  const head = sets.find((set) => set.skipped.length === 0)
   const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
-  // What saving does to what's on air (see "On air" in docs/design/server/radio.md). The sets added count as ones that can
-  // be played, since saving reads their tracks.
+  // What saving does to what's on air.
   let consequence: string
   if (sets.length === 0) consequence = 'La rotation sera vide\u00a0: la radio sera hors ondes.'
-  else if (sets.every((set) => set.skipped.length > 0)) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
-  else if (!onAir) consequence = 'La radio reviendra tout de suite en ondes.'
-  else if (!sets.some((set) => set.id === onAir)) consequence = 'Le set en cours sera retiré de la rotation\u00a0: la radio passera tout de suite au set suivant.'
-  else consequence = "Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant."
+  else if (!head) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
+  else if (!onAir) consequence = `La radio reviendra tout de suite en ondes, avec ${setInSentence(head)}.`
+  else if (head.id === onAir.id) consequence = "Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant."
+  else consequence = `${capitalized(setInSentence(head))} passera tout de suite en ondes, à la place ${setInSentence(onAir, 'du')}.`
 
   const send = async () => {
     setStep('sending')
@@ -331,23 +420,29 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   return (
     <>
       <div ref={list} className="rotation-edit">
-        <OrderedList
-          items={sets}
-          keyOf={(set) => set.id}
-          label={performerNames}
-          name={(set) => setName(set, set.session)}
-          detail={(set) => (
-            <>
-              {sessionName(set.session)}
-              {set.id === onAir && <OnAirTag />}
-              <SetState set={set} />
-            </>
-          )}
-          onChange={setSets}
-          nextFocus={pickerId}
-          disabled={locked}
-          autoScroll
-        />
+        <PlayHead rows="[data-item]" index={head ? sets.indexOf(head) : null}>
+          <OrderedList
+            items={sets}
+            keyOf={(set) => set.id}
+            label={performerNames}
+            name={(set) => setName(set, set.session)}
+            detail={(set) => (
+              <>
+                {set === head && <span className="visually-hidden">en ondes </span>}
+                {sessionName(set.session)}
+                {/* The set on air goes on, and another starts from its start, if its length is known. */}
+                {set === head && lengthOf(set) !== null && (
+                  <Progress startedAt={set.id === onAir?.id ? Date.parse(rotation.current!.startedAt) : null} durationMs={lengthOf(set)!} />
+                )}
+                <SetState set={set} />
+              </>
+            )}
+            onChange={setSets}
+            nextFocus={pickerId}
+            disabled={locked}
+            autoScroll
+          />
+        </PlayHead>
       </div>
       {sets.length === 0 && <p className="admin-placeholder">La rotation est vide.</p>}
 

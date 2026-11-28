@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import type { Schema } from '../../api/client'
 import { held, jsonBody, mockFetch, moveWithKeyboard, named, requestsTo, spaced } from '../../test-utils'
@@ -38,7 +38,7 @@ function rotationSet(id: string, names: string[], minutes: number | null, change
 
 const at = (time: number) => new Date(time).toISOString()
 
-// In the rotation's order: A, K, which is skipped, B, on air, then C.
+// From the play head, as the server gives them: B, on air, C, A, then K, which is skipped.
 const A = rotationSet('a', ['Aurore'], 30, { startsAt: at(ON_AIR_AT + 95 * MINUTE) })
 const K = rotationSet('k', ['Kwame'], 62, { skipped: ['preview'] })
 const B = rotationSet('b', ['Brume', 'Cyan'], 65, { startsAt: at(ON_AIR_AT) })
@@ -49,7 +49,7 @@ const ROTATION: RadioRotation = {
   updatedBy: 'someone@example.com',
   updatedAt: '2026-09-30T12:00:00.000Z',
   current: { setId: 'b', startedAt: at(ON_AIR_AT) },
-  sets: [A, K, B, C],
+  sets: [B, C, A, K],
 }
 
 // Two sets that can be added: the most recent session first.
@@ -73,16 +73,56 @@ function renderPage(bodies: Record<string, Body | Promise<Body>> = {}) {
 }
 
 const list = () => document.querySelector<HTMLElement>('.rotation-sets')!
+// The text of `element`, but for how far into the set under the play head the radio is, which `progress` gives, and what
+// only screen readers are told, which `onAirSaid` gives.
+function textOf(element: Element): string {
+  const copy = element.cloneNode(true) as Element
+  copy.querySelectorAll('.rotation-progress, .visually-hidden').forEach((hidden) => hidden.remove())
+  return spaced(copy.textContent)
+}
 // The text of each row of the list, the days between them included.
-const rows = () =>
-  within(list())
-    .getAllByRole('listitem')
-    .map((row) => spaced(row.textContent))
+const rows = () => within(list()).getAllByRole('listitem').map(textOf)
+
+// The rows are laid out 100px apart, in their list, so that where the play head is drawn says which row it's over.
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.tagName === 'LI' && this.parentElement ? Array.prototype.indexOf.call(this.parentElement.children, this) * 100 : 0
+  })
+})
+
+// The row the play head is drawn over, as `rows` or `draft` give it, or null when there's none.
+function underHead(): string | null {
+  const head = document.querySelector<HTMLElement>('.rotation-head')
+  if (!head) return null
+  const row = head.closest('.rotation-frame')!.querySelectorAll('ol > li')[parseInt(head.style.top) / 100]
+  return row.querySelector('b') ? draftOf(row) : textOf(row)
+}
+
+// The rows that screen readers are told are on air, by their text, which is only the row under the play head.
+const onAirSaid = () =>
+  Array.from(document.querySelectorAll('.visually-hidden'))
+    .filter((hidden) => hidden.textContent!.trim() === 'en ondes')
+    .map((hidden) => {
+      const row = hidden.closest('li')!
+      return row.querySelector('b') ? draftOf(row) : textOf(row)
+    })
+
+// How far into the set under the play head the radio is, as it's shown, and as it's said, or null without it.
+function progress(): { shown: string; said: string | null; now: string | null; max: string | null } | null {
+  const bar = screen.queryByRole('progressbar', { name: 'Avancement du set' })
+  if (!bar) return null
+  return {
+    shown: spaced(bar.closest('.rotation-progress')!.textContent),
+    said: spaced(bar.getAttribute('aria-valuetext')),
+    now: bar.getAttribute('aria-valuenow'),
+    max: bar.getAttribute('aria-valuemax'),
+  }
+}
 const loaded = () => screen.findByRole('button', { name: 'modifier' })
 
 // What's being changed: each set's number and performers, and its session's title and day.
-const draft = () =>
-  Array.from(document.querySelectorAll('.admin-ordered > li')).map((item) => spaced(`${item.querySelector('b')!.textContent} ${item.querySelector('.admin-ordered-text')!.textContent}`))
+const draftOf = (item: Element) => `${item.querySelector('b')!.textContent} ${textOf(item.querySelector('.admin-ordered-text')!)}`
+const draft = () => Array.from(document.querySelectorAll('.admin-ordered > li')).map(draftOf)
 
 async function modify(bodies?: Record<string, Body | Promise<Body>>) {
   renderPage(bodies)
@@ -110,27 +150,68 @@ const performersOf = (text: string | null) => text!.replace(/(HAUTE RIVE TAKEOVE
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('Rotation', () => {
   describe('the rotation', () => {
-    it('lists the sets from the one on air, around the rotation, with when each one starts, and the day whenever it changes', async () => {
+    it('lists the sets as the server gives them, from the one on air, with when each one starts, and the day whenever it changes', async () => {
       renderPage()
       await loaded()
 
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Rotation radio')
       expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par someone@example.com le 30 septembre 2026 à 08 h 00.')
       expect(rows()).toEqual([
-        `23 h 00Brume, Cyanen cours${SATURDAY} · 1 h 05 · SoundCloud · YouTube`,
+        `23 h 00Brume, Cyan${SATURDAY}1 h 05`,
         'vendredi 2 octobre',
-        `00 h 05Écume${SATURDAY} · 30 min · SoundCloud · YouTube`,
-        `00 h 35Aurore${SATURDAY} · 30 min · SoundCloud · YouTube`,
-        `Kwame${SATURDAY} · 1 h 02 · SoundCloud · YouTube` + "Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.",
+        `00 h 05Écume${SATURDAY}30 min`,
+        `00 h 35Aurore${SATURDAY}30 min`,
+        `Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.1 h 02`,
       ])
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
-    it('links to the performers, the session, the track and the video, and fades out the sets that are skipped', async () => {
+    it('draws the play head over the set on air, which shows how far into it the radio is, every second', async () => {
+      // 23 minutes and 14 seconds into B. Only the clock and the timers that move the bar on are faked.
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+      vi.setSystemTime(ON_AIR_AT + 23 * MINUTE + 14 * 1000)
+      renderPage()
+      await loaded()
+
+      expect(document.querySelector('.rotation-head')).toHaveTextContent('▶ en ondes')
+      expect(underHead()).toBe(rows()[0])
+      // Which screen readers are told, since the play head is only drawn.
+      expect(onAirSaid()).toEqual([rows()[0]])
+      expect(rows()[0]).toMatch(/^23 h 00Brume, Cyan/)
+      expect(progress()).toEqual({ shown: '23:14 / 1:05:00', said: '23 min sur 1 h 05', now: '1394', max: '3900' })
+      await act(() => vi.advanceTimersByTime(2000))
+      expect(progress()).toMatchObject({ shown: '23:16 / 1:05:00', now: '1396' })
+      // Once it's over, until the rotation is loaded again.
+      await act(() => vi.advanceTimersByTime(60 * MINUTE))
+      expect(progress()).toMatchObject({ shown: '1:05:00 / 1:05:00', said: '1 h 05 sur 1 h 05' })
+    })
+
+    it('draws no play head off air', async () => {
+      const skipped = (set: RotationSet): RotationSet => ({ ...set, skipped: ['cancelled'], startsAt: null })
+      renderPage({ [ROTATION_URL]: { ...ROTATION, current: null, sets: ROTATION.sets.map(skipped) } })
+      await loaded()
+
+      expect(underHead()).toBeNull()
+      expect(onAirSaid()).toEqual([])
+      expect(progress()).toBeNull()
+    })
+
+    it('says the length of a set to the nearest minute, in its row as in its bar', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+      vi.setSystemTime(ON_AIR_AT + 10 * MINUTE)
+      renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [{ ...B, durationMs: 64 * MINUTE + 45 * 1000 }, C, A, K] } })
+      await loaded()
+
+      expect(rows()[0]).toMatch(/1 h 05$/)
+      expect(progress()).toEqual({ shown: '10:00 / 1:04:45', said: '10 min sur 1 h 05', now: '600', max: '3885' })
+    })
+
+    it('links to the performers and the session, but not the track or the video, and fades out the sets that are skipped', async () => {
       renderPage()
       await loaded()
 
@@ -138,24 +219,23 @@ describe('Rotation', () => {
       expect(within(b).getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-Brume')
       expect(within(b).getByRole('link', { name: 'Cyan' })).toHaveAttribute('href', '/admin/artistes/artist-Cyan')
       expect(within(b).getByRole('link', { name: named(SATURDAY) })).toHaveAttribute('href', '/admin/sessions/session-1')
-      expect(within(b).getByRole('link', { name: 'SoundCloud' })).toHaveAttribute('href', 'https://soundcloud.com/parkingdotradio/b')
-      expect(within(b).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=video-b')
+      expect(within(b).getAllByRole('link')).toHaveLength(3)
       expect(b).toHaveClass('rotation-set-current')
       expect(screen.getByText(/^Kwame$/).closest('li')).toHaveClass('rotation-set-skipped')
     })
 
-    it('says why each skipped set is skipped, and leaves out what a set has no length or link for', async () => {
+    it('says why each skipped set is skipped, and leaves out the length of a set whose track has not been read', async () => {
       const unread = rotationSet('u', ['Ulysse'], null, { youtubeVideo: null, session: { ...GUEST_MIXES, start: null }, skipped: ['not-announced', 'no-youtube-video', 'unread'] })
       renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [...ROTATION.sets, unread] } })
       await loaded()
 
-      expect(rows().find((row) => row!.startsWith('Ulysse'))).toBe("UlysseGUEST MIXES, date à déterminer · SoundCloudPas diffusé : la session n'est pas annoncée, le set n'a pas de vidéo sur YouTube, la piste n'a pas encore été lue sur SoundCloud.")
+      expect(rows().find((row) => row!.startsWith('Ulysse'))).toBe("UlysseGUEST MIXES, date à déterminerPas diffusé : la session n'est pas annoncée, le set n'a pas de vidéo sur YouTube, la piste n'a pas encore été lue sur SoundCloud.")
     })
 
     it('warns when the last read of a track failed, and that the radio goes on with what was read before, unless it never was', async () => {
       const failed = { ...C, readError: 'SoundCloud cannot be reached' }
       const never = rotationSet('n', ['Nadia'], null, { skipped: ['unread'], readError: 'SoundCloud cannot be reached' })
-      renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [A, K, B, failed, never] } })
+      renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [B, failed, never, A, K] } })
       await loaded()
 
       const warnings = document.querySelectorAll('.rotation-set .admin-warning')
@@ -174,7 +254,7 @@ describe('Rotation', () => {
       expect(screen.queryByText(/^Modifiée par/)).not.toBeInTheDocument()
     })
 
-    it('says when every set is skipped, so that the radio is off air, and lists them in the order of the rotation, without times', async () => {
+    it('says when every set is skipped, so that the radio is off air, and lists them as the server gives them, without times', async () => {
       const skipped = (set: RotationSet): RotationSet => ({ ...set, skipped: ['cancelled'], startsAt: null })
       renderPage({ [ROTATION_URL]: { ...ROTATION, current: null, sets: [A, K, B, C].map(skipped) } })
       await loaded()
@@ -207,7 +287,7 @@ describe('Rotation', () => {
     const NEXT: RadioRotation = {
       ...ROTATION,
       current: { setId: 'c', startedAt: C.startsAt! },
-      sets: [A, K, { ...B, startsAt: at(ON_AIR_AT + 125 * MINUTE) }, C],
+      sets: [C, A, K, { ...B, startsAt: at(ON_AIR_AT + 125 * MINUTE) }],
     }
 
     // With the timers too, or only the clock.
@@ -233,7 +313,7 @@ describe('Rotation', () => {
       await act(() => vi.advanceTimersByTimeAsync(5 * MINUTE))
       expect(requestsTo('GET', ROTATION_URL)).toHaveLength(0)
       await act(() => vi.advanceTimersByTimeAsync(2000))
-      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écumeen cours/))
+      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écume/))
       expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
     })
 
@@ -271,7 +351,7 @@ describe('Rotation', () => {
       await act(() => document.dispatchEvent(new Event('visibilitychange')))
       expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
       await shownAgain(NEXT)
-      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écumeen cours/))
+      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écume/))
     })
 
     it('keeps what it loaded last when loading it again fails, and says why', async () => {
@@ -282,33 +362,35 @@ describe('Rotation', () => {
       await shownAgain({ ok: false, error: 'Internal server error' })
 
       expect(spaced((await screen.findByRole('alert')).textContent)).toBe("La rotation n'a pas pu être chargée à nouveau : Internal server error")
-      expect(rows()[0]).toMatch(/^23 h 00Brume, Cyanen cours/)
+      expect(rows()[0]).toMatch(/^23 h 00Brume, Cyan/)
       expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument()
     })
 
-    it('loads it again while it is being changed, leaving the changes as they are', async () => {
+    it('loads it again while it is being changed, leaving the changes as they are, but not what saving them does', async () => {
       fakeTime(ON_AIR_AT, { timers: false })
       await modify()
       fireEvent.click(screen.getByRole('button', { name: /^retirer Set de Aurore/ }))
 
       await shownAgain(NEXT)
       await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1))
-      // C is now the one on air.
-      await waitFor(() => expect(draft()[1]).toMatch(/en cours$/))
-      expect(draft()).toEqual([`1 Brume, Cyan${SATURDAY}`, `2 Écume${SATURDAY}en cours`, `3 Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`])
+      expect(draft()).toEqual([`1 Brume, Cyan${SATURDAY}`, `2 Écume${SATURDAY}`, `3 Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`])
+      // C is now the one on air: saving would put B back on air.
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      await waitFor(() => expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Le set de Brume et Cyan passera tout de suite en ondes, à la place du set de Écume.'))
+      fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
 
       // Once it's left as it is, the page shows it as it was loaded again.
       fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
-      expect(rows()[0]).toMatch(/^00 h 05Écumeen cours/)
+      expect(rows()[0]).toMatch(/^00 h 05Écume/)
     })
   })
 
   describe('changing it', () => {
-    it('lists the sets in the order shown, numbered, with the one on air and why the others are skipped, without times', async () => {
+    it('lists the sets in the order shown, numbered, the first on air and the others next, or why they are skipped, without times', async () => {
       await modify()
 
       expect(draft()).toEqual([
-        `1 Brume, Cyan${SATURDAY}en cours`,
+        `1 Brume, Cyan${SATURDAY}`,
         `2 Écume${SATURDAY}`,
         `3 Aurore${SATURDAY}`,
         `4 Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.`,
@@ -317,6 +399,24 @@ describe('Rotation', () => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: named(`réordonner Set de Brume et Cyan, ${SATURDAY}`) }))
       expect(document.querySelector('.rotation-sets')).not.toBeInTheDocument()
       expect(screen.getByText('Seuls les sets annoncés et joués, avec un lien SoundCloud et YouTube, sont disponibles.')).toBeInTheDocument()
+    })
+
+    it('keeps the play head over the first set that can be played, whose bar only moves on when it is the set on air', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+      vi.setSystemTime(ON_AIR_AT + 23 * MINUTE + 14 * 1000)
+      await modify()
+      expect(underHead()).toBe(`1 Brume, Cyan${SATURDAY}`)
+      expect(progress()).toMatchObject({ shown: '23:14 / 1:05:00' })
+      await act(() => vi.advanceTimersByTime(1000))
+      expect(progress()).toMatchObject({ shown: '23:15 / 1:05:00' })
+
+      // Another set under it starts from its start once it's saved.
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -2)
+      expect(underHead()).toBe(`1 Aurore${SATURDAY}`)
+      expect(onAirSaid()).toEqual([underHead()])
+      expect(progress()).toEqual({ shown: '0:00 / 30:00', said: '0 min sur 30 min', now: '0', max: '1800' })
+      await act(() => vi.advanceTimersByTime(5000))
+      expect(progress()).toMatchObject({ shown: '0:00 / 30:00' })
     })
 
     it('reorders the sets with the keyboard, takes them out, and adds others at the end, keeping the focus', async () => {
@@ -379,7 +479,7 @@ describe('Rotation', () => {
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -1)
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), 1)
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-      expect(screen.queryByText(/^Le changement s'applique/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(rows()).toHaveLength(5)
       expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(0)
     })
@@ -417,12 +517,41 @@ describe('Rotation', () => {
       expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(0)
     })
 
+    it('says which set goes on air right away, in place of the one on air, when another one is first', async () => {
+      await modify()
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -2)
+      expect(draft().slice(0, 2).map(performersOf)).toEqual(['1 Aurore', '2 Brume, Cyan'])
+      expect(underHead()).toBe(`1 Aurore${SATURDAY}`)
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(['Le set de Aurore passera tout de suite en ondes, à la place du set de Brume et Cyan.'])
+
+      // A set added, which counts as one that can be played.
+      fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
+      pick('Set de Fréquence')
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Fréquence/ }), -4)
+      expect(underHead()).toBe(`1 Fréquence Boréale${SATURDAY}`)
+      expect(onAirSaid()).toEqual([underHead()])
+      // Its length isn't known until it's read.
+      expect(progress()).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(['Le set de Fréquence Boréale passera tout de suite en ondes, à la place du set de Brume et Cyan.'])
+    })
+
+    it('goes by the first set that can be played, which can be the one on air', async () => {
+      await modify()
+      await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Kwame/ }), -3)
+      expect(draft().map(performersOf)).toEqual(['1 Kwame', '2 Brume, Cyan', '3 Écume', '4 Aurore'])
+      expect(underHead()).toBe(`2 Brume, Cyan${SATURDAY}`)
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toEqual(["Le set en cours continue : les changements s'appliquent dès le set suivant."])
+    })
+
     it('says when the set on air is taken out, when only skipped sets would be left, and when the rotation would be empty', async () => {
       await modify()
       const remove = (...names: string[]) => names.forEach((name) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^retirer Set de ${name}`) })))
       remove('Brume')
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-      expect(confirmation()).toEqual(['Le set en cours sera retiré de la rotation : la radio passera tout de suite au set suivant.'])
+      expect(confirmation()).toEqual(['Le set de Écume passera tout de suite en ondes, à la place du set de Brume et Cyan.'])
 
       // Only Kwame's set, which is skipped.
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
@@ -442,7 +571,7 @@ describe('Rotation', () => {
       await modify({ [ROTATION_URL]: { ...ROTATION, current: null, sets: [A, K, B, C].map(skipped) } })
       pick('Set de Fréquence')
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-      expect(confirmation()).toEqual(['La radio reviendra tout de suite en ondes.'])
+      expect(confirmation()).toEqual(['La radio reviendra tout de suite en ondes, avec le set de Fréquence Boréale.'])
 
       // Without it, none can.
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
@@ -481,7 +610,7 @@ describe('Rotation', () => {
       expect(screen.getByRole('status')).toHaveTextContent('La rotation a été enregistrée.')
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par admin@example.com le 1 octobre 2026 à 23 h 30.')
-      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyanen cours', 'vendredi 2 octobre', '00 h 05Aurore', 'Kwame', '00 h 35Fréquence Boréale'])
+      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyan', 'vendredi 2 octobre', '00 h 05Aurore', 'Kwame', '00 h 35Fréquence Boréale'])
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'modifier' }))
 
       // Until the rotation is changed again.
@@ -495,7 +624,7 @@ describe('Rotation', () => {
       await modify()
       // The tab is shown again, and the load it sends is held back.
       const reload = held()
-      mockFetch({ [ROTATION_URL]: reload.body, [CREDENTIALS_URL]: CREDENTIALS, [CANDIDATES_URL]: CANDIDATES, [`PUT ${ROTATION_URL}`]: { ...ROTATION, sets: [A, K, B] } })
+      mockFetch({ [ROTATION_URL]: reload.body, [CREDENTIALS_URL]: CREDENTIALS, [CANDIDATES_URL]: CANDIDATES, [`PUT ${ROTATION_URL}`]: { ...ROTATION, sets: [B, A, K] } })
       vi.setSystemTime(ON_AIR_AT + 61 * 1000)
       await act(() => document.dispatchEvent(new Event('visibilitychange')))
       await waitFor(() => expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1))
@@ -506,7 +635,7 @@ describe('Rotation', () => {
       await screen.findByText('La rotation a été enregistrée.')
 
       await reload.answer(ROTATION)
-      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyanen cours', 'vendredi 2 octobre', '00 h 35Aurore', 'Kwame'])
+      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyan', 'vendredi 2 octobre', '00 h 35Aurore', 'Kwame'])
     })
 
     it("says which set can't be added, and why, keeps the changes, and loads the sets that can be added again", async () => {
