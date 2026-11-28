@@ -1,279 +1,430 @@
-import { Fragment, useState } from 'react'
-import type { FormEvent } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../../api/client'
-import type { Data, Schema } from '../../api/client'
+import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
-import type { Loaded } from '../../api/use-api'
+import { useTabShownCount } from '../../api/use-tab-shown'
+import { Combobox } from '../../combobox'
+import type { ComboboxFilter, ComboboxOption } from '../../combobox'
 import { QUEBEC_TIME_ZONE } from '../../quebec-time'
-import { dateTimeFormat } from './describe'
+import { byWhom, capitalized, formatDuration, sessionLongDay, sessionName, setInSentence, setName } from './describe'
+import { search } from './list'
+import { OrderedList } from './ordered-list'
+import { sessionPath } from './session-errors'
+import { Performers, SetLinks } from './set-cells'
 
-type RadioPlaylist = Schema<'RadioPlaylist'>
-type RadioPlaylistTrack = Schema<'RadioPlaylistTrack'>
+// The radio's rotation of sets, from the set on air, and changing it (see docs/design/client/admin/rotation.md).
 
-// When the tracks begin, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md).
+type RadioRotation = Schema<'RadioRotation'>
+type SkipReason = Schema<'RotationSkipReason'>
+// A set of the rotation, or one that can be added to it, with why it's skipped (never, for one that can be added).
+type Listed = Schema<'RotationCandidate'> & Pick<Schema<'RotationSet'>, 'skipped'>
+
+// When the sets go on air, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md),
+// as on the legacy page (see rotation-legacy.tsx).
 const timeFormat = new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit', timeZone: QUEBEC_TIME_ZONE })
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', timeZone: QUEBEC_TIME_ZONE })
 
-// Why a track is left out of the rotation, as SoundCloud says.
-const LEFT_OUT_REASONS: Record<Schema<'LeftOutTrack'>['reason'] | 'unexpected', string> = {
-  preview: 'Track marquée comme preview sur SoundCloud',
-  blocked: 'SoundCloud ne permet pas aux applications de la jouer',
-  'not-streamable': 'SoundCloud ne permet pas de la diffuser',
-  unexpected: 'Erreur lors de la lecture de la description',
+// Why a set is skipped, or can't be added (see "Which sets" in docs/design/server/radio.md).
+const SKIP_REASONS: Record<SkipReason, string> = {
+  cancelled: 'le set est annulé',
+  'no-soundcloud-track': "le set n'a pas de piste sur SoundCloud",
+  'no-youtube-video': "le set n'a pas de vidéo sur YouTube",
+  'not-announced': "la session n'est pas annoncée",
+  unread: "la piste n'a pas encore été lue sur SoundCloud",
+  missing: 'SoundCloud ne montre plus de piste à ce lien',
+  unexpected: 'SoundCloud décrit la piste de façon inattendue',
+  preview: 'seul un extrait de 30 secondes de la piste peut être joué',
+  blocked: 'la piste ne peut pas être jouée',
+  'not-streamable': 'la piste ne peut pas être lue en streaming',
 }
 
-// How many tracks are listed at first, and how many more each time more are asked for.
-const FIRST_TRACKS = 10
-const MORE_TRACKS = 25
+const reasonsText = (reasons: SkipReason[]) => reasons.map((reason) => SKIP_REASONS[reason]).join(', ')
 
-function describeTrack({ artist, event, date }: Schema<'RadioTrack'>): string {
-  return [artist, event, date].filter(Boolean).join(' · ')
+// How long after the set on air ends the rotation is loaded again, so that the server has moved on by then, and how long
+// after it was last loaded at the soonest, so that a browser whose clock is ahead of the server's doesn't load it again
+// and again until the server's clock gets there.
+const AFTER_END_MS = 2 * 1000
+const MIN_RELOAD_MS = 10 * 1000
+
+// When the set on air ends, or null when the radio is off air.
+function onAirEnds({ current, sets }: RadioRotation): number | null {
+  const durationMs = current && sets.find((set) => set.id === current.setId)?.durationMs
+  return current && durationMs ? Date.parse(current.startedAt) + durationMs : null
+}
+
+// The rotation, loaded again when the set on air ends and when the tab is shown again, and why it last failed to load,
+// if it did, which leaves what was loaded before. `saved` replaces it with what saving it answered. Only the answer of
+// the last request counts, so that one that was sent before it was saved doesn't take its place.
+function useRotation(): { rotation: RadioRotation | null; error: string | null; saved: (rotation: RadioRotation) => void } {
+  const [loaded, setLoaded] = useState<{ rotation: RadioRotation | null; error: string | null }>({ rotation: null, error: null })
+  const [ended, setEnded] = useState(0)
+  const tabShown = useTabShownCount()
+  const latest = useRef(0)
+
+  useEffect(() => {
+    const request = ++latest.current
+    api.GET('/api/admin/radio/rotation').then((result) => {
+      if (request !== latest.current) return
+      if (result.ok) setLoaded({ rotation: result, error: null })
+      else setLoaded((loaded) => ({ ...loaded, error: result.error }))
+    })
+  }, [ended, tabShown])
+
+  // Again after each answer, even one that failed, so that the page catches up once the server can be reached again.
+  useEffect(() => {
+    const ends = loaded.rotation && onAirEnds(loaded.rotation)
+    if (ends === null) return
+    const timer = setTimeout(() => setEnded((count) => count + 1), Math.max(ends + AFTER_END_MS - Date.now(), MIN_RELOAD_MS))
+    return () => clearTimeout(timer)
+  }, [loaded])
+
+  const saved = (rotation: RadioRotation) => {
+    latest.current++
+    setLoaded({ rotation, error: null })
+  }
+  return { ...loaded, saved }
+}
+
+// The rotation's sets in the order they come on air: from the one on air, around the rotation, or in its order when the
+// radio is off air.
+function shownOrder({ current, sets }: RadioRotation): Schema<'RotationSet'>[] {
+  const at = current ? sets.findIndex((set) => set.id === current.setId) : -1
+  return at <= 0 ? sets : [...sets.slice(at), ...sets.slice(0, at)]
 }
 
 export function Rotation() {
-  // Changed to load everything again, once another playlist is chosen.
-  const [version, setVersion] = useState(0)
-  const settings = useApi('/api/admin/radio', { version })
-  const radio = useApi('/api/radio', { params: { query: { upcoming: '0' } }, version })
+  const { rotation, error, saved } = useRotation()
+  const credentials = useApi('/api/admin/radio/credentials')
+  const [editing, setEditing] = useState(false)
+  const [savedNotice, setSavedNotice] = useState(false)
+  // « modifier » gets the focus back once the rotation is no longer being changed.
+  const modify = useRef<HTMLButtonElement>(null)
+  const wasEditing = useRef(editing)
+  useEffect(() => {
+    if (wasEditing.current && !editing) modify.current?.focus()
+    wasEditing.current = editing
+  }, [editing])
 
+  const updated = rotation && byWhom('Modifiée', rotation.updatedBy, rotation.updatedAt)
   return (
     <>
       <h1>Rotation radio</h1>
-      {settings.kind === 'loaded' && !settings.value.credentialsEntered && (
+      {credentials.kind === 'loaded' && credentials.value.credentials === null && (
         <p className="admin-error" role="alert">
-          La radio ne peut lire aucune playlist sur SoundCloud tant que les identifiants de son application n'ont pas été
-          entrés dans la <Link to="/admin/configuration">configuration</Link>.
+          La radio ne peut lire aucune piste sur SoundCloud tant que les identifiants de son application n'ont pas été entrés
+          dans la <Link to="/admin/configuration">configuration</Link>.
         </p>
       )}
-
-      <h2>À l'antenne</h2>
-      <OnAir settings={settings} radio={radio} />
-
-      <h2>Changer de playlist</h2>
-      <ChangePlaylist onChosen={() => setVersion((version) => version + 1)} />
+      {updated && <p className="admin-meta">{updated}</p>}
+      {rotation === null ? (
+        error && (
+          <p className="admin-error" role="alert">
+            La rotation n'a pas pu être chargée&nbsp;: {error}
+          </p>
+        )
+      ) : (
+        <>
+          {error && (
+            <p className="admin-error" role="alert">
+              La rotation n'a pas pu être chargée à nouveau&nbsp;: {error}
+            </p>
+          )}
+          {savedNotice && (
+            <p className="admin-notice" role="status">
+              La rotation a été enregistrée.
+            </p>
+          )}
+          {editing ? (
+            <EditRotation
+              rotation={rotation}
+              onCancel={() => setEditing(false)}
+              onSaved={(rotation) => {
+                saved(rotation)
+                setSavedNotice(true)
+                setEditing(false)
+              }}
+            />
+          ) : (
+            <>
+              <div className="admin-toolbar">
+                <button
+                  ref={modify}
+                  type="button"
+                  onClick={() => {
+                    setSavedNotice(false)
+                    setEditing(true)
+                  }}
+                >
+                  modifier
+                </button>
+              </div>
+              <RotationSets rotation={rotation} />
+            </>
+          )}
+        </>
+      )}
     </>
   )
 }
 
-// The playlist the rotation is read from, and its tracks from the one on air.
-function OnAir({ settings, radio }: { settings: Loaded<Data<'get', '/api/admin/radio'>>; radio: Loaded<Schema<'Radio'>> }) {
-  if (settings.kind === 'loading') return null
-  if (settings.kind === 'error') {
-    return (
-      <p className="admin-error" role="alert">
-        La playlist de la radio n'a pas pu être chargée&nbsp;: {settings.message}
-      </p>
-    )
+// The rotation's sets, from the set on air, each one that isn't skipped with when it goes on air, and the day before it
+// whenever it changes, as on the legacy page.
+function RotationSets({ rotation }: { rotation: RadioRotation }) {
+  if (rotation.sets.length === 0) return <p className="admin-placeholder">La rotation est vide&nbsp;: la radio est hors ondes.</p>
+  const rows: { set: Schema<'RotationSet'>; startsAt: number | null; day: string | null }[] = []
+  let day: string | null = null
+  for (const set of shownOrder(rotation)) {
+    const startsAt = set.startsAt === null ? null : Date.parse(set.startsAt)
+    const startsOn = startsAt === null ? null : dayFormat.format(startsAt)
+    rows.push({ set, startsAt, day: day !== null && startsOn !== day ? startsOn : null })
+    day = startsOn ?? day
   }
-  const { current } = settings.value
-  if (!current) {
-    return <p className="admin-placeholder">Aucune playlist n'a encore été choisie&nbsp;: la radio est hors ondes.</p>
-  }
-
-  const { url, title, chosenBy, chosenAt, playlist, error } = current
   return (
     <>
-      <PlaylistHeader url={url} title={title} playlist={playlist} />
-      <p className="admin-meta">
-        Choisie par {chosenBy} le {dateTimeFormat.format(new Date(chosenAt))}.
-      </p>
-      {error && (
-        <p className="admin-error" role="alert">
-          La playlist n'a pas pu être lue sur SoundCloud&nbsp;: {error}
-          {playlist && '. La radio continue avec ce qui en avait été lu avant.'}
-        </p>
+      {rotation.sets.every((set) => set.skipped.length > 0) && (
+        <p className="admin-placeholder">Aucun set de la rotation ne peut être diffusé&nbsp;: la radio est hors ondes.</p>
       )}
-      {radio.kind === 'error' && <p className="admin-placeholder">Hors ondes&nbsp;: {radio.message}</p>}
-      {playlist && <PlaylistTracks key={playlist.url} playlist={playlist} onAir={radio.kind === 'loaded' ? radio.value.current : null} />}
-    </>
-  )
-}
-
-// The playlist's title, linking to it, and the account it belongs to when it could be read.
-function PlaylistHeader({ url, title, playlist }: { url: string; title: string; playlist: RadioPlaylist | null }) {
-  return (
-    <div className="radio-playlist">
-      <p className="radio-playlist-title">
-        <a href={url} target="_blank" rel="noreferrer">
-          {title}
-        </a>
-      </p>
-      {playlist && (
-        <p>
-          Playlist {playlist.private ? 'privée' : 'publique'} de{' '}
-          <a href={playlist.account.url} target="_blank" rel="noreferrer">
-            {playlist.account.name}
-          </a>
-        </p>
-      )}
-    </div>
-  )
-}
-
-// The tracks of a playlist in the order they come on air: from the one on air, if it's given, around the
-// playlist and back.
-function PlaylistTracks({ playlist, onAir }: { playlist: RadioPlaylist; onAir: Schema<'Radio'>['current'] | null }) {
-  const [visible, setVisible] = useState(FIRST_TRACKS)
-  const { tracks } = playlist
-
-  const onAirIndex = onAir ? tracks.findIndex((track) => track.kind === 'rotation' && track.track.id === onAir.track.id) : -1
-  // When each track that's on the radio begins, if what's on air is known. A track that begins on another day
-  // than the one before it is introduced by that day.
-  let begins = onAir && onAirIndex !== -1 ? Date.parse(onAir.startedAt) : null
-  let day = begins === null ? null : dayFormat.format(begins)
-  const rows: { index: number; track: RadioPlaylistTrack; begins: number | null; day: string | null }[] = []
-  for (let i = 0; i < tracks.length; i++) {
-    const index = (Math.max(onAirIndex, 0) + i) % tracks.length
-    const track = tracks[index]
-    const row = { index, track, begins: null as number | null, day: null as string | null }
-    if (track.kind === 'rotation' && begins !== null) {
-      row.begins = begins
-      const beginsDay = dayFormat.format(begins)
-      if (beginsDay !== day) row.day = day = beginsDay
-      begins += track.track.durationMs
-    }
-    rows.push(row)
-  }
-
-  return (
-    <>
-      <ol className="radio-tracks">
-        {rows.slice(0, visible).map(({ index, track, begins, day }) => (
-          <Fragment key={index}>
+      <ol className="radio-tracks rotation-sets">
+        {rows.map(({ set, startsAt, day }) => (
+          <Fragment key={set.id}>
             {day && <li className="radio-tracks-day">{day}</li>}
-            <TrackRow track={track} begins={begins} current={index === onAirIndex} />
+            <RotationSet set={set} startsAt={startsAt} onAir={set.id === rotation.current?.setId} />
           </Fragment>
         ))}
       </ol>
-      {visible < rows.length && (
-        <button type="button" className="radio-tracks-more" onClick={() => setVisible((visible) => visible + MORE_TRACKS)}>
-          afficher plus
-        </button>
-      )}
     </>
   )
 }
 
-// A track of a playlist, with when it begins if it's on the radio and that's known. A track that's left out
-// says why when it's hovered or clicked.
-function TrackRow({ track, begins, current }: { track: RadioPlaylistTrack; begins: number | null; current: boolean }) {
-  const [reasonShown, setReasonShown] = useState(false)
-  const label = track.kind === 'unexpected' ? track.title : describeTrack(track.track)
-  const reason = track.kind === 'rotation' ? null : LEFT_OUT_REASONS[track.kind === 'left-out' ? track.reason : 'unexpected']
+function RotationSet({ set, startsAt, onAir }: { set: Schema<'RotationSet'>; startsAt: number | null; onAir: boolean }) {
+  const skipped = set.skipped.length > 0
   return (
-    <li className={reason ? 'radio-track-left-out' : current ? 'radio-track-current' : undefined}>
-      <span className="radio-track-time">{begins === null ? '' : timeFormat.format(begins)}</span>
-      <span>
-        {reason ? (
-          <button type="button" title={reason} aria-expanded={reasonShown} onClick={() => setReasonShown(!reasonShown)}>
-            {label}
-          </button>
-        ) : (
-          label
-        )}
-        {current && <span className="radio-track-tag">en cours</span>}
-        {reasonShown && <span className="radio-track-reason">{reason}</span>}
-      </span>
+    <li className={skipped ? 'rotation-set-skipped' : onAir ? 'rotation-set-current' : undefined}>
+      <span className="radio-track-time">{startsAt === null ? '' : timeFormat.format(startsAt)}</span>
+      <div className="rotation-set">
+        <p className="rotation-set-performers">
+          {set.performers.length > 0 ? <Performers performers={set.performers} /> : 'Set'}
+          {onAir && <OnAirTag />}
+        </p>
+        <p>
+          <Link to={sessionPath(set.session)}>{sessionName(set.session)}</Link>
+          {set.durationMs !== null && ` · ${formatDuration(Math.round(set.durationMs / 60000))}`}
+          {(set.soundcloudTrack || set.youtubeVideo) && ' · '}
+          <SetLinks set={{ ...set, application: null }} />
+        </p>
+        <SetState set={set} />
+      </div>
     </li>
   )
 }
 
-type Step =
-  | { kind: 'idle' | 'previewing' }
-  | { kind: 'preview' | 'choosing'; link: string; playlist: RadioPlaylist }
-  | { kind: 'chosen'; title: string }
-  | { kind: 'error'; message: string }
+const OnAirTag = () => <span className="radio-track-tag">en cours</span>
 
-// Previews the playlist at a link, then chooses it.
-function ChangePlaylist({ onChosen }: { onChosen: () => void }) {
-  const [link, setLink] = useState('')
-  const [step, setStep] = useState<Step>({ kind: 'idle' })
-
-  const preview = async (event: FormEvent) => {
-    event.preventDefault()
-    if (playlistLink(link) === null) {
-      setStep({ kind: 'error', message: "Ce n'est pas un lien vers une playlist SoundCloud." })
-      return
-    }
-    setStep({ kind: 'previewing' })
-    const result = await api.POST('/api/admin/radio/preview', { body: { link } })
-    if (result.ok) setStep({ kind: 'preview', link, playlist: result.playlist })
-    else setStep({ kind: 'error', message: `La playlist n'a pas pu être lue : ${result.error}` })
-  }
-
-  const choose = async () => {
-    if (step.kind !== 'preview') return
-    setStep({ ...step, kind: 'choosing' })
-    const result = await api.POST('/api/admin/radio/playlist', { body: { link: step.link } })
-    if (result.ok) {
-      setLink('')
-      setStep({ kind: 'chosen', title: step.playlist.title })
-      onChosen()
-    } else {
-      setStep({ kind: 'error', message: `La playlist n'a pas pu être choisie : ${result.error}` })
-    }
-  }
-
+// Why a set is skipped, if it is, and why the last read of its track failed, if it did.
+function SetState({ set }: { set: Listed & Partial<Pick<Schema<'RotationSet'>, 'readError'>> }) {
   return (
     <>
-      <form className="admin-form" onSubmit={preview}>
-        <label>
-          Lien de la playlist
-          <input
-            type="url"
-            value={link}
-            placeholder="https://soundcloud.com/…/sets/…"
-            onChange={(event) => {
-              setLink(event.target.value)
-              // What's previewed is what gets chosen, so a preview doesn't outlive its link.
-              if (step.kind === 'preview') setStep({ kind: 'idle' })
-            }}
-            required
-          />
-        </label>
-        <p className="admin-hint">Pour une playlist privée, utilisez son lien privé, qui se termine par /s-…</p>
-        <button type="submit" disabled={step.kind === 'previewing' || step.kind === 'choosing'}>
-          prévisualiser
-        </button>
-      </form>
-      {step.kind === 'error' && (
-        <p className="admin-error" role="alert">
-          {step.message}
+      {set.skipped.length > 0 && <p>Pas diffusé&nbsp;: {reasonsText(set.skipped)}.</p>}
+      {set.readError && (
+        <p className="admin-warning">
+          {/* With U+FE0E, so that phones don't draw it as a colored emoji. */}
+          {'\u26a0\ufe0e'} La piste n'a pas pu être lue sur SoundCloud&nbsp;: {set.readError}.
+          {!set.skipped.includes('unread') && ' La radio continue avec ce qui en avait été lu avant.'}
         </p>
-      )}
-      {step.kind === 'chosen' && <p className="admin-notice">La radio joue maintenant «&nbsp;{step.title}&nbsp;».</p>}
-      {(step.kind === 'preview' || step.kind === 'choosing') && (
-        <div className="radio-preview">
-          <PlaylistHeader url={step.playlist.url} title={step.playlist.title} playlist={step.playlist} />
-          <PlaylistTracks playlist={step.playlist} onAir={null} />
-          {step.playlist.tracks.some((track) => track.kind === 'rotation') ? (
-            <>
-              <p>La radio passera tout de suite au début de cette playlist (sans couper les auditeurs en cours).</p>
-              <button type="button" className="radio-choose" onClick={choose} disabled={step.kind === 'choosing'}>
-                jouer cette playlist
-              </button>
-            </>
-          ) : (
-            <p className="admin-error">Aucune piste de cette playlist ne peut être jouée en entier&nbsp;: elle ne peut pas être choisie.</p>
-          )}
-        </div>
       )}
     </>
   )
 }
 
-// Links to SoundCloud playlists, e.g. "https://soundcloud.com/parkingdotradio/sets/rotation". A private playlist can only
-// be read through its private link, which ends with its secret, e.g.
-// "https://soundcloud.com/parkingdotradio/sets/rotation/s-AbC123". Parameters, e.g. "?si=...", are allowed.
-//
-// This is a copy of the server's `playlistLink` (server/src/radio/routes.ts), which decides: it lets the page say that
-// a link isn't to a playlist without asking for a preview.
-const PLAYLIST_LINK = /^\s*https?:\/\/(?:www\.)?soundcloud\.com(\/[^/?#\s]+\/sets\/[^/?#\s]+(?:\/s-[^/?#\s]+)?)\/?(?:[?#]\S*)?\s*$/
+// What a set's performers are called, e.g. "Aurore, Brume", or "Set" once they're all deleted.
+const performerNames = (set: Listed) => set.performers.map((performer) => performer.name).join(', ') || 'Set'
 
-// The playlist `link` leads to, as a link without anything that doesn't identify the playlist, or null if it isn't a link
-// to a playlist.
-function playlistLink(link: string): string | null {
-  const path = PLAYLIST_LINK.exec(link)?.[1]
-  return path ? `https://soundcloud.com${path}` : null
+// What finds a set in the field that adds one: its performers, its session's title, and its day, written out.
+const searchFields = (set: Listed) => [...set.performers.map((performer) => performer.name), set.session.title, sessionLongDay(set.session)]
+
+// Why saving the rotation `sent` failed: about one of its sets, by its place, or else the server's error.
+function saveError(error: { error: string; setIndex?: number; reasons?: SkipReason[] }, sent: Listed[]): string {
+  const set = error.setIndex === undefined ? undefined : sent[error.setIndex]
+  if (!set) return `La rotation n'a pas pu être enregistrée\u00a0: ${error.error}`
+  const named = `${capitalized(setInSentence(set))} (${sessionName(set.session)})`
+  // Without `reasons`, it's the only error about a set that the page can get: it never sends a set twice.
+  if (!error.reasons) return `${named} n'existe plus\u00a0: retirez-le de la rotation.`
+  return `${named} ne peut pas être ajouté à la rotation\u00a0: ${reasonsText(error.reasons)}.`
 }
+
+type Step = 'editing' | 'confirming' | 'sending'
+
+// The rotation's sets as they were shown when « modifier » was clicked, to reorder them, take them out, or add others,
+// then save them once that's confirmed.
+function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation; onCancel: () => void; onSaved: (rotation: RadioRotation) => void }) {
+  const [shown] = useState(() => shownOrder(rotation))
+  const [sets, setSets] = useState<Listed[]>(shown)
+  const [step, setStep] = useState<Step>('editing')
+  const [error, setError] = useState<string | null>(null)
+  // Loaded again once saving says that a set can't be added, which may no longer be the only one.
+  const [candidatesVersion, setCandidatesVersion] = useState(0)
+  const candidates = useApi('/api/admin/radio/rotation/candidates', { version: candidatesVersion })
+  const pickerId = useId()
+  // What the confirmation is described by, for screen readers, which read it as the focus moves into it.
+  const confirmationId = useId()
+  const dialog = useRef<HTMLDialogElement>(null)
+  const list = useRef<HTMLDivElement>(null)
+  const save = useRef<HTMLButtonElement>(null)
+  const confirm = useRef<HTMLButtonElement>(null)
+  const locked = step !== 'editing'
+
+  // The focus goes where « modifier » was, on the first set's handle, or on the field when there's none. The confirmation
+  // is a modal dialog, which the browser draws over the page, closes with Escape, and keeps the focus in while it's open:
+  // it opens with the focus on « confirmer », and closes with it back on « enregistrer ».
+  useEffect(() => {
+    ;(list.current?.querySelector<HTMLElement>('.admin-handle') ?? document.getElementById(pickerId))?.focus()
+  }, [pickerId])
+  const previousStep = useRef(step)
+  useEffect(() => {
+    if (step === 'confirming' && previousStep.current === 'editing') {
+      dialog.current?.showModal()
+      confirm.current?.focus()
+    }
+    if (step === 'editing' && previousStep.current !== 'editing') {
+      dialog.current?.close()
+      save.current?.focus()
+    }
+    previousStep.current = step
+  }, [step])
+
+  // The sets that can be added, then those taken out of the list, each once, unless they're in it.
+  const offered = useMemo(() => {
+    const listed = new Set(sets.map((set) => set.id))
+    const removed = shown.filter((set) => !listed.has(set.id))
+    const taken = new Set([...sets, ...shown].map((set) => set.id))
+    const addable = candidates.kind === 'loaded' ? candidates.value.sets.filter((set) => !taken.has(set.id)) : []
+    return [...addable.map((set): Listed => ({ ...set, skipped: [] })), ...removed]
+  }, [candidates, sets, shown])
+  // Kept from one render to the next, so that the field doesn't search them again on every render (see combobox.tsx).
+  const options = useMemo(() => offered.map((set): ComboboxOption => ({ key: set.id, label: setName(set), detail: sessionName(set.session) })), [offered])
+  const filter = useMemo((): ComboboxFilter => {
+    const fields = new Map(offered.map((set) => [set.id, searchFields(set)]))
+    return (options, query) => search(options, query, (option) => fields.get(option.key)!)
+  }, [offered])
+
+  const onAir = rotation.current?.setId
+  const changed = sets.length !== shown.length || sets.some((set, i) => set.id !== shown[i].id)
+  // What saving does to what's on air (see "On air" in docs/design/server/radio.md). The sets added count as ones that can
+  // be played, since saving reads their tracks.
+  let consequence: string
+  if (sets.length === 0) consequence = 'La rotation sera vide\u00a0: la radio sera hors ondes.'
+  else if (sets.every((set) => set.skipped.length > 0)) consequence = 'Aucun set de la rotation ne pourra être diffusé\u00a0: la radio sera hors ondes.'
+  else if (!onAir) consequence = 'La radio reviendra tout de suite en ondes.'
+  else if (!sets.some((set) => set.id === onAir)) consequence = 'Le set en cours sera retiré de la rotation\u00a0: la radio passera tout de suite au set suivant.'
+  else consequence = "Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant."
+
+  const send = async () => {
+    setStep('sending')
+    const result = await api.PUT('/api/admin/radio/rotation', { body: { sets: sets.map((set) => set.id) } })
+    if (result.ok) return onSaved(result)
+    setStep('editing')
+    setError(saveError(result, sets))
+    if ('reasons' in result && result.reasons) setCandidatesVersion((version) => version + 1)
+  }
+
+  return (
+    <>
+      <div ref={list} className="rotation-edit">
+        <OrderedList
+          items={sets}
+          keyOf={(set) => set.id}
+          label={performerNames}
+          name={(set) => setName(set, set.session)}
+          detail={(set) => (
+            <>
+              {sessionName(set.session)}
+              {set.id === onAir && <OnAirTag />}
+              <SetState set={set} />
+            </>
+          )}
+          onChange={setSets}
+          nextFocus={pickerId}
+          disabled={locked}
+          autoScroll
+        />
+      </div>
+      {sets.length === 0 && <p className="admin-placeholder">La rotation est vide.</p>}
+
+      <div className="admin-form rotation-add">
+        <div className="admin-field">
+          <label htmlFor={pickerId}>Ajouter un set</label>
+          <Combobox
+            id={pickerId}
+            options={options}
+            selected={null}
+            onSelect={(id) => {
+              const set = offered.find((set) => set.id === id)
+              if (set) setSets([...sets, set])
+            }}
+            filter={filter}
+            placeholder={
+              candidates.kind === 'error' ? "les sets n'ont pas pu être chargés" : candidates.kind === 'loading' ? 'chargement des sets…' : 'choisir un set…'
+            }
+            disabled={locked || candidates.kind === 'error'}
+          />
+        </div>
+        <p className="admin-hint">Seuls les sets annoncés et joués, avec un lien SoundCloud et YouTube, sont disponibles.</p>
+      </div>
+      {candidates.kind === 'error' && (
+        <p className="admin-error" role="alert">
+          Les sets qu'on peut ajouter n'ont pas pu être chargés&nbsp;: {candidates.message}
+        </p>
+      )}
+
+      {error && (
+        <p className="admin-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="admin-toolbar">
+        <button
+          ref={save}
+          type="button"
+          className="admin-primary"
+          onClick={() => {
+            setError(null)
+            if (changed) setStep('confirming')
+            else onCancel()
+          }}
+        >
+          enregistrer
+        </button>
+        <button type="button" onClick={onCancel}>
+          annuler
+        </button>
+      </div>
+      <dialog
+        ref={dialog}
+        className="rotation-confirm"
+        aria-label="Enregistrer la rotation"
+        aria-describedby={confirmationId}
+        // Escape goes back to changing the list, but not while the rotation is sent. Browsers can close it anyway, e.g. on
+        // a second Escape, which goes back to changing the list too.
+        onCancel={(event) => {
+          event.preventDefault()
+          if (step === 'confirming') setStep('editing')
+        }}
+        onClose={() => {
+          if (step === 'confirming') setStep('editing')
+        }}
+      >
+        <p id={confirmationId}>{consequence}</p>
+        <div className="admin-toolbar">
+          <button ref={confirm} type="button" className="admin-primary" disabled={step === 'sending'} onClick={send}>
+            {step === 'sending' ? 'enregistrement…' : 'confirmer'}
+          </button>
+          <button type="button" disabled={step === 'sending'} onClick={() => setStep('editing')}>
+            revenir
+          </button>
+        </div>
+      </dialog>
+    </>
+  )
+}
+

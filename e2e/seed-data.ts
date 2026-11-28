@@ -469,7 +469,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     applications: [application([141], 'new', { receivedDaysAgo: 9 })],
   },
   // The guests of past guest mixes, whose sets are on SoundCloud and YouTube, known only by name.
-  ...['DENEB', 'BOOMY', 'CRISSEMARQUEUR', 'esile', 'Chloe Lallouz', 'SIMULAT3D HUMAN', 'OMIZS', 'PALMEER', 'CHVCK'].map((name) => ({
+  ...['SIRÈNE', 'BOUMIX', 'PLUMEFEUTRE', 'lumio', 'Margot Lafleur', 'SYNTH3TIC ÉCHO', 'ORVAL', 'KALMAR', 'BRVCK'].map((name) => ({
     profile: { name, ...LEFT_OUT },
     applications: [],
   })),
@@ -627,13 +627,13 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
   // Collectives known only by name, from their past takeovers, whose sets are on SoundCloud and YouTube, with their
   // artists, known by name too.
   {
-    profile: { name: 'Fence Hop', country: '', city: '', description: '', links: {}, email: null, phone: '' },
-    members: [{ name: 'JEY SYANO' }, { name: 'LEX FERENDA' }, { name: 'SOFTWAREWOLFE' }],
+    profile: { name: 'Haie Vive', country: '', city: '', description: '', links: {}, email: null, phone: '' },
+    members: [{ name: 'MIRO VELANE' }, { name: 'NOX BRUMAL' }, { name: 'TERRAFORMEUSE' }],
     applications: [],
   },
   {
-    profile: { name: 'PUNKDT', country: '', city: '', description: '', links: {}, email: null, phone: '' },
-    members: [{ name: 'Queenie Jr' }, { name: 'Vayia' }, { name: 'Erick Mizen' }],
+    profile: { name: 'PANKRAT', country: '', city: '', description: '', links: {}, email: null, phone: '' },
+    members: [{ name: 'Reinette Jr' }, { name: 'Talia' }, { name: 'Gaspard Rivet' }],
     applications: [],
   },
 ]
@@ -691,7 +691,7 @@ export type SeedSession = {
 }
 
 // A set of an hour of a past session, as a DJ, with its track, one of the real ones the stand-in for SoundCloud knows,
-// e.g. "deneb" for "https://soundcloud.com/parkingdotradio/deneb", and its video on YouTube.
+// by the end of its link, "https://soundcloud.com/parkingdotradio/<track>", and its video on YouTube.
 function recorded(performer: string, track: string, youtubeVideo: string): SeedSet {
   const soundcloudTrack = `https://soundcloud.com/parkingdotradio/${track}`
   if (!STAND_IN_TRACKS.some(({ link }) => link === soundcloudTrack)) throw new Error(`${soundcloudTrack} isn't one of STAND_IN_TRACKS`)
@@ -763,15 +763,15 @@ export const SEED_SESSIONS: SeedSession[] = [
     ],
   },
   // Past sessions whose sets are on SoundCloud, with Parking Radio's real tracks, and on YouTube.
-  played(80, [recorded('JEY SYANO', 'jeysyano', 'ktTsEHfsQdA'), recorded('LEX FERENDA', 'lexferenda', '00hn04sElAs'), recorded('SOFTWAREWOLFE', 'softwarewolfe', '1HUqys2m2fU')], {
-    takeover: 'Fence Hop',
+  played(80, [recorded('MIRO VELANE', 'jeysyano', 'ktTsEHfsQdA'), recorded('NOX BRUMAL', 'lexferenda', '00hn04sElAs'), recorded('TERRAFORMEUSE', 'softwarewolfe', '1HUqys2m2fU')], {
+    takeover: 'Haie Vive',
   }),
-  played(52, [recorded('DENEB', 'deneb', 'JZSPYmZZ_1U'), recorded('BOOMY', 'boomy', 'I40svMNkmdM'), recorded('CRISSEMARQUEUR', 'crissemarqueur', '6Cyve922ib4')]),
-  played(44, [recorded('esile', 'esile', 'ZRyaKC8S4aI'), recorded('Chloe Lallouz', 'chloelallouz', 'imjJl6feoM0'), recorded('SIMULAT3D HUMAN', 'simulat3dhuman', 'fKOHZ10XrIQ')]),
+  played(52, [recorded('SIRÈNE', 'deneb', 'JZSPYmZZ_1U'), recorded('BOUMIX', 'boomy', 'I40svMNkmdM'), recorded('PLUMEFEUTRE', 'crissemarqueur', '6Cyve922ib4')]),
+  played(44, [recorded('lumio', 'esile', 'ZRyaKC8S4aI'), recorded('Margot Lafleur', 'chloelallouz', 'imjJl6feoM0'), recorded('SYNTH3TIC ÉCHO', 'simulat3dhuman', 'fKOHZ10XrIQ')]),
   // Whose sets can be added to the rotation, but aren't in it.
-  played(43, [recorded('OMIZS', 'omizs', 'iyiDOPQH6AA'), recorded('PALMEER', 'palmeer', 'PmFA8bW89W8'), recorded('CHVCK', 'chvck', 'SnMkR1Rwz7o')], { rotation: false }),
-  played(33, [recorded('Queenie Jr', 'queeniejr-20261029', 'kLcswPJayeo'), recorded('Vayia', 'vayia', '9LRBWCfX5iY'), recorded('Erick Mizen', 'mizen', 'IT57ovDzKzo')], {
-    takeover: 'PUNKDT',
+  played(43, [recorded('ORVAL', 'omizs', 'iyiDOPQH6AA'), recorded('KALMAR', 'palmeer', 'PmFA8bW89W8'), recorded('BRVCK', 'chvck', 'SnMkR1Rwz7o')], { rotation: false }),
+  played(33, [recorded('Reinette Jr', 'queeniejr-20261029', 'kLcswPJayeo'), recorded('Talia', 'vayia', '9LRBWCfX5iY'), recorded('Gaspard Rivet', 'mizen', 'IT57ovDzKzo')], {
+    takeover: 'PANKRAT',
   }),
   // Collectif Béton's takeover, which comes from its application, with a name of its own: a guest who isn't one of its
   // artists, then two of its artists together, until after midnight.

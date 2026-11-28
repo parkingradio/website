@@ -33,6 +33,7 @@ logged-in admin's email and a "se déconnecter" button:
 - [Sessions](sessions.md)
 - [Artistes](artistes.md)
 - [Rotation radio](rotation.md)
+- [Rotation radio (legacy)](rotation-legacy.md)
 - [Intégrations](integrations.md)
 - [Admins](admins.md)
 - [Configuration](configuration.md)
@@ -167,7 +168,8 @@ dots at the start of each item: with a mouse, or on a touch screen once it's hel
 a collective's artists are also numbered. Only the handle starts a drag, so that elsewhere the items' links and buttons
 work as usual, and swiping scrolls the page. The item moves to where it's dropped, and the others make room for it, but
 the list's order only changes once it's dropped. Escape puts it back. Dragging with a mouse or a finger doesn't scroll
-the page, since the lists are short.
+the page, since the lists are short, except in the radio's rotation (see [Rotation radio](rotation.md)), which can be
+longer than the screen: there, the page scrolls while an item is dragged near the screen's top or bottom.
 
 The handle also works with the keyboard: Space or Enter picks the item up, the up and down arrows move it one place, and
 Space, Enter or Tab drops it, while moving the focus elsewhere, e.g. by clicking, puts it back. The focus stays on the

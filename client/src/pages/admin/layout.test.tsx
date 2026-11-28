@@ -55,6 +55,7 @@ describe('Admin pages', () => {
       ['sessions', '/admin/sessions'],
       ['artistes', '/admin/artistes'],
       ['rotation radio', '/admin/rotation'],
+      ['rotation radio (legacy)', '/admin/rotation-legacy'],
       ['intégrations', '/admin/integrations'],
       ['admins', '/admin/admins'],
       ['configuration', '/admin/configuration'],

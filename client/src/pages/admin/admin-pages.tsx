@@ -4,6 +4,7 @@ import { AdminLayout } from './layout'
 import { Admins } from './admins'
 import { Calendrier } from './calendrier'
 import { Rotation } from './rotation'
+import { RotationLegacy } from './rotation-legacy'
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './applications'
 import { ArtistPage, ArtistsPage, NewArtistPage } from './artists'
 import { CollectivePage, NewCollectivePage } from './collectives'
@@ -20,6 +21,7 @@ const pages = {
   Admins,
   Calendrier,
   Rotation,
+  RotationLegacy,
   ApplicationsPage,
   NewApplicationPage,
   ApplicationPage,

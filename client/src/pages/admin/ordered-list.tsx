@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import { DragHandle, SortableList } from './sortable'
 import { arrayMove, useSortableItem } from './use-sortable'
 
@@ -12,12 +13,18 @@ type OrderedListProps<T> = {
   // What's shown of an item, and the name its buttons say, e.g. "retirer Aurore", which is what's shown unless it's given.
   label: (item: T) => string
   name?: (item: T) => string
+  // What's shown on a second line under an item's label, if anything, e.g. a set's session in the radio's rotation.
+  detail?: (item: T) => ReactNode
   onChange: (items: T[]) => void
   // The id of what gets the focus once the last item is removed, e.g. the field that adds one.
   nextFocus: string
+  // While the list can't be changed, e.g. while it's sent.
+  disabled?: boolean
+  // For a list that can be longer than the screen (see `SortableList`).
+  autoScroll?: boolean
 }
 
-export function OrderedList<T>({ items, keyOf, label, name = label, onChange, nextFocus }: OrderedListProps<T>) {
+export function OrderedList<T>({ items, keyOf, label, name = label, detail, onChange, nextFocus, disabled = false, autoScroll }: OrderedListProps<T>) {
   const list = useRef<HTMLOListElement>(null)
   // What gets the focus once an item is removed, since its × is gone: the next item's ×, by its key, or else `nextFocus`.
   const focusNext = useRef<{ key: string } | 'next' | null>(null)
@@ -42,24 +49,48 @@ export function OrderedList<T>({ items, keyOf, label, name = label, onChange, ne
   if (items.length === 0) return null
   const keys = items.map(keyOf)
   return (
-    <SortableList ids={keys} nameOf={(index) => name(items[index])} onMove={(from, to) => onChange(arrayMove(items, from, to))}>
+    <SortableList
+      ids={keys}
+      nameOf={(index) => name(items[index])}
+      disabled={disabled}
+      autoScroll={autoScroll}
+      onMove={(from, to) => onChange(arrayMove(items, from, to))}
+    >
       <ol ref={list} className="admin-chosen admin-ordered">
         {items.map((item, index) => (
-          <OrderedItem key={keys[index]} id={keys[index]} number={index + 1} label={label(item)} name={name(item)} onRemove={() => remove(index)} />
+          <OrderedItem
+            key={keys[index]}
+            id={keys[index]}
+            number={index + 1}
+            label={label(item)}
+            name={name(item)}
+            detail={detail?.(item)}
+            disabled={disabled}
+            onRemove={() => remove(index)}
+          />
         ))}
       </ol>
     </SortableList>
   )
 }
 
-function OrderedItem({ id, number, label, name, onRemove }: { id: string; number: number; label: string; name: string; onRemove: () => void }) {
+type OrderedItemProps = { id: string; number: number; label: string; name: string; detail: ReactNode; disabled: boolean; onRemove: () => void }
+
+function OrderedItem({ id, number, label, name, detail, disabled, onRemove }: OrderedItemProps) {
   const { ref, style, dragging, handle } = useSortableItem(id)
   return (
     <li ref={ref} style={style} data-item={id} data-dragging={dragging || undefined}>
       <DragHandle handle={handle} label={`réordonner ${name}`} />
       <b>{number}</b>
-      {label}
-      <button type="button" data-action="remove" aria-label={`retirer ${name}`} onClick={onRemove}>
+      {detail ? (
+        <div className="admin-ordered-text">
+          {label}
+          <div className="admin-ordered-detail">{detail}</div>
+        </div>
+      ) : (
+        label
+      )}
+      <button type="button" data-action="remove" aria-label={`retirer ${name}`} disabled={disabled} onClick={onRemove}>
         ×
       </button>
     </li>
