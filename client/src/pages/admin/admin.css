@@ -460,6 +460,16 @@
   margin-top: 1.5rem;
 }
 
+/* Its rows are as wide as the list, as when it isn't changed, with their « × » lined up on the right. */
+.rotation-edit .admin-ordered {
+  align-items: stretch;
+}
+
+.rotation-edit .admin-ordered-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .rotation-add {
   max-width: 600px;
 }
