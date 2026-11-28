@@ -518,7 +518,7 @@ describe('Rotation', () => {
       await modify()
       const day = () => screen.getByText('vendredi 2 octobre')
       const aurore = screen.getByRole('button', { name: /^réordonner Set de Aurore/ })
-      mockListLayout()
+      const laidOut = mockListLayout()
 
       // Picked up, and moved, but not dropped yet: the day keeps its place, but isn't shown.
       await pickUp(aurore)
@@ -528,6 +528,7 @@ describe('Rotation', () => {
       // Put back.
       fireEvent.keyDown(aurore, { key: 'Escape', code: 'Escape' })
       await act(() => new Promise((resolve) => setTimeout(resolve)))
+      laidOut.mockRestore()
       expect(day()).toBeVisible()
 
       // Dropped (see the test above for where the day is then).
