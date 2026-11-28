@@ -11,15 +11,15 @@ have been entered, a line says that the radio can't read any track until then, a
 [Configuration](configuration.md), where they're entered.
 
 The sets are listed in the order they come on air, as the server gives them, from the play head (see
-[On air](../../server/radio.md#on-air)), the one on air first. Like the legacy page's tracks, each other set that isn't
-skipped shows when it begins, with the day whenever it changes. Each set shows its performers and its session's title
-and day (see [Names, in Sessions](sessions.md#names)), linking to their pages, its track's length once it's been read,
-and its "SoundCloud" and "YouTube" links.
+[On air](../../server/radio.md#on-air)), the one on air first, one per row, set apart like the rows of the admin pages'
+tables. Like the legacy page's tracks, each set that isn't skipped shows when it begins, or began, for the one on air,
+with the day whenever it changes. Each set shows its performers and its session's title and day (see
+[Names, in Sessions](sessions.md#names)), linking to their pages, and its track's length once it's been read, each in
+its column.
 
-The play head is drawn across the list, as a red line over the set on air, with « ▶ en ondes » in the margin where the
-times are. The list moves under it, rather than it moving with a set. The set under it shows how far into it the radio
-is, by the browser's clock: a bar, with the time played and the set's length, e.g. « 23:14 / 55:02 », which moves on
-every second. Off air, there's no play head.
+The play head is drawn across the list, over the set on air, which screen readers are told is « en ondes ». The set
+under it shows how far into it the radio is, by the browser's clock: a bar, with the time played and the set's length,
+e.g. « 23:14 / 55:02 », which moves on every second. Off air, there's no play head.
 
 Skipped sets stay in their place, faded out, without a time, and say why (see
 [Which sets](../../server/radio.md#which-sets)). When the last read of a set's track failed, the set has a warning (see
@@ -40,11 +40,12 @@ what it loaded last, and says why above it.
 « modifier » turns the list, in the order shown, into one that can be changed like a set's performers (see
 [A set's form, in Sessions](sessions.md#a-sets-form)): numbered, with handles that move the sets (see
 [Reordering](layout.md#reordering)), and a « × » that takes one out. It says why sets are skipped, with their
-warnings, but without times. The play head stays where it is, over the first set that isn't skipped, the sets added
-counting as ones that can be played, since saving reads their tracks: saving puts that set on air (see
-[On air](../../server/radio.md#on-air)), so moving another set there puts it on air. Its bar goes on moving when it's
-the set on air, and otherwise shows « 0:00 » and its length, since saving starts it from its start, or no bar while its
-length isn't known, e.g. for a set just added. With no set that can be played, there's no play head.
+warnings, but without times. The play head is over the first set that isn't skipped, the sets added counting as ones
+that can be played, since saving reads their tracks: saving puts that set on air (see
+[On air](../../server/radio.md#on-air)), so moving another set there puts it on air. The list moves under it, rather
+than it moving with a set. Its bar goes on moving when it's the set on air, and otherwise shows « 0:00 » and its length,
+since saving starts it from its start, or no bar while its length isn't known, e.g. for a set just added. With no set
+that can be played, there's no play head.
 
 Under the list, « Ajouter un set » adds a set at the end of it, and keeps the focus. It offers the sets that can be
 added (see

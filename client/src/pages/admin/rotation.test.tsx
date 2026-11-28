@@ -73,10 +73,11 @@ function renderPage(bodies: Record<string, Body | Promise<Body>> = {}) {
 }
 
 const list = () => document.querySelector<HTMLElement>('.rotation-sets')!
-// The text of `element`, but for how far into the set under the play head the radio is, which `progress` gives.
+// The text of `element`, but for how far into the set under the play head the radio is, which `progress` gives, and what
+// only screen readers are told, which `onAirSaid` gives.
 function textOf(element: Element): string {
   const copy = element.cloneNode(true) as Element
-  copy.querySelectorAll('.rotation-progress').forEach((progress) => progress.remove())
+  copy.querySelectorAll('.rotation-progress, .visually-hidden').forEach((hidden) => hidden.remove())
   return spaced(copy.textContent)
 }
 // The text of each row of the list, the days between them included.
@@ -96,6 +97,15 @@ function underHead(): string | null {
   const row = head.closest('.rotation-frame')!.querySelectorAll('ol > li')[parseInt(head.style.top) / 100]
   return row.querySelector('b') ? draftOf(row) : textOf(row)
 }
+
+// The rows that screen readers are told are on air, by their text, which is only the row under the play head.
+const onAirSaid = () =>
+  Array.from(document.querySelectorAll('.visually-hidden'))
+    .filter((hidden) => hidden.textContent!.trim() === 'en ondes')
+    .map((hidden) => {
+      const row = hidden.closest('li')!
+      return row.querySelector('b') ? draftOf(row) : textOf(row)
+    })
 
 // How far into the set under the play head the radio is, as it's shown, and as it's said, or null without it.
 function progress(): { shown: string; said: string | null; now: string | null; max: string | null } | null {
@@ -152,11 +162,11 @@ describe('Rotation', () => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Rotation radio')
       expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par someone@example.com le 30 septembre 2026 à 08 h 00.')
       expect(rows()).toEqual([
-        `Brume, Cyan${SATURDAY} · 1 h 05 · SoundCloud · YouTube`,
+        `23 h 00Brume, Cyan${SATURDAY}1 h 05`,
         'vendredi 2 octobre',
-        `00 h 05Écume${SATURDAY} · 30 min · SoundCloud · YouTube`,
-        `00 h 35Aurore${SATURDAY} · 30 min · SoundCloud · YouTube`,
-        `Kwame${SATURDAY} · 1 h 02 · SoundCloud · YouTube` + "Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.",
+        `00 h 05Écume${SATURDAY}30 min`,
+        `00 h 35Aurore${SATURDAY}30 min`,
+        `Kwame${SATURDAY}Pas diffusé : seul un extrait de 30 secondes de la piste peut être joué.1 h 02`,
       ])
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
@@ -170,7 +180,9 @@ describe('Rotation', () => {
 
       expect(document.querySelector('.rotation-head')).toHaveTextContent('▶ en ondes')
       expect(underHead()).toBe(rows()[0])
-      expect(rows()[0]).toMatch(/^Brume, Cyan/)
+      // Which screen readers are told, since the play head is only drawn.
+      expect(onAirSaid()).toEqual([rows()[0]])
+      expect(rows()[0]).toMatch(/^23 h 00Brume, Cyan/)
       expect(progress()).toEqual({ shown: '23:14 / 1:05:00', said: '23 min sur 1 h 05', now: '1394', max: '3900' })
       await act(() => vi.advanceTimersByTime(2000))
       expect(progress()).toMatchObject({ shown: '23:16 / 1:05:00', now: '1396' })
@@ -185,10 +197,21 @@ describe('Rotation', () => {
       await loaded()
 
       expect(underHead()).toBeNull()
+      expect(onAirSaid()).toEqual([])
       expect(progress()).toBeNull()
     })
 
-    it('links to the performers, the session, the track and the video, and fades out the sets that are skipped', async () => {
+    it('says the length of a set to the nearest minute, in its row as in its bar', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+      vi.setSystemTime(ON_AIR_AT + 10 * MINUTE)
+      renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [{ ...B, durationMs: 64 * MINUTE + 45 * 1000 }, C, A, K] } })
+      await loaded()
+
+      expect(rows()[0]).toMatch(/1 h 05$/)
+      expect(progress()).toEqual({ shown: '10:00 / 1:04:45', said: '10 min sur 1 h 05', now: '600', max: '3885' })
+    })
+
+    it('links to the performers and the session, but not the track or the video, and fades out the sets that are skipped', async () => {
       renderPage()
       await loaded()
 
@@ -196,18 +219,17 @@ describe('Rotation', () => {
       expect(within(b).getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-Brume')
       expect(within(b).getByRole('link', { name: 'Cyan' })).toHaveAttribute('href', '/admin/artistes/artist-Cyan')
       expect(within(b).getByRole('link', { name: named(SATURDAY) })).toHaveAttribute('href', '/admin/sessions/session-1')
-      expect(within(b).getByRole('link', { name: 'SoundCloud' })).toHaveAttribute('href', 'https://soundcloud.com/parkingdotradio/b')
-      expect(within(b).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=video-b')
+      expect(within(b).getAllByRole('link')).toHaveLength(3)
       expect(b).toHaveClass('rotation-set-current')
       expect(screen.getByText(/^Kwame$/).closest('li')).toHaveClass('rotation-set-skipped')
     })
 
-    it('says why each skipped set is skipped, and leaves out what a set has no length or link for', async () => {
+    it('says why each skipped set is skipped, and leaves out the length of a set whose track has not been read', async () => {
       const unread = rotationSet('u', ['Ulysse'], null, { youtubeVideo: null, session: { ...GUEST_MIXES, start: null }, skipped: ['not-announced', 'no-youtube-video', 'unread'] })
       renderPage({ [ROTATION_URL]: { ...ROTATION, sets: [...ROTATION.sets, unread] } })
       await loaded()
 
-      expect(rows().find((row) => row!.startsWith('Ulysse'))).toBe("UlysseGUEST MIXES, date à déterminer · SoundCloudPas diffusé : la session n'est pas annoncée, le set n'a pas de vidéo sur YouTube, la piste n'a pas encore été lue sur SoundCloud.")
+      expect(rows().find((row) => row!.startsWith('Ulysse'))).toBe("UlysseGUEST MIXES, date à déterminerPas diffusé : la session n'est pas annoncée, le set n'a pas de vidéo sur YouTube, la piste n'a pas encore été lue sur SoundCloud.")
     })
 
     it('warns when the last read of a track failed, and that the radio goes on with what was read before, unless it never was', async () => {
@@ -291,7 +313,7 @@ describe('Rotation', () => {
       await act(() => vi.advanceTimersByTimeAsync(5 * MINUTE))
       expect(requestsTo('GET', ROTATION_URL)).toHaveLength(0)
       await act(() => vi.advanceTimersByTimeAsync(2000))
-      await waitFor(() => expect(rows()[0]).toMatch(/^Écume/))
+      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écume/))
       expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
     })
 
@@ -329,7 +351,7 @@ describe('Rotation', () => {
       await act(() => document.dispatchEvent(new Event('visibilitychange')))
       expect(requestsTo('GET', ROTATION_URL)).toHaveLength(1)
       await shownAgain(NEXT)
-      await waitFor(() => expect(rows()[0]).toMatch(/^Écume/))
+      await waitFor(() => expect(rows()[0]).toMatch(/^00 h 05Écume/))
     })
 
     it('keeps what it loaded last when loading it again fails, and says why', async () => {
@@ -340,7 +362,7 @@ describe('Rotation', () => {
       await shownAgain({ ok: false, error: 'Internal server error' })
 
       expect(spaced((await screen.findByRole('alert')).textContent)).toBe("La rotation n'a pas pu être chargée à nouveau : Internal server error")
-      expect(rows()[0]).toMatch(/^Brume, Cyan/)
+      expect(rows()[0]).toMatch(/^23 h 00Brume, Cyan/)
       expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument()
     })
 
@@ -359,7 +381,7 @@ describe('Rotation', () => {
 
       // Once it's left as it is, the page shows it as it was loaded again.
       fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
-      expect(rows()[0]).toMatch(/^Écume/)
+      expect(rows()[0]).toMatch(/^00 h 05Écume/)
     })
   })
 
@@ -391,6 +413,7 @@ describe('Rotation', () => {
       // Another set under it starts from its start once it's saved.
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -2)
       expect(underHead()).toBe(`1 Aurore${SATURDAY}`)
+      expect(onAirSaid()).toEqual([underHead()])
       expect(progress()).toEqual({ shown: '0:00 / 30:00', said: '0 min sur 30 min', now: '0', max: '1800' })
       await act(() => vi.advanceTimersByTime(5000))
       expect(progress()).toMatchObject({ shown: '0:00 / 30:00' })
@@ -507,6 +530,7 @@ describe('Rotation', () => {
       pick('Set de Fréquence')
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Fréquence/ }), -4)
       expect(underHead()).toBe(`1 Fréquence Boréale${SATURDAY}`)
+      expect(onAirSaid()).toEqual([underHead()])
       // Its length isn't known until it's read.
       expect(progress()).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
@@ -586,7 +610,7 @@ describe('Rotation', () => {
       expect(screen.getByRole('status')).toHaveTextContent('La rotation a été enregistrée.')
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par admin@example.com le 1 octobre 2026 à 23 h 30.')
-      expect(rows().map(performersOf)).toEqual(['Brume, Cyan', 'vendredi 2 octobre', '00 h 05Aurore', 'Kwame', '00 h 35Fréquence Boréale'])
+      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyan', 'vendredi 2 octobre', '00 h 05Aurore', 'Kwame', '00 h 35Fréquence Boréale'])
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'modifier' }))
 
       // Until the rotation is changed again.
@@ -611,7 +635,7 @@ describe('Rotation', () => {
       await screen.findByText('La rotation a été enregistrée.')
 
       await reload.answer(ROTATION)
-      expect(rows().map(performersOf)).toEqual(['Brume, Cyan', 'vendredi 2 octobre', '00 h 35Aurore', 'Kwame'])
+      expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyan', 'vendredi 2 octobre', '00 h 35Aurore', 'Kwame'])
     })
 
     it("says which set can't be added, and why, keeps the changes, and loads the sets that can be added again", async () => {

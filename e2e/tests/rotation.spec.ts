@@ -38,7 +38,7 @@ test("the radio's rotation of sets has the seeded sets that seed-data.ts puts in
 const progress = (row: Locator) => row.getByRole('progressbar', { name: 'Avancement du set' })
 
 // The rows of the sets, without the days between them.
-const shownSets = (page: Page) => page.locator('.rotation-sets > li:not(.radio-tracks-day)')
+const shownSets = (page: Page) => page.locator('.rotation-sets > li[data-set]')
 
 test('Rotation radio lists the sets from the one on air, with why the skipped one is skipped, and the legacy page is next to it in the menu', async ({ page }) => {
   await logIn(page, { at: '/admin/rotation' })
@@ -48,6 +48,8 @@ test('Rotation radio lists the sets from the one on air, with why the skipped on
   await expect(page.locator('.rotation-head')).toHaveText('▶ en ondes')
   await expect(progress(shownSets(page).first())).toBeVisible()
   await expect(page.getByRole('progressbar')).toHaveCount(1)
+  // Which screen readers are told.
+  await expect(shownSets(page).first().locator('.visually-hidden')).toHaveText('en ondes')
   const kwame = shownSets(page).filter({ hasText: 'Kwame Asante' })
   await expect(kwame).toContainText('Pas diffusé\u00a0: seul un extrait de 30 secondes de la piste peut être joué.')
   await expect(kwame).toHaveClass('rotation-set-skipped')

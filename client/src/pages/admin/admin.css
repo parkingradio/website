@@ -331,11 +331,38 @@
   margin-top: 0.75rem;
 }
 
-/* The radio's rotation of sets, as a schedule like a playlist's tracks: each set on lines of its own, its performers,
-   then its session, its length and its links, then why it's skipped, if it is. Skipped sets are faded out, and say why,
-   so that it isn't told by color alone. */
-.rotation-sets li:not(.radio-tracks-day) {
-  margin-top: 0.5rem;
+/* The radio's rotation of sets, as a schedule, its rows set apart like the rows of the admin pages' tables (see
+   `.admin-table`), in columns: when each set begins, then its performers, its session, and why it's skipped, if it is,
+   then its length. The day before the sets that begin on another day is a row of its own. Skipped sets are faded out,
+   and say why, so that it isn't told by color alone. */
+.rotation-sets {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.6;
+}
+
+.rotation-sets > li {
+  padding: 0.6rem 0 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.rotation-sets > li[data-set] {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  column-gap: 1rem;
+}
+
+.rotation-day {
+  padding-top: 1rem;
+  font-weight: 700;
+}
+
+.rotation-set-time,
+.rotation-set-length {
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .rotation-set {
@@ -357,14 +384,10 @@
 }
 
 /* The play head: a red line across the list, the frame's rather than a row's, at the top of the row under it, with
-   « ▶ en ondes » in the margin where the times are (see `PlayHead` in rotation.tsx). Red like the environment's stamp
-   (see layout.css). While the list is changed, the frame makes room for the margin. */
+   « ▶ en ondes » on it, at its left end, and a tint over that row (see `PlayHead` in rotation.tsx). Red like the
+   environment's stamp (see layout.css). */
 .rotation-frame {
   position: relative;
-}
-
-.rotation-edit .rotation-frame {
-  padding-left: 5.5rem;
 }
 
 .rotation-head {
@@ -372,19 +395,36 @@
   z-index: 1;
   left: 0;
   right: 0;
-  margin-top: -4px;
-  border-top: 2px solid #e0301e;
+  box-sizing: border-box;
+  border-top: 3px solid #e0301e;
   pointer-events: none;
+}
+
+.rotation-head-tint {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(224 48 30 / 6%);
 }
 
 .rotation-head span {
   position: absolute;
-  top: 0.25rem;
+  top: -1.5px;
   left: 0;
-  color: #e0301e;
+  padding: 0 6px 0 4px;
+  transform: translateY(-50%);
+  background: #e0301e;
+  color: #fff;
   font-size: 11px;
   font-weight: 700;
+  line-height: 16px;
   white-space: nowrap;
+}
+
+/* Over a box, rather than a row, the label stands on the line, so as not to cover the box's text. */
+.rotation-edit .rotation-head span {
+  top: -3px;
+  transform: translateY(-100%);
 }
 
 /* How far into the set under the play head the radio is: a thin bar, then the time played and the set's length. */
