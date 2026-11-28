@@ -1,3 +1,4 @@
+import { toTheSecond } from '../api/formats.js'
 import type { Status } from '../sessions/fields.js'
 import type { TrackState } from './track-states.js'
 
@@ -104,11 +105,12 @@ export function onAirAt(entries: readonly Entry[], saved: Saved | null, now: num
 }
 
 // The sets that come after `onAir`, which is on air, with when each one starts: `count` of them, around the rotation as
-// many times as it takes, or, without `count`, each other set that isn't skipped, once.
+// many times as it takes, or, without `count`, each other set that isn't skipped, once. The times are worked out from
+// when `onAir` started as the API gives it, to the second, so that adding the sets' lengths to it gives the same times.
 export function upcoming<E extends Entry>(entries: readonly E[], onAir: OnAir, count?: number): { entry: E; startsAt: number }[] {
   const sets = entries.filter(playable)
   const index = sets.findIndex((entry) => entry.setId === onAir.setId)
-  let startsAt = onAir.startedAt + sets[index].durationMs!
+  let startsAt = toTheSecond(onAir.startedAt) + sets[index].durationMs!
   const found: { entry: E; startsAt: number }[] = []
   for (let i = 1; i <= (count ?? sets.length - 1); i++) {
     const entry = sets[(index + i) % sets.length]

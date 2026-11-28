@@ -289,6 +289,39 @@ describe('the rotation of sets', () => {
     expect((await putRotation([a, d])).json().current.setId).toBe(a)
   })
 
+  it('gives when each set goes on air from when the set on air started, as it gives it, to the second', async () => {
+    const session = await createSession(4)
+    const [a, p, b, c] = setIds(session)
+    // Tracks that last an hour and 700 milliseconds, p's too, which is skipped, so that its length isn't counted.
+    const length = HOUR + 700
+    const states = ['playable', 'preview', 'playable', 'playable'] as const
+    states.forEach((state, i) => answers.set(linkOf(session, i), { state, durationMs: length, secretToken: null }))
+    await putRotation([a, p, b, c])
+    // a went on air 600 milliseconds into a second, which the API drops.
+    const startedAt = Math.floor(Date.now() / 1000) * 1000 - 10_000
+    await database.db.execute(sql`update radio_rotation set on_air_started_at = ${new Date(startedAt + 600).toISOString()}::timestamptz`)
+    // When the set k after a goes on air: a's start as given, plus k lengths, to the second.
+    const after = (k: number) => Math.floor((startedAt + k * length) / 1000) * 1000
+
+    for (const given of [await rotation(), (await putRotation([a, p, b, c])).json()]) {
+      expect(given.current.setId).toBe(a)
+      expect(Date.parse(given.current.startedAt)).toBe(startedAt)
+      const starts = given.sets.map(({ id, startsAt }: { id: string; startsAt: string | null }) => [id, startsAt && Date.parse(startsAt)])
+      expect(starts).toEqual([
+        [a, startedAt],
+        [p, null],
+        [b, after(1)],
+        [c, after(2)],
+      ])
+    }
+
+    const now = await onAir('?upcoming=4')
+    expect(Date.parse(now.current.startedAt)).toBe(startedAt)
+    expect(now.upcoming.map(({ set, startsAt }: { set: { id: string }; startsAt: string }) => [set.id, Date.parse(startsAt)])).toEqual(
+      [b, c, a, b].map((id, i) => [id, after(i + 1)]),
+    )
+  })
+
   it('puts a set just added first on air once its track is read, by the time it responds', async () => {
     const [a, b] = setIds(await createSession(2))
     const [x, y] = setIds(await createSession(2, { day: 2 }))
