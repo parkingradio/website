@@ -47,8 +47,8 @@ named with their session (see [Names, in Sessions](sessions.md#names)), and sear
 field says which sets can be added. When they can't be loaded, the field can't be used, and the page says why.
 
 « annuler » leaves the rotation as it is, and so does « enregistrer » when the list is as it was when « modifier » was
-clicked. Otherwise, « enregistrer » asks to confirm, on the page rather than in a dialog, with « confirmer », and
-« revenir », which goes back to changing the list, and a sentence that says what saving does to what's on air (see
+clicked. Otherwise, « enregistrer » asks to confirm, in a dialog on the page rather than the browser's, with
+« confirmer », and « revenir », which, like Escape, goes back to changing the list, and a sentence that says what saving does to what's on air (see
 [On air](../../server/radio.md#on-air)), the first of these that applies:
 
 - The radio will be off air: the rotation would be empty, or every set in it skipped, the sets added counting as ones

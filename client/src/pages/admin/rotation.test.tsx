@@ -316,7 +316,7 @@ describe('Rotation', () => {
       // Where « modifier » was.
       expect(document.activeElement).toBe(screen.getByRole('button', { name: named(`réordonner Set de Brume et Cyan, ${SATURDAY}`) }))
       expect(document.querySelector('.rotation-sets')).not.toBeInTheDocument()
-      expect(screen.getByText(/^On peut ajouter les sets/)).toBeInTheDocument()
+      expect(screen.getByText('Seuls les sets annoncés et joués, avec un lien SoundCloud et YouTube, sont disponibles.')).toBeInTheDocument()
     })
 
     it('reorders the sets with the keyboard, takes them out, and adds others at the end, keeping the focus', async () => {
@@ -386,24 +386,34 @@ describe('Rotation', () => {
   })
 
   describe('confirming', () => {
-    const confirmation = () => Array.from(document.querySelectorAll('.rotation-confirm p')).map((p) => spaced(p.textContent))
+    // What the dialog says, while it's open.
+    const confirmation = () => Array.from(document.querySelectorAll('.rotation-confirm[open] p')).map((p) => spaced(p.textContent))
 
-    it('asks to confirm what the change does on the radio, here that the set on air goes on, and goes back to the changes with « revenir »', async () => {
+    it('asks to confirm what the change does on the radio in a dialog, here that the set on air goes on, and goes back to the changes with « revenir »', async () => {
       await modify()
       await moveWithKeyboard(screen.getByRole('button', { name: /^réordonner Set de Aurore/ }), -1)
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
       expect(confirmation()).toEqual(["Le set en cours continue : les changements s'appliquent dès le set suivant."])
-      // Which screen readers read along with it, as it gets the focus.
-      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer', description: named("Le set en cours continue : les changements s'appliquent dès le set suivant.") }))
+      // Which screen readers read as the focus moves into it, onto « confirmer ».
+      expect(screen.getByRole('dialog', { name: 'Enregistrer la rotation', description: named("Le set en cours continue : les changements s'appliquent dès le set suivant.") })).toHaveAttribute('open')
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'confirmer' }))
       // The list can't be changed meanwhile.
       expect(screen.getByRole('button', { name: /^retirer Set de Aurore/ })).toBeDisabled()
       expect(picker()).toBeDisabled()
 
       fireEvent.click(screen.getByRole('button', { name: 'revenir' }))
       expect(confirmation()).toEqual([])
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'enregistrer' }))
       expect(screen.getByRole('button', { name: /^retirer Set de Aurore/ })).toBeEnabled()
+
+      // Escape too.
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+      expect(confirmation()).toHaveLength(1)
+      fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+      expect(confirmation()).toEqual([])
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'enregistrer' }))
       expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(0)
     })
 
@@ -456,9 +466,12 @@ describe('Rotation', () => {
       const answer = held()
       await changeAndConfirm({ [`PUT ${ROTATION_URL}`]: answer.body })
 
+      // The dialog stays open, and Escape doesn't close it.
       const sending = screen.getByRole('button', { name: 'enregistrement…' })
       expect(sending).toBeDisabled()
       expect(screen.getByRole('button', { name: 'revenir' })).toBeDisabled()
+      fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+      expect(screen.getByRole('dialog')).toHaveAttribute('open')
       expect(screen.getByRole('button', { name: /^réordonner Set de Aurore/ })).toHaveAttribute('aria-disabled', 'true')
       await waitFor(() => expect(requestsTo('PUT', ROTATION_URL)).toHaveLength(1))
       expect(jsonBody(requestsTo('PUT', ROTATION_URL)[0])).toEqual({ sets: ['b', 'a', 'k', 'f'] })
@@ -466,6 +479,7 @@ describe('Rotation', () => {
       const savedF = rotationSet('f', ['Fréquence Boréale'], 60, { startsAt: at(ON_AIR_AT + 95 * MINUTE) })
       await answer.answer({ ...ROTATION, updatedBy: 'admin@example.com', updatedAt: '2026-10-02T03:30:00.000Z', sets: [B, { ...A, startsAt: at(ON_AIR_AT + 65 * MINUTE) }, K, savedF] })
       expect(screen.getByRole('status')).toHaveTextContent('La rotation a été enregistrée.')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(spaced(screen.getByText(/^Modifiée par/).textContent)).toBe('Modifiée par admin@example.com le 1 octobre 2026 à 23 h 30.')
       expect(rows().map(performersOf)).toEqual(['23 h 00Brume, Cyanen cours', 'vendredi 2 octobre', '00 h 05Aurore', 'Kwame', '00 h 35Fréquence Boréale'])
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'modifier' }))
@@ -504,6 +518,7 @@ describe('Rotation', () => {
         `Le set de Fréquence Boréale (${SATURDAY}) ne peut pas être ajouté à la rotation : la session n'est pas annoncée, le set est annulé.`,
       )
       expect(draft().map(performersOf)).toEqual(['1 Brume, Cyan', '2 Aurore', '3 Kwame', '4 Fréquence Boréale'])
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'enregistrer' }))
       await waitFor(() => expect(requestsTo('GET', CANDIDATES_URL)).toHaveLength(2))
     })

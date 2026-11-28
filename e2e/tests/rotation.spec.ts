@@ -87,10 +87,19 @@ test('a set is added, one taken out, and another moved, then the rotation is sav
     const changed = await Promise.all((await items.all()).map(performersOf))
 
     await page.getByRole('button', { name: 'enregistrer' }).click()
-    // The set on air stays: it goes on.
-    await expect(page.getByRole('button', { name: 'confirmer' })).toHaveAccessibleDescription("Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant.")
-    await page.getByRole('button', { name: 'confirmer' }).click()
+    // In a dialog over the page, which Escape closes, going back to the list.
+    const dialog = page.getByRole('dialog', { name: 'Enregistrer la rotation' })
+    await expect(dialog.getByRole('button', { name: 'confirmer' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('button', { name: 'enregistrer' })).toBeFocused()
+    await page.getByRole('button', { name: 'enregistrer' }).click()
+    // It says that the set on air, which stays, goes on.
+    await expect(dialog).toHaveAccessibleDescription("Le set en cours continue\u00a0: les changements s'appliquent dès le set suivant.")
+    await expect(dialog.getByRole('button', { name: 'confirmer' })).toBeFocused()
+    await dialog.getByRole('button', { name: 'confirmer' }).click()
     await expect(page.getByText('La rotation a été enregistrée.')).toBeVisible()
+    await expect(dialog).toBeHidden()
 
     // As it was changed, in the order shown.
     const saved = await getRotation(page)

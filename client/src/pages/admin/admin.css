@@ -356,10 +356,8 @@
   opacity: 0.55;
 }
 
-/* Changing it: the list, then the field that adds a set, as wide as its options' labels and details need, then what
-   « enregistrer » asks to confirm. */
-.rotation-edit,
-.rotation-confirm {
+/* Changing it: the list, then the field that adds a set, as wide as its options' labels and details need. */
+.rotation-edit {
   margin-top: 1.5rem;
 }
 
@@ -367,8 +365,23 @@
   max-width: 600px;
 }
 
+/* What « enregistrer » asks to confirm, in a modal dialog over the page, boxed like the admin pages' other boxes, within
+   the screen's width, less a 16px gutter on each side. */
+.rotation-confirm {
+  box-sizing: border-box;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 1.25rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: inherit;
+}
+
+.rotation-confirm::backdrop {
+  background: rgb(0 0 0 / 30%);
+}
+
 .rotation-confirm .admin-toolbar {
-  margin-top: 0.75rem;
+  margin-top: 1rem;
 }
 
 /* The playlist about to be chosen, boxed apart from the current one. Choosing it is the main thing to do

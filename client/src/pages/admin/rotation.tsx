@@ -266,22 +266,30 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
   const [candidatesVersion, setCandidatesVersion] = useState(0)
   const candidates = useApi('/api/admin/radio/rotation/candidates', { version: candidatesVersion })
   const pickerId = useId()
-  // What « confirmer » is described by, for screen readers, which read it as it gets the focus.
+  // What the confirmation is described by, for screen readers, which read it as the focus moves into it.
   const confirmationId = useId()
+  const dialog = useRef<HTMLDialogElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const save = useRef<HTMLButtonElement>(null)
   const confirm = useRef<HTMLButtonElement>(null)
   const locked = step !== 'editing'
 
-  // The focus goes where « modifier » was, on the first set's handle, or on the field when there's none, then follows
-  // the steps: on « confirmer » as it's asked, and back on « enregistrer » after it.
+  // The focus goes where « modifier » was, on the first set's handle, or on the field when there's none. The confirmation
+  // is a modal dialog, which the browser draws over the page, closes with Escape, and keeps the focus in while it's open:
+  // it opens with the focus on « confirmer », and closes with it back on « enregistrer ».
   useEffect(() => {
     ;(list.current?.querySelector<HTMLElement>('.admin-handle') ?? document.getElementById(pickerId))?.focus()
   }, [pickerId])
   const previousStep = useRef(step)
   useEffect(() => {
-    if (step === 'confirming' && previousStep.current === 'editing') confirm.current?.focus()
-    if (step === 'editing' && previousStep.current !== 'editing') save.current?.focus()
+    if (step === 'confirming' && previousStep.current === 'editing') {
+      dialog.current?.showModal()
+      confirm.current?.focus()
+    }
+    if (step === 'editing' && previousStep.current !== 'editing') {
+      dialog.current?.close()
+      save.current?.focus()
+    }
     previousStep.current = step
   }, [step])
 
@@ -361,10 +369,7 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
             disabled={locked || candidates.kind === 'error'}
           />
         </div>
-        <p className="admin-hint">
-          On peut ajouter les sets qui ne sont pas annulés, qui ont une piste SoundCloud et une vidéo YouTube, et dont la
-          session est annoncée, ainsi que ceux retirés de la liste.
-        </p>
+        <p className="admin-hint">Seuls les sets annoncés et joués, avec un lien SoundCloud et YouTube, sont disponibles.</p>
       </div>
       {candidates.kind === 'error' && (
         <p className="admin-error" role="alert">
@@ -377,37 +382,48 @@ function EditRotation({ rotation, onCancel, onSaved }: { rotation: RadioRotation
           {error}
         </p>
       )}
-      {step === 'editing' ? (
+      <div className="admin-toolbar">
+        <button
+          ref={save}
+          type="button"
+          className="admin-primary"
+          onClick={() => {
+            setError(null)
+            if (changed) setStep('confirming')
+            else onCancel()
+          }}
+        >
+          enregistrer
+        </button>
+        <button type="button" onClick={onCancel}>
+          annuler
+        </button>
+      </div>
+      <dialog
+        ref={dialog}
+        className="rotation-confirm"
+        aria-label="Enregistrer la rotation"
+        aria-describedby={confirmationId}
+        // Escape goes back to changing the list, but not while the rotation is sent. Browsers can close it anyway, e.g. on
+        // a second Escape, which goes back to changing the list too.
+        onCancel={(event) => {
+          event.preventDefault()
+          if (step === 'confirming') setStep('editing')
+        }}
+        onClose={() => {
+          if (step === 'confirming') setStep('editing')
+        }}
+      >
+        <p id={confirmationId}>{consequence}</p>
         <div className="admin-toolbar">
-          <button
-            ref={save}
-            type="button"
-            className="admin-primary"
-            onClick={() => {
-              setError(null)
-              if (changed) setStep('confirming')
-              else onCancel()
-            }}
-          >
-            enregistrer
+          <button ref={confirm} type="button" className="admin-primary" disabled={step === 'sending'} onClick={send}>
+            {step === 'sending' ? 'enregistrement…' : 'confirmer'}
           </button>
-          <button type="button" onClick={onCancel}>
-            annuler
+          <button type="button" disabled={step === 'sending'} onClick={() => setStep('editing')}>
+            revenir
           </button>
         </div>
-      ) : (
-        <div className="admin-notice rotation-confirm">
-          <p id={confirmationId}>{consequence}</p>
-          <div className="admin-toolbar">
-            <button ref={confirm} type="button" className="admin-primary" aria-describedby={confirmationId} disabled={step === 'sending'} onClick={send}>
-              {step === 'sending' ? 'enregistrement…' : 'confirmer'}
-            </button>
-            <button type="button" disabled={step === 'sending'} onClick={() => setStep('editing')}>
-              revenir
-            </button>
-          </div>
-        </div>
-      )}
+      </dialog>
     </>
   )
 }
